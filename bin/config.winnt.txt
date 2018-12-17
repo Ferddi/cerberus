@@ -4,7 +4,8 @@
 '
 'Can be overriden via transcc cmd line
 '
-MODPATH="${CERBERUSDIR}/modules;${CERBERUSDIR}/modules_ext"
+'MODPATH="${CERBERUSDIR}/modules;${CERBERUSDIR}/modules_ext"
+MODPATH="modules;modules_ext;../modules;../modules_ext"
 '--------------------
 
 '--------------------
@@ -28,6 +29,11 @@ HTML_PLAYER="${CERBERUSDIR}\bin\cserver_winnt.exe"
 
 '***** 64 bit mingw *****
 'MINGW_PATH="D:\Applications\Compilers\TDM-GCC-64"
+
+' for Cerberus.exe in main directory
+MINGW_PATH="3rdparty\x86_64-8.1.0-release-posix-seh-rt_v6-rev0\mingw64\bin"
+
+' for bin\Ted.exe in bin directroy
 MINGW_PATH="..\3rdparty\x86_64-8.1.0-release-posix-seh-rt_v6-rev0\mingw64\bin"
 '--------------------
 
