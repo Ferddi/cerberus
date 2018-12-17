@@ -1,0 +1,27 @@
+
+' this flag is used in mojo.app.cxs for init, begin render and end render
+#MOJO_USE_BGFX=True
+
+#If TARGET="html5"
+
+	Import mojo.app
+	Import mojo.input
+	Import mojo.audio
+
+	Import mojo1bgfx.graphicsgles20
+	' Import mojo2
+
+#Else
+
+	Import mojo.app
+	Import mojo.input
+	Import mojo.audio
+
+	Import mojo1bgfx.graphicsbgfx
+'  	Import mojo1bgfx.renderer
+
+#Endif
+
+Import mojo1bgfx.graphicsfont
+Import mojo1bgfx.graphicsimage
+Import mojo1bgfx.wrapper

@@ -1,0 +1,694 @@
+
+'-------------------------------------------------------------------------------
+' wrapper functions between mojo 1 and mojo 2
+'-------------------------------------------------------------------------------
+
+#If TARGET="html5"
+#Else
+	Import bgfx ' bgfx is imported only for bgfxFrame( False )
+#Endif
+
+Import mojo1bgfx
+
+' inverse color channel
+Const COLOR_CHANNEL:Float = 255.0
+Const INV_COLOR_CHANNEL:Float = 1.0 / COLOR_CHANNEL
+
+Const AlphaBlend:Int = 0
+Const AdditiveBlend:Int = 1
+
+'-------------------------------------------------------------------------------
+' class DrawList wrapper functions
+'-------------------------------------------------------------------------------
+
+Function SetBlend:Void( blend:Int )
+
+	' mojo.graphics
+	'  Const AlphaBlend=0
+	'  Const AdditiveBlend=1
+	'  Const LightenBlend=1	'deprecated
+
+	' mojo2.graphics
+	'  Class BlendMode
+	'  	Const Opaque:=0
+	'  	Const Alpha:=1
+	'  	Const Additive:=2
+	'  	Const Multiply:=3
+	'  	Const Multiply2:= 4
+	'  	Const Alpha2:= 5
+	'  	Const Opaque2:= 6
+	'  	Const AlphaStamp:= 7	
+	'  End
+
+	_activeCanvas.SetBlendMode( blend + 1 )
+End
+
+Function GetBlend:Int( )
+	Return _activeCanvas.BlendMode( ) - 1
+End
+
+Function SetColor:Void( r:Float, g:Float, b:Float )
+	_activeCanvas.SetColor( r * INV_COLOR_CHANNEL, g * INV_COLOR_CHANNEL, b * INV_COLOR_CHANNEL )
+End
+
+Function SetColor:Void( r:Float, g:Float, b:Float, a:Float )
+	_activeCanvas.SetColor( r * INV_COLOR_CHANNEL, g * INV_COLOR_CHANNEL, b * INV_COLOR_CHANNEL, a )
+End
+
+Function SetRgb:Void( rgb:Int )
+	Local r:Int = (rgb Shr 16) & $ff
+	Local g:Int = (rgb Shr 8) & $ff
+	Local b:Int = rgb & $ff
+	_activeCanvas.SetColor( Float(r) * INV_COLOR_CHANNEL, Float(g) * INV_COLOR_CHANNEL, Float(b) * INV_COLOR_CHANNEL )
+End
+
+Function SetArgb:Void( argb:Int )
+	Local a:Int = (argb Shr 24) & $ff
+	Local r:Int = (argb Shr 16) & $ff
+	Local g:Int = (argb Shr 8) & $ff
+	Local b:Int = argb & $ff
+	_activeCanvas.SetAlpha( Float(a) * INV_COLOR_CHANNEL )
+	_activeCanvas.SetColor( Float(r) * INV_COLOR_CHANNEL, Float(g) * INV_COLOR_CHANNEL, Float(b) * INV_COLOR_CHANNEL )
+End
+
+Function SetColor:Void( rgb:Int )
+	SetRgb( rgb )
+End
+
+Function SetAlpha:Void( alpha:Float )
+	_activeCanvas.SetAlpha( alpha )
+End
+
+Function GetColor:Float[]( )
+	Local color:Float[] = _activeCanvas.Color( )
+	For Local ii:Int = 0 Until color.Length()
+		color[ ii ] *= COLOR_CHANNEL
+	Next
+	Return color
+End
+
+Function GetColor:Void( color:Float[] )
+	_activeCanvas.GetColor( color )
+	For Local ii:Int = 0 Until color.Length()
+		color[ ii ] *= COLOR_CHANNEL
+	Next
+End
+
+Function GetRgb:Int()
+	Local color:Float[3]
+	_activeCanvas.GetColor( color )
+	Return ((Int(color[0] * COLOR_CHANNEL) & $ff) Shl 16) |
+		((Int(color[1] * COLOR_CHANNEL)  & $ff) Shl 8) |
+		(Int(color[2] * COLOR_CHANNEL) & $ff)
+End
+
+Function GetArgb:Int()
+	Local alpha:Float = _activeCanvas.Alpha( )
+	Local color:Float[3]
+	_activeCanvas.GetColor( color )
+	Return ((Int(alpha * COLOR_CHANNEL) & $ff) Shl 24) |
+			((Int(color[0] * COLOR_CHANNEL) & $ff) Shl 16) |
+			((Int(color[1] * COLOR_CHANNEL) & $ff) Shl 8) |
+			 (Int(color[2] * COLOR_CHANNEL) & $ff)
+End
+
+Function GetAlpha:Float( )
+	Return _activeCanvas.Alpha( )
+End
+
+Function IdentityMatrix:Void( )
+	_activeCanvas.IdentityMatrix( )
+End
+
+Function ResetMatrix:Void( )
+	_activeCanvas.ResetMatrix( )
+End
+	
+Function SetMatrix:Void( matrix:Float[] )
+	_activeCanvas.SetMatrix( matrix )
+End
+
+Function SetMatrix:Void( ix:Float, iy:Float, jx:Float, jy:Float, tx:Float, ty:Float )
+	_activeCanvas.SetMatrix( ix, iy, jx, jy, tx, ty )
+End
+
+Function GetMatrix:Float[]( )
+	Return _activeCanvas.GetMatrix( )
+End
+
+Function GetMatrix:Void( matrix:Float[] )
+	_activeCanvas.GetMatrix( matrix )
+End
+
+Function Transform:Void( matrix:Float[] )
+	_activeCanvas.Transform( matrix )
+End
+
+Function Transform:Void( ix:Float, iy:Float, jx:Float, jy:Float, tx:Float, ty:Float )
+	_activeCanvas.Transform( ix, iy, jx, jy, tx, ty )
+End
+
+Function Translate:Void( tx:Float, ty:Float )
+	_activeCanvas.Translate( tx, ty )
+End
+
+Function Rotate:Void( rz:Float )
+	_activeCanvas.Rotate( rz )
+End
+
+Function Scale:Void( sx:Float, sy:Float )
+	_activeCanvas.Scale( sx, sy )
+End
+
+Function TranslateRotate:Void( tx:Float, ty:Float, rz:Float )
+	_activeCanvas.TranslateRotate( tx, ty, rz )
+End
+
+Function RotateScale:Void( rz:Float, sx:Float, sy:Float )
+	_activeCanvas.RotateScale( rz, sx, sy )
+End
+
+Function TranslateScale:Void( tx:Float, ty:Float, sx:Float, sy:Float )
+	_activeCanvas.TranslateScale( tx, ty, sx, sy )
+End
+
+Function TranslateRotateScale:Void( tx:Float, ty:Float, rz:Float, sx:Float, sy:Float )
+	_activeCanvas.TranslateRotateScale( tx, ty, rz, sx, sy )
+End
+
+Function SetMatrixStackCapacity:Void( capacity:Int )
+	_activeCanvas.SetMatrixStackCapacity( capacity )
+End
+
+Function GetMatrixStackCapacity:Int( )
+	Return _activeCanvas.MatrixStackCapacity()
+End
+
+Function PushMatrix:Void( )
+	_activeCanvas.PushMatrix( )
+End
+
+Function PopMatrix:Void( )
+	_activeCanvas.PopMatrix( )
+End
+
+Function SetFont:Void( font:Font )
+	_activeCanvas.SetFont( font )
+End
+
+Function GetFont:Font( )
+	Return _activeCanvas.Font( )
+End
+
+Function SetDefaultMaterial:Void( material:Material )
+	_activeCanvas.SetDefaultMaterial( material )
+End
+
+Function GetDefaultMaterial:Material( )
+	Return _activeCanvas.DefaultMaterial( )
+End
+
+Function DrawPoint:Void( x0:Float, y0:Float, material:Material=Null, s0:Float=0, t0:Float=0 )
+	_activeCanvas.DrawPoint( x0, y0, material, s0, t0 )
+End
+
+Function DrawLine:Void( x0:Float, y0:Float, x1:Float, y1:Float, material:Material=Null, s0:Float=0, t0:Float=0, s1:Float=1, t1:Float=0 )
+	_activeCanvas.DrawLine( x0, y0, x1, y1, material, s0, t0, s1, t1 )
+End
+
+Function DrawTriangle:Void( x0:Float, y0:Float, x1:Float, y1:Float, x2:Float, y2:Float, material:Material=Null, s0:Float=.5, t0:Float=0, s1:Float=1, t1:Float=1, s2:Float=0, t2:Float=1 )
+	_activeCanvas.DrawTriangle( x0, y0, x1, y1, x2, y2, material, s0, t0, s1, t1, s2, t2 )
+End
+
+Function DrawQuad:Void( x0:Float, y0:Float, x1:Float, y1:Float, x2:Float, y2:Float, x3:Float, y3:Float, material:Material=Null, s0:Float=0, t0:Float=0, s1:Float=1, t1:Float=0, s2:Float=1, t2:Float=1, s3:Float=0, t3:Float=1 )
+	_activeCanvas.DrawQuad( x0, y0, x1, y1, x2, y2, x3, y3, material, s0, t0, s1, t1, s2, t2, s3, t3 )
+End
+
+Function DrawOval:Void( x:Float, y:Float, width:Float, height:Float, material:Material=Null )
+	_activeCanvas.DrawOval( x, y, width, height, material )
+End
+
+Function DrawEllipse:Void( x:Float, y:Float, xr:Float, yr:Float, material:Material=Null )
+	_activeCanvas.DrawEllipse( x, y, xr, yr, material )
+End
+
+Function DrawCircle:Void( x:Float, y:Float, r:Float, material:Material=Null )
+	_activeCanvas.DrawCircle( x, y, r, material )
+End
+
+Function DrawPoly:Void( vertices:Float[], material:Material=Null )
+	_activeCanvas.DrawPoly( vertices, material )
+End
+
+Function DrawPrimitives:Void( order:Int, count:Int, vertices:Float[], material:Material=Null )
+	_activeCanvas.DrawPrimitives( order, count, vertices, material )
+End
+
+Function DrawPrimitives:Void( order:Int, count:Int, vertices:Float[], texcoords:Float[], material:Material=Null )
+	_activeCanvas.DrawPrimitives( order, count, vertices, texcoords, material )
+End
+
+' 20180218, Holzchopf - ADDED drawing primitives with individual vertex color
+Function DrawPrimitives:Void( order:Int, count:Int, vertices:Float[], texcoords:Float[], vertcols:Int[], material:Material=Null )
+	_activeCanvas.DrawPrimitives( order, count, vertices, texcoords, vertcols, material )
+End
+
+Function DrawIndexedPrimitives:Void( order:Int, count:Int, vertices:Float[], indices:Int[], material:Material=Null )
+	_activeCanvas.DrawIndexedPrimitives( order, count, vertices, indices, material )
+End
+
+Function DrawIndexedPrimitives:Void( order:Int, count:Int, vertices:Float[], texcoords:Float[], indices:Int[], material:Material=Null )
+	_activeCanvas.DrawIndexedPrimitives( order, count, vertices, texcoords, indices, material )
+End
+
+' 20180218, Holzchopf - ADDED drawing primitives with individual vertex color
+Function DrawIndexedPrimitives:Void( order:Int, count:Int, vertices:Float[], texcoords:Float[], vertcols:Int[], indices:Int[], material:Material=Null )
+	_activeCanvas.DrawIndexedPrimitives( order, count, vertices, texcoords, vertcols, indices, material )
+End
+
+Function DrawRect:Void( x0:Float, y0:Float, width:Float, height:Float, material:Material=Null, s0:Float=0, t0:Float=0, s1:Float=1, t1:Float=1 )
+	_activeCanvas.DrawRect( x0, y0, width, height, material, s0, t0, s1, t1 )
+End
+
+Function DrawRect:Void( x0:Float, y0:Float, width:Float, height:Float, image:Image )
+	_activeCanvas.DrawRect( x0, y0, width, height, image )
+End
+
+Function DrawRect:Void( x:Float, y:Float, image:Image, sourceX:Int, sourceY:Int, sourceWidth:Int, sourceHeight:Int )
+	_activeCanvas.DrawRect( x, y, image, sourceX, sourceY, sourceWidth, sourceHeight )
+End
+
+Function DrawRect:Void( x0:Float, y0:Float, width:Float, height:Float, image:Image, sourceX:Int, sourceY:Int, sourceWidth:Int, sourceHeight:Int )
+	_activeCanvas.DrawRect( x0, y0, width, height, image, sourceX, sourceY, sourceWidth, sourceHeight )
+End
+
+' gradient rect - kinda hacky, but doesn't slow anything else down
+Function DrawGradientRect:Void( x0:Float, y0:Float, width:Float, height:Float, r0:Float, g0:Float, b0:Float, a0:Float, r1:Float, g1:Float, b1:Float, a1:Float, axis:Int )
+	_activeCanvas.DrawGradientRect( x0, y0, width, height, r0, g0, b0, a0, r1, g1, b1, a1, axis )
+End
+
+Function DrawImage:Void( image:Image, frame:Int=0 )
+	_activeCanvas.DrawImage( image, frame )
+End
+
+Function DrawImage:Void( image:Image, tx:Float, ty:Float, frame:Int=0 )
+	_activeCanvas.DrawImage( image, tx, ty, frame )
+End
+
+'  Function DrawImage:Void( image:Image, tx:Float, ty:Float, rz:Float, frame:Int=0 )
+'  	_activeCanvas.DrawImage( image, tx, ty, rz, frame )
+'  End
+
+Function DrawImage:Void( image:Image, tx:Float, ty:Float, rz:Float, sx:Float, sy:Float, frame:Int=0 )
+	_activeCanvas.DrawImage( image, tx, ty, rz, sx, sy, frame )
+End
+
+Function DrawImage9P:Void( image:Image, tx:Float, ty:Float, patchSize:Int, rz:Float, scaleX:Float, scaleY:Float, frame:Int=0 )
+	_activeCanvas.DrawImage9P( image, tx, ty, patchSize, rz, scaleX, scaleY, frame )
+End
+
+Function DrawText:Void( text:String, x:Float, y:Float, xhandle:Float=0, yhandle:Float=0 )
+'  	_activeCanvas.DrawText( text, x, y, xhandle, yhandle )
+	' put DrawText into font, so there is only one code in graphicsfont,
+	' instead of 2 places graphicsgles20 and graphicsbgfx
+	Local font:Font = _activeCanvas.Font()
+	font.DrawText(_activeCanvas, text, x, y, xhandle, yhandle )
+End
+
+Function DrawText:Void( textLines:String[], x:Float, y:Float, xhandle:Float=0, yhandle:Float=0 )
+'  	_activeCanvas.DrawText( textLines, x, y, xhandle, yhandle )
+	' put DrawText into font, so there is only one code in graphicsfont,
+	' instead of 2 places graphicsgles20 and graphicsbgfx
+	Local font:Font = _activeCanvas.Font()
+	font.DrawText(_activeCanvas, textLines, x, y, xhandle, yhandle )
+End
+
+Function DrawShadow:Bool( lx:Float, ly:Float, x0:Float, y0:Float, x1:Float, y1:Float )
+	Return _activeCanvas.DrawShadow( lx, ly, x0, y0, x1, y1 )
+End
+
+Function DrawShadows:Void( x0:Float, y0:Float, drawList:DrawList )
+	_activeCanvas.DrawShadows( x0, y0, drawList )
+End
+
+Function AddShadowCaster:Void( caster:ShadowCaster )
+	_activeCanvas.AddShadowCaster( caster )
+End
+
+Function AddShadowCaster:Void( caster:ShadowCaster, tx:Float, ty:Float )
+	_activeCanvas.AddShadowCaster( caster, tx, ty )
+End
+
+Function AddShadowCaster:Void( caster:ShadowCaster, tx:Float, ty:Float, rz:Float )
+	_activeCanvas.AddShadowCaster( caster, tx, ty, rz )
+End
+
+Function AddShadowCaster:Void( caster:ShadowCaster, tx:Float, ty:Float, rz:Float, sx:Float, sy:Float )
+	_activeCanvas.AddShadowCaster( caster, tx, ty, rz, sx, sy )
+End
+
+'  Function IsEmpty:Bool() Property
+'  	_activeCanvas.PopMatrix( )
+'  End
+
+'  Function Compact:Void()
+'  	_activeCanvas.PopMatrix( )
+'  End
+
+'-------------------------------------------------------------------------------
+' class Canvas wrapper functions
+'-------------------------------------------------------------------------------
+
+Function SetRenderTarget:Void( target:Object )
+	_activeCanvas.SetRenderTarget( target )
+End
+
+Function GetRenderTarget:Object( )
+	Return _activeCanvas.RenderTarget( )
+End
+
+Function GetCanvasWidth:Int( )
+	Return _activeCanvas.Width( )
+End
+
+Function GetCanvasHeight:Int( )
+	Return _activeCanvas.Height( )
+End
+
+Function SetColorMask:Void( r:Bool, g:Bool, b:Bool, a:Bool )
+	_activeCanvas.SetColorMask( r, g, b, a )
+End
+
+Function ColorMask:Bool[]( )
+	Return _activeCanvas.ColorMask( )
+End
+
+Function SetViewport:Void( x:Int, y:Int, w:Int, h:Int )
+	_activeCanvas.SetViewport( x, y, w, h )
+End
+
+Function GetViewport:Int[]( )
+	Return _activeCanvas.Viewport( )
+End
+
+Function SetScissor:Void( x:Int, y:Int, w:Int, h:Int )
+	_activeCanvas.SetScissor( x, y, w, h )
+End
+
+Function GetScissor:Float[]()
+	Return _activeCanvas.Scissorf( )
+End
+
+Function GetScissor:Void( scissor:Float[] )
+	_activeCanvas.Scissorf( scissor )
+End
+
+Function SetProjectionMatrix:Void( projMatrix:Float[] )
+	_activeCanvas.SetProjectionMatrix( projMatrix )
+End
+
+Function SetProjection2d:Void( left:Float, right:Float, top:Float, bottom:Float, znear:Float=-1, zfar:Float=1 )
+	_activeCanvas.SetProjection2d( left, right, top, bottom, znear, zfar )
+End
+
+Function GetProjectionMatrix:Float[]( )
+	Return _activeCanvas.ProjectionMatrix( )
+End
+
+Function SetViewMatrix:Void( viewMatrix:Float[] )
+	_activeCanvas.SetViewMatrix( viewMatrix )
+End
+
+Function GetViewMatrix:Float[]( )
+	Return _activeCanvas.ViewMatrix( )
+End
+
+Function SetModelMatrix:Void( modelMatrix:Float[] )
+	_activeCanvas.SetModelMatrix( modelMatrix )
+End
+
+Function GetModelMatrix:Float[]( )
+	Return _activeCanvas.ModelMatrix( )
+End
+
+Function SetAmbientLight:Void( r:Float, g:Float, b:Float, a:Float=1 )
+	_activeCanvas.SetAmbientLight( r, g, b, a )
+End
+
+Function GetAmbientLight:Float[]( )
+	Return _activeCanvas.AmbientLight( )
+End
+
+Function SetFogColor:Void( r:Float, g:Float, b:Float, a:Float )
+	_activeCanvas.SetFogColor( r, g, b, a )
+End
+
+Function GetFogColor:Float[]( )
+	Return _activeCanvas.FogColor( )
+End
+
+Function SetLightType:Void( index:Int, type:Int )
+	_activeCanvas.SetLightType( index, type )
+End
+
+Function GetLightType:Int( index:Int )
+	Return _activeCanvas.GetLightType( index )
+End
+
+Function SetLightColor:Void( index:Int, r:Float, g:Float, b:Float, a:Float=1 )
+	_activeCanvas.SetLightColor( index, r, g, b, a )
+End
+
+Function GetLightColor:Float[]( index:Int )
+	Return _activeCanvas.GetLightColor( index )
+End
+
+Function SetLightPosition:Void( index:Int, x:Float, y:Float, z:Float )
+	_activeCanvas.SetLightPosition( index, x, y, z )
+End
+
+Function GetLightPosition:Float[]( index:Int )
+	Return _activeCanvas.GetLightPosition( index )
+End
+
+Function SetLightRange:Void( index:Int, range:Float )
+	_activeCanvas.SetLightRange( index, range )
+End
+
+Function GetLightRange:Float( index:Int )
+	Return _activeCanvas.GetLightRange( index )
+End
+
+Function SetShadowMap:Void( image:Image )
+	_activeCanvas.SetShadowMap( image )
+End
+
+Function GetShadowMap:Image( )
+	Return _activeCanvas.ShadowMap( )
+End
+
+' TODO not working
+'  Function SetLineWidth:Void( lineWidth:Float )
+'  	_activeCanvas.SetLineWidth( lineWidth )
+'  End
+'  
+'  Function GetLineWidth:Float( )
+'  	Return _activeCanvas.LineWidth( )
+'  End
+
+' Cls r=0-255, g=0-255, b=0-255
+Function Cls:Void( r:Float=0, g:Float=0, b:Float=0 )
+'  	Local rgba:Int = (Int(r) Shl 24) | (Int(g) Shl 16) | (Int(b) Shl 8) | $ff
+'  	_activeCanvas.Clear( r, g, b, 1.0 )
+	_activeCanvas.Clear( r * INV_COLOR_CHANNEL, g * INV_COLOR_CHANNEL, b * INV_COLOR_CHANNEL, 1.0 )
+End
+
+' Clear r=0-1, g=0-1, b=0-1, a=0-1
+Function Clear:Void( r:Float=0, g:Float=0, b:Float=0, a:Float=1 )
+'  	Local rgba:Int = (Int(r * 255) Shl 24) | (Int(g * 255) Shl 16) | (Int(b * 255) Shl 8) | Int(a * 255)
+'  	_activeCanvas.Clear( r * 255, g * 255, b * 255, a )
+	_activeCanvas.Clear( r, g, b, a )
+End
+
+'  ReadPixels : Void ( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )
+'  Function ReadPixels:Void( x:Int, y:Int, width:Int, height:Int, data:DataBuffer, dataOffset:Int=0, dataPitch:Int=0 )
+'  	_activeCanvas.ReadPixels( x, y, width, height, data, dataOffset, dataPitch )
+'  End
+
+Function ReadPixels:Void( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )
+	_activeCanvas.ReadPixels( pixels, x, y, width, height, arrayOffset, arrayPitch )
+End
+
+Function RenderDrawList:Void( drawbuf:DrawList )
+	_activeCanvas.RenderDrawList( drawbuf )
+End
+
+Function RenderDrawList:Void( drawbuf:DrawList, tx:Float, ty:Float, rz:Float=0, sx:Float=1, sy:Float=1 )
+	_activeCanvas.RenderDrawList( drawbuf, tx, ty, rz, sx, sy )
+End
+
+#rem	
+Function RenderDrawListEx:Void( drawbuf:DrawList, tx:Float=0, ty:Float=0, rz:Float=0, sx:Float=1, sy:Float=1 )
+	_activeCanvas.RenderDrawListEx( drawbuf, tx, ty, rz, sx, sy )
+End
+#end
+
+Function FlushCanvas:Void( )
+	_activeCanvas.Flush( )
+End
+
+Function FrameCanvas:Void( )
+	#If TARGET="html5"
+		' do nothing
+	#Else
+		bgfxFrame(False)
+	#Endif
+End
+
+Function TransformCoords:Void( coords_in:Float[], coords_out:Float[], mode:Int=0 )
+	_activeCanvas.TransformCoords( coords_in, coords_out, mode )
+End
+
+'-------------------------------------------------------------------------------
+' missing mojo 1
+'-------------------------------------------------------------------------------
+
+Function CreateImage:Image( width:Int, height:Int, frameCount:Int=1, flags:Int=Image.DefaultFlags )
+	Return Image.CreateMojo1( width, height, frameCount, flags )
+End
+
+Function LoadImage:Image( path:String, frameCount:Int=1, flags:Int=Image.DefaultFlags )
+	Return Image.LoadMojo1( path, frameCount, flags )
+End
+
+Function LoadImage:Image( path:String, frameWidth:Int, frameHeight:Int, frameCount:Int, flags:Int=Image.DefaultFlags )
+	Return Image.LoadMojo1( path, frameWidth, frameHeight, frameCount, flags )
+End
+
+Function DrawImageRect:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, frame:Int=0 )
+	_activeCanvas.DrawImageRect( image, x, y, srcX, srcY, srcWidth, srcHeight, frame )
+End
+
+Function DrawImageRect:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, rotation:Float, scaleX:Float, scaleY:Float, frame:Int=0 )
+	_activeCanvas.DrawImageRect( image, x, y, srcX, srcY, srcWidth, srcHeight, rotation, scaleX, scaleY, frame )
+End
+
+Function DrawImageHandle:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, handleX:Float, handleY:Float, frame:Int=0 )
+	_activeCanvas.DrawImageHandle( image, x, y, srcX, srcY, srcWidth, srcHeight, handleX, handleY, frame )
+End
+
+Function DrawImageHandle:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, rotation:Float, scaleX:Float, scaleY:Float, handleX:Float, handleY:Float, frame:Int=0 )
+	_activeCanvas.DrawImageHandle( image, x, y, srcX, srcY, srcWidth, srcHeight, rotation, scaleX, scaleY, handleX, handleY, frame )
+End
+
+Function DrawImageAlign:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, alignX:Float, alignY:Float, frame:Int=0 )
+	_activeCanvas.DrawImageAlign( image, x, y, srcX, srcY, srcWidth, srcHeight, alignX, alignY, frame )
+End
+
+Function DrawImageAlign:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, rotation:Float, scaleX:Float, scaleY:Float, alignX:Float, alignY:Float, frame:Int=0 )
+	_activeCanvas.DrawImageAlign( image, x, y, srcX, srcY, srcWidth, srcHeight, rotation, scaleX, scaleY, alignX, alignY, frame )
+End
+
+Function FontHeight:Float()
+	Return GetFont( ).TextHeight( "" )
+End
+
+Function TextHeight:Float()
+	Return GetFont( ).TextHeight( "" )
+End
+
+Function TextWidth:Float( text:String )
+	Return GetFont( ).TextWidth( text )
+End
+
+' from mojo.graphics
+Function InvTransform:Float[]( coords:Float[] )
+	Return _activeCanvas.InvTransform( coords )
+End
+
+'-------------------------------------------------------------------------------
+' view id functions
+'-------------------------------------------------------------------------------
+
+Global _canvases:Stack<Canvas>
+Global _canvasStack:Stack<Canvas> ' for PushCanvas and PopCanvas
+Global _activeCanvas:Canvas
+
+' this is called from mojo.app.cxs function StartGame
+Function InitMojo1Bgfx:Void( )
+
+	_canvases = New Stack<Canvas>()
+	ResizeCanvas( 1 )
+
+	_canvasStack = New Stack<Canvas>()
+
+	_activeCanvas = _canvases.Get(0)
+	_activeCanvas.SetViewMode( Canvas.ViewModeSequential )
+End
+
+Function ResizeCanvas:Void( newSize:Int )
+
+	Local length:Int = _canvases.Length()
+
+	For Local viewId:Int = length Until newSize
+		_canvases.Push( New Canvas( viewId ) )
+	Next
+
+	' debugging
+	length = _canvases.Length()
+	For Local index:Int = 0 Until length
+		Print "index=" + index + " _canvases[index].GetViewId()=" + _canvases.Get(index).GetViewId()
+	Next
+End
+
+Function SetCanvasViewMode:Void( viewMode:Int )
+	_activeCanvas.SetViewMode( viewMode )
+End
+
+Function SetCanvasViewMode:Void( viewId:Int, viewMode:Int )
+
+	If _canvases.Length() <= viewId Then
+		ResizeCanvas( viewId + 1 )
+	Endif
+
+	_canvases.Get(index).SetViewMode( viewMode )
+End
+
+Function ResetCanvas:Void()
+	_activeCanvas = _canvases.Get(0)
+End
+
+Function SetCanvas:Void( viewId:Int )
+
+	If _canvases.Length() <= viewId Then
+		ResizeCanvas( viewId + 1 )
+	Endif
+
+	_activeCanvas = _canvases.Get(viewId)
+End
+
+Function GetCanvas:Int()
+	Return _activeCanvas.GetViewId()
+End
+
+Function NextCanvas:Void()
+	Local viewId:Int = GetCanvas() + 1
+	If viewId >= MAX_CANVASES - 1 Then viewId = MAX_CANVASES - 1
+	SetCanvas( viewId )
+	Print "NextCanvas viewId=" + viewId
+End
+
+Function PrevCanvas:Void()
+	Local viewId:Int = GetCanvas() - 1
+	If viewId <= 0 Then viewId = 0
+	SetCanvas( viewId )
+End
+
+Function PushCanvas:Void()
+	_canvasStack.Push( _activeCanvas )
+End
+
+Function PopCanvas:Void()
+	_activeCanvas = _canvasStack.Pop( )
+	Print "PopCanvas viewId=" + GetCanvas()
+End

@@ -20,6 +20,10 @@ Import input
 
 Import data
 
+#If MOJO_USE_BGFX
+	Import mojo1bgfx
+#Endif
+
 Global _app:App
 Global _game:=BBGame.Game()
 Global _delegate:GameDelegate
@@ -85,7 +89,11 @@ Class GameDelegate Extends BBGameDelegate
 		ValidateDeviceWindow False
 
 		EnumDisplayModes
-		
+
+		#If MOJO_USE_BGFX
+			InitMojo1Bgfx()
+		#Endif
+
 		_app.OnCreate()
 	End
 
@@ -106,12 +114,33 @@ Class GameDelegate Extends BBGameDelegate
 		_input.EndUpdate
 	End
 
+'  	Method RenderGame:Void()
+'  		ValidateDeviceWindow True
+'  		Local mode:=_graphics.BeginRender()
+'  		If mode graphics.BeginRender
+'  		If mode=2 _app.OnLoading Else _app.OnRender
+'  		If mode graphics.EndRender
+'  		_graphics.EndRender
+'  	End
+
 	Method RenderGame:Void()
+
 		ValidateDeviceWindow True
+
 		Local mode:=_graphics.BeginRender()
-		If mode graphics.BeginRender
-		If mode=2 _app.OnLoading Else _app.OnRender
-		If mode graphics.EndRender
+
+'  		Print "app.RenderGame mode=" + mode
+
+		#If MOJO_USE_BGFX
+			BeginRenderMojo1Bgfx()
+			If mode=2 _app.OnLoading Else _app.OnRender
+			EndRenderMojo1Bgfx()
+		#Else
+			If mode graphics.BeginRender
+			If mode=2 _app.OnLoading Else _app.OnRender
+			If mode graphics.EndRender
+		#Endif
+
 		_graphics.EndRender
 	End
 

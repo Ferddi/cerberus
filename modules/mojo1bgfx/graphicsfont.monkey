@@ -1,0 +1,427 @@
+
+Import mojo.app
+Import graphicsimage
+
+'***** Font *****
+
+Class Glyph
+	Field id:Int
+	Field page:Int
+	
+	Field x:Int
+	Field y:Int
+	Field width:Int
+	Field height:Int
+	Field advance:Int
+	Field xoff:Int
+	Field yoff:Int
+	
+	Method New( page:Int,id:Int,x:Int,y:Int,width:Int,height:Int,advance:Int )
+		Self.page = page
+		Self.id = id
+		Self.x = x
+		Self.y = y
+		Self.width = width
+		Self.height = height
+		Self.advance = advance
+		Self.xoff = 0
+		Self.yoff = 0
+	End
+End
+
+Class Font
+
+	Method New( pages:Image[], pageCount:Int, chars:IntMap<Glyph>, firstChar:Int, height:Float, kernings:Int[]=[] )
+		Self._pages = pages
+		Self._pageCount = pageCount
+		Self._firstChar = firstChar
+		Self._height = height
+		Self._charMap = chars
+		Self._kernings = kernings
+	End
+
+	Method GetGlyph:Glyph( char:Int )
+		Return Self._charMap.Get(char)
+	End
+	
+	Method TextWidth:Float( text:String )
+		Local w:Float = 0.0
+		If _kernings Then
+			Local first:Int = text[0]
+			Local second:Int = first
+			Local glyph:Glyph = _charMap.Get(first)
+			If glyph Then
+				w += glyph.advance
+			Endif
+			Local length:Int = text.Length()
+			For Local charIndex:Int = 1 Until length
+				Local char:Int = text[ charIndex ]
+				first = second; second = char
+				glyph = _charMap.Get( char )
+				If Not glyph Then Continue
+				w += _kernings[(first Shl 8) + second]
+				w += glyph.advance
+			Next
+		Else
+			For Local char:Int = Eachin text
+				Local glyph:Glyph = _charMap.Get( char )
+				If Not glyph Continue
+				w += glyph.advance
+			Next
+		Endif
+		Return w
+	End
+
+	Method TextHeight:Float( text:String )
+		Return _height
+	End
+
+	Method DrawText:Void( canvas:Canvas,text:String,x:Float,y:Float,xhandle:Float=0,yhandle:Float=0 )
+
+		x -= TextWidth( text )  * xhandle
+		y -= TextHeight( text ) * yhandle
+
+		If _kernings Then
+
+			Local first:Int = text[0]
+			Local second:Int = first
+
+			' draw the first character
+			Local glyph:Glyph = _charMap.Get(first)
+			If glyph Then
+				canvas.DrawRect( x + glyph.xoff, y + glyph.yoff, _pages[glyph.page], glyph.x, glyph.y, glyph.width, glyph.height )
+				x += glyph.advance
+			Endif
+
+			' For Local char:Int = Eachin text
+			Local length:Int = text.Length()
+			For Local charIndex:Int = 1 Until length
+				Local char:Int = text[ charIndex ]
+				first = second; second = char
+				Local glyph:Glyph = _charMap.Get( char )
+				If Not glyph Then Continue
+				x += _kernings[(first Shl 8) + second]
+				canvas.DrawRect( x + glyph.xoff, y + glyph.yoff, _pages[glyph.page], glyph.x, glyph.y, glyph.width, glyph.height )
+				x += glyph.advance
+			Next
+		Else
+
+			For Local char:Int = Eachin text
+				Local glyph:Glyph = _charMap.Get(char)
+				If Not glyph Then Continue
+				canvas.DrawRect( x + glyph.xoff, y + glyph.yoff, _pages[glyph.page], glyph.x, glyph.y, glyph.width, glyph.height )
+				x += glyph.advance
+			Next
+
+		Endif
+	End
+
+	Method DrawText:Void( canvas:Canvas,textLines:String[],x:Float,y:Float,xhandle:Float=0,yhandle:Float=0 )
+
+		Local linesCount:Int = textLines.Length()
+		Local currX:Float = x
+
+		y -= TextHeight( "" ) * yhandle * linesCount
+
+		If _kernings Then
+
+			For Local _y:Int = 1 To linesCount
+
+				Local text:String = textLines[_y-1]
+				x -= TextWidth( text ) * xhandle
+
+				Local first:Int = text[0]
+				Local second:Int = first
+
+				' draw the first character
+				Local glyph:Glyph = _charMap.Get(first)
+				If glyph Then
+					canvas.DrawRect( x + glyph.xoff, y + glyph.yoff, _pages[glyph.page], glyph.x, glyph.y, glyph.width, glyph.height )
+					x += glyph.advance
+				Endif
+
+				Local length:Int = text.Length()
+				For Local charIndex:Int = 1 Until length
+					Local char:Int = text[ charIndex ]
+					first = second; second = char
+					Local glyph:Glyph = _charMap.Get( char )
+					If Not glyph Then Continue
+					x += _kernings[(first Shl 8) + second]
+					canvas.DrawRect( x + glyph.xoff, y + glyph.yoff, _pages[glyph.page], glyph.x, glyph.y, glyph.width, glyph.height )
+					x += glyph.advance
+				Next
+
+				y += TextHeight( text )
+				x = currX 
+			Next
+
+		Else
+
+			For Local _y:Int = 1 To linesCount
+
+				Local text:String = textLines[_y-1]
+				x -= TextWidth( text )*xhandle
+
+				For Local char:Int = Eachin text
+					Local glyph:Glyph = _charMap.Get(char)
+					If Not glyph Then Continue
+					canvas.DrawRect( x + glyph.xoff, y + glyph.yoff, _pages[glyph.page], glyph.x, glyph.y, glyph.width, glyph.height )
+					x += glyph.advance
+				Next
+
+				y += TextHeight( text )
+				x = currX 
+			Next
+
+		Endif
+	End
+	
+	Function Load:Font( path:String,firstChar:Int,numChars:Int,padded:Bool )
+'Print("Font load-> "+path)
+		Local image:=Image.Load( path )
+'	If image=Null
+'	Print("Image = NULL")
+'	Endif
+		Local _pages:Image[] = New Image[1]
+		_pages[0] = image
+		Local _charMap:IntMap<Glyph> = New IntMap<Glyph> 
+		
+		Local _pageCount:Int = 1
+		If Not image Return Null
+		
+		Local cellWidth:=image.Width/numChars
+		Local cellHeight:=image.Height
+		Local glyphX:=0,glyphY:=0,glyphWidth:=cellWidth,glyphHeight:=cellHeight
+		If padded glyphX+=1;glyphY+=1;glyphWidth-=2;glyphHeight-=2
+
+		Local w:=image.Width/cellWidth
+		Local h:=image.Height/cellHeight
+'Print(w+":"+h+"         "+image.Width+":"+image.Height+"         "+cellWidth+":"+cellHeight)
+		For Local i:=0 Until numChars
+			Local y:=i / w
+			Local x:=i Mod w
+			Local glyph:=New Glyph( 0,firstChar+i,x*cellWidth+glyphX,y*cellHeight+glyphY,glyphWidth,glyphHeight,glyphWidth )
+			_charMap.Add(firstChar+i, glyph)
+		Next
+		
+		Return New Font( _pages , _pageCount, _charMap, firstChar,glyphHeight )
+	End
+	
+	Function Load:Font( path:String,cellWidth:Int,cellHeight:Int,glyphX:Int,glyphY:Int,glyphWidth:Int,glyphHeight:Int,firstChar:Int,numChars:Int )
+		Local image:=Image.Load( path )
+		Local _pages:Image[] = New Image[1]
+		_pages[0] = image
+		Local _charMap:IntMap<Glyph> = New IntMap<Glyph> 
+		
+		Local _pageCount:Int = 1
+		If Not image Return Null
+
+		Local w:=image.Width/cellWidth
+		Local h:=image.Height/cellHeight
+
+		For Local i:=0 Until numChars
+			Local y:=i / w
+			Local x:=i Mod w
+			Local glyph:=New Glyph( 0,firstChar+i,x*cellWidth+glyphX,y*cellHeight+glyphY,glyphWidth,glyphHeight,glyphWidth )
+			_charMap.Add(firstChar+i, glyph)
+		Next
+		
+		Return New Font( _pages, _pageCount, _charMap, firstChar, glyphHeight )
+	End
+
+	'------------------------------------------
+	Function Load:Font(url:String)
+		Local iniText:String
+		Local pageNum:Int = 0
+		Local idnum:Int = 0
+		Local tmpChar:Glyph = Null
+		Local plLen:Int
+		Local lines:String[]
+
+    	Local filename:String
+    	Local lineHeight:Int
+
+		Local _pages:Image[]
+		Local _charMap:IntMap<Glyph> = New IntMap<Glyph> 
+		Local _pageCount:Int
+		Local _kernings:Int[]
+		
+		Local path:String = ""
+				
+		If url.Find("/") > -1 Then
+			Local pl:= url.Split("/")
+			plLen = pl.Length()
+			For Local pi:= 0 To (plLen-2)
+				path = path + pl[pi]+"/"
+			Next
+		Endif
+		Local ts:String = url.ToLower()
+		If (ts.Find(".txt") > 0) Then
+			iniText = app.LoadString(url)
+		Else
+			iniText = app.LoadString(url+".txt")
+		Endif
+
+		lines = iniText.Split(String.FromChar(13)+String.FromChar(10))
+		If lines.Length() < 2 then
+			lines = iniText.Split(String.FromChar(10))
+		Endif
+
+		For Local line := Eachin lines
+		
+			line = line.Trim()
+			If line.StartsWith("info") Or line = "" Then Continue
+			If line.StartsWith("padding") Then Continue
+			If line.StartsWith("common") Then 
+				Local commondata:= line.Split(String.FromChar(32)) 
+				For Local common:= Eachin commondata
+					' Maximum Line height
+					If common.StartsWith("lineHeight=") Then
+						Local lnh$[] = common.Split("=")
+						lnh[1] = lnh[1].Trim()
+						lineHeight = Int(lnh[1])
+					Endif
+					' Number of bitmap font images
+					If common.StartsWith("pages=") Then
+						Local lnh$[] = common.Split("=")
+						lnh[1] = lnh[1].Trim()
+						_pageCount = Int(lnh[1])
+						_pages = New Image[_pageCount]
+					Endif
+				Next
+			Endif
+			
+			' Loading the bitmap font images
+			If line.StartsWith("page") Then
+				Local pagedata := line.Split(String.FromChar(32)) 
+				For Local data := Eachin pagedata
+					If data.StartsWith("file=") Then
+						Local fn$[] = data.Split("=")
+						fn[1] = fn[1].Trim()
+						filename = fn[1]
+						If filename[0] = 34 Then
+							filename = filename[1..(filename.Length()-1)]
+						Endif
+						filename = path+filename.Trim()
+
+						_pages[pageNum] = Image.Load(filename)
+#If CONFIG="debug"
+						If _pages[pageNum] = Null Then Error("~n~nError in file graphics.cxs, Method Font.Load:Font(url:String)~n~nCan not load page image: "+filename)
+#End
+						pageNum = pageNum + 1
+					Endif
+				Next
+			Endif
+			
+			If line.StartsWith("chars") Then Continue
+
+			If line.StartsWith("char") Then
+				tmpChar = New Glyph
+				Local linedata:= line.Split(String.FromChar(32))
+				For Local data:= Eachin linedata
+					If data.StartsWith("id=") Then
+						Local idc$[] = data.Split("=")
+						idc[1] = idc[1].Trim()
+						tmpChar.id = Int(idc[1])
+					Endif
+					If data.StartsWith("x=") Then
+						Local xc$[] = data.Split("=")
+						xc[1] = xc[1].Trim()
+						tmpChar.x = Int(xc[1])
+					Endif
+					If data.StartsWith("y=") Then
+						Local yc$[] = data.Split("=")
+						yc[1] = yc[1].Trim()
+						tmpChar.y = Int(yc[1])
+					Endif
+					If data.StartsWith("width=") Then
+						Local wc$[] = data.Split("=")
+						wc[1] = wc[1].Trim()
+						tmpChar.width = Int(wc[1])
+					Endif
+					If data.StartsWith("height=") Then
+						Local hc$[] = data.Split("=")
+						hc[1] = hc[1].Trim()
+						tmpChar.height = Int(hc[1])
+					Endif
+					If data.StartsWith("xoffset=") Then
+						Local xoc$[] = data.Split("=")
+						xoc[1] = xoc[1].Trim()
+						tmpChar.xoff = Int(xoc[1])
+					Endif
+					If data.StartsWith("yoffset=") Then
+						Local yoc$[] = data.Split("=")
+						yoc[1] = yoc[1].Trim()
+						tmpChar.yoff = Int(yoc[1])
+					Endif
+					If data.StartsWith("xadvance=") Then
+						Local advc$[] = data.Split("=")
+						advc[1] = advc[1].Trim()
+						tmpChar.advance = Int(advc[1])
+					Endif
+					If data.StartsWith("page=") Then
+						Local advc$[] = data.Split("=")
+						advc[1] = advc[1].Trim()
+						tmpChar.page = Int(advc[1])
+					Endif
+				Next
+				_charMap.Add(tmpChar.id, tmpChar)
+			Endif
+
+			If line.StartsWith("kernings") Then
+				' only characters 0-255 have kernings.
+				_kernings = New Int[65536]	' 256 * 256 = 65536
+				For Local ii:Int = 0 Until 65536
+					_kernings[ii] = 0
+				Next
+				Continue
+			Endif
+
+			If line.StartsWith("kerning") Then
+
+				Local linedata:= line.Split(String.FromChar(32))
+
+				Local first:Int
+				Local second:Int
+				Local amount:Int
+
+				For Local data:= Eachin linedata
+					If data.StartsWith("first") Then
+						Local firstc$[] = data.Split("=")
+						firstc[1] = firstc[1].Trim()
+						first = Int(firstc[1])
+					Endif
+					If data.StartsWith("second") Then
+						Local secondc$[] = data.Split("=")
+						secondc[1] = secondc[1].Trim()
+						second = Int(secondc[1])
+					Endif
+					If data.StartsWith("amount") Then
+						Local amountc$[] = data.Split("=")
+						amountc[1] = amountc[1].Trim()
+						amount = Int(amountc[1])
+					Endif
+				Next
+
+				' only characters 0-255 have kernings.
+				If first < 256 And second < 256 Then
+					_kernings[first * 256 + second] = amount
+					' Print "first=" + first + " second=" + second + " amount=" + amount
+				Endif
+			Endif
+
+			Continue
+		Next
+		Return New Font( _pages, _pageCount, _charMap, -1, lineHeight, _kernings )
+	End
+
+	'-----------------------------
+'  	Private
+
+	Field _pages:Image[]
+	Field _pageCount:Int
+	Field _firstChar:Int
+	Field _height:Float
+	Field _charMap:IntMap<Glyph> = New IntMap<Glyph>
+	Field _kernings:Int[]
+End
