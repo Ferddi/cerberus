@@ -1,0 +1,561 @@
+'   *
+'   * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+'   * License: https:'github.com/bkaradzic/bgfx#license-bsd-2-clause
+'   *
+
+'  #ifndef BGFX_DEFINES_H_HEADER_GUARD
+'  Const BGFX_DEFINES_H_HEADER_GUARD
+
+Const BGFX_API_VERSION:Int = 84
+
+'/ Color RGB/alpha/depth write. When it's not specified write will be disabled.
+Global BGFX_STATE_WRITE_R                 :Int[] = [ $00000000, $00000001 ]  '!< Enable R write.
+Global BGFX_STATE_WRITE_G                 :Int[] = [ $00000000, $00000002 ]  '!< Enable G write.
+Global BGFX_STATE_WRITE_B                 :Int[] = [ $00000000, $00000004 ]  '!< Enable B write.
+Global BGFX_STATE_WRITE_A                 :Int[] = [ $00000000, $00000008 ]  '!< Enable alpha write.
+Global BGFX_STATE_WRITE_Z                 :Int[] = [ $00000040, $00000000 ]  '!< Enable depth write.
+
+'/ Enable RGB write.
+'  Global BGFX_STATE_WRITE_RGB (0  \
+'  			| BGFX_STATE_WRITE_R \
+'  			| BGFX_STATE_WRITE_G \
+'  			| BGFX_STATE_WRITE_B \
+'  			)
+Global BGFX_STATE_WRITE_RGB               :Int[] = [ $00000000, $00000007 ]  '!< Enable depth write.
+
+'/ Write all channels mask.
+'  Global BGFX_STATE_WRITE_MASK (0   \
+'  			| BGFX_STATE_WRITE_RGB \
+'  			| BGFX_STATE_WRITE_A   \
+'  			| BGFX_STATE_WRITE_Z   \
+'  			)
+Global BGFX_STATE_WRITE_MASK              :Int[] = [ $00000040, $0000000F ]  '!< Enable depth write.
+
+'/ Depth test state. When `BGFX_STATE_DEPTH_` is not specified depth test will be disabled.
+Global BGFX_STATE_DEPTH_TEST_LESS         :Int[] = [ $00000000, $00000010 ]  '!< Enable depth test, less.
+Global BGFX_STATE_DEPTH_TEST_LEQUAL       :Int[] = [ $00000000, $00000020 ]  '!< Enable depth test, less or equal.
+Global BGFX_STATE_DEPTH_TEST_EQUAL        :Int[] = [ $00000000, $00000030 ]  '!< Enable depth test, equal.
+Global BGFX_STATE_DEPTH_TEST_GEQUAL       :Int[] = [ $00000000, $00000040 ]  '!< Enable depth test, greater or equal.
+Global BGFX_STATE_DEPTH_TEST_GREATER      :Int[] = [ $00000000, $00000050 ]  '!< Enable depth test, greater.
+Global BGFX_STATE_DEPTH_TEST_NOTEQUAL     :Int[] = [ $00000000, $00000060 ]  '!< Enable depth test, not equal.
+Global BGFX_STATE_DEPTH_TEST_NEVER        :Int[] = [ $00000000, $00000070 ]  '!< Enable depth test, never.
+Global BGFX_STATE_DEPTH_TEST_ALWAYS       :Int[] = [ $00000000, $00000080 ]  '!< Enable depth test, always.
+Const BGFX_STATE_DEPTH_TEST_SHIFT         :Int = 4                           '!< Depth test state bit shift.
+Global BGFX_STATE_DEPTH_TEST_MASK         :Int[] = [ $00000000, $000000f0 ]  '!< Depth test state bit mask.
+
+'/ Use BGFX_STATE_BLEND_FUNC(_src, _dst) or BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA)
+'/ helper macros.
+Global BGFX_STATE_BLEND_ZERO              :Int[] = [ $00000000, $00001000 ]  '!< 0, 0, 0, 0
+Global BGFX_STATE_BLEND_ONE               :Int[] = [ $00000000, $00002000 ]  '!< 1, 1, 1, 1
+Global BGFX_STATE_BLEND_SRC_COLOR         :Int[] = [ $00000000, $00003000 ]  '!< Rs, Gs, Bs, As
+Global BGFX_STATE_BLEND_INV_SRC_COLOR     :Int[] = [ $00000000, $00004000 ]  '!< 1-Rs, 1-Gs, 1-Bs, 1-As
+Global BGFX_STATE_BLEND_SRC_ALPHA         :Int[] = [ $00000000, $00005000 ]  '!< As, As, As, As
+Global BGFX_STATE_BLEND_INV_SRC_ALPHA     :Int[] = [ $00000000, $00006000 ]  '!< 1-As, 1-As, 1-As, 1-As
+Global BGFX_STATE_BLEND_DST_ALPHA         :Int[] = [ $00000000, $00007000 ]  '!< Ad, Ad, Ad, Ad
+Global BGFX_STATE_BLEND_INV_DST_ALPHA     :Int[] = [ $00000000, $00008000 ]  '!< 1-Ad, 1-Ad, 1-Ad ,1-Ad
+Global BGFX_STATE_BLEND_DST_COLOR         :Int[] = [ $00000000, $00009000 ]  '!< Rd, Gd, Bd, Ad
+Global BGFX_STATE_BLEND_INV_DST_COLOR     :Int[] = [ $00000000, $0000a000 ]  '!< 1-Rd, 1-Gd, 1-Bd, 1-Ad
+Global BGFX_STATE_BLEND_SRC_ALPHA_SAT     :Int[] = [ $00000000, $0000b000 ]  '!< f, f, f, 1; f = min(As, 1-Ad)
+Global BGFX_STATE_BLEND_FACTOR            :Int[] = [ $00000000, $0000c000 ]  '!< Blend factor
+Global BGFX_STATE_BLEND_INV_FACTOR        :Int[] = [ $00000000, $0000d000 ]  '!< 1-Blend factor
+Const BGFX_STATE_BLEND_SHIFT              :Int = 12                          '!< Blend state bit shift.
+Global BGFX_STATE_BLEND_MASK              :Int[] = [ $00000000, $0ffff000 ]  '!< Blend state bit mask.
+
+'/ Use BGFX_STATE_BLEND_EQUATION(_equation) or BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)
+'/ helper macros.
+Global BGFX_STATE_BLEND_EQUATION_ADD      :Int[] = [ $00000000, $00000000 ]  '!< Blend add: src + dst.
+Global BGFX_STATE_BLEND_EQUATION_SUB      :Int[] = [ $00000000, $10000000 ]  '!< Blend subtract: src - dst.
+Global BGFX_STATE_BLEND_EQUATION_REVSUB   :Int[] = [ $00000000, $20000000 ]  '!< Blend reverse subtract: dst - src.
+Global BGFX_STATE_BLEND_EQUATION_MIN      :Int[] = [ $00000000, $30000000 ]  '!< Blend min: min(src, dst).
+Global BGFX_STATE_BLEND_EQUATION_MAX      :Int[] = [ $00000000, $40000000 ]  '!< Blend max: max(src, dst).
+Const BGFX_STATE_BLEND_EQUATION_SHIFT     :Int = 28                          '!< Blend equation bit shift.
+Global BGFX_STATE_BLEND_EQUATION_MASK     :Int[] = [ $00000003, $f0000000 ]  '!< Blend equation bit mask.
+
+Global BGFX_STATE_BLEND_INDEPENDENT       :Int[] = [ $00000004, $00000000 ]  '!< Enable blend independent.
+Global BGFX_STATE_BLEND_ALPHA_TO_COVERAGE :Int[] = [ $00000008, $00000000 ]  '!< Enable alpha to coverage.
+
+'/ Cull state. When `BGFX_STATE_CULL_*` is not specified culling will be disabled.
+Global BGFX_STATE_CULL_CW                 :Int[] = [ $00000010, $00000000 ]  '!< Cull clockwise triangles.
+Global BGFX_STATE_CULL_CCW                :Int[] = [ $00000020, $00000000 ]  '!< Cull counter-clockwise triangles.
+Const BGFX_STATE_CULL_SHIFT               :Int = 36                          '!< Culling mode bit shift.
+Global BGFX_STATE_CULL_MASK               :Int[] = [ $00000030, $00000000 ]  '!< Culling mode bit mask.
+
+'/ See BGFX_STATE_ALPHA_REF(_ref) helper macro.
+Const BGFX_STATE_ALPHA_REF_SHIFT          :Int = 40                          '!< Alpha reference bit shift.
+Global BGFX_STATE_ALPHA_REF_MASK          :Int[] = [ $0000ff00, $00000000 ]  '!< Alpha reference bit mask.
+
+Global BGFX_STATE_PT_TRISTRIP             :Int[] = [ $00010000, $00000000 ]  '!< Tristrip.
+Global BGFX_STATE_PT_LINES                :Int[] = [ $00020000, $00000000 ]  '!< Lines.
+Global BGFX_STATE_PT_LINESTRIP            :Int[] = [ $00030000, $00000000 ]  '!< Line strip.
+Global BGFX_STATE_PT_POINTS               :Int[] = [ $00040000, $00000000 ]  '!< Points.
+Global BGFX_STATE_PT_SHIFT                :Int = 48                          '!< Primitive type bit shift.
+Global BGFX_STATE_PT_MASK                 :Int[] = [ $00070000, $00000000 ]  '!< Primitive type bit mask.
+
+'/ See BGFX_STATE_POINT_SIZE(_size) helper macro.
+Const BGFX_STATE_POINT_SIZE_SHIFT         :Int = 52                          '!< Point size bit shift.
+Global BGFX_STATE_POINT_SIZE_MASK         :Int[] = [ $00f00000, $00000000 ]  '!< Point size bit mask.
+
+'/ Enable MSAA write when writing into MSAA frame buffer.
+'/ This flag is ignored when not writing into MSAA frame buffer.
+Global BGFX_STATE_MSAA                    :Int[] = [ $01000000, $00000000 ]  '!< Enable MSAA rasterization.
+Global BGFX_STATE_LINEAA                  :Int[] = [ $02000000, $00000000 ]  '!< Enable line AA rasterization.
+Global BGFX_STATE_CONSERVATIVE_RASTER     :Int[] = [ $04000000, $00000000 ]  '!< Enable conservative rasterization.
+
+'/ Do not use!
+Const BGFX_STATE_RESERVED_SHIFT           :Int = 61                          '!< Internal bits shift.
+Global BGFX_STATE_RESERVED_MASK           :Int[] = [ $e0000000, $00000000 ]  '!< Internal bits mask.
+
+Global BGFX_STATE_NONE                    :Int[] = [ $00000000, $00000000 ]  '!< No state.
+Global BGFX_STATE_MASK                    :Int[] = [ $ffffffff, $ffffffff ]  '!< State mask.
+
+'/ Default state is write to RGB, alpha, and depth with depth test less enabled, with clockwise
+'/ culling and MSAA (when writing into MSAA frame buffer, otherwise this flag is ignored).
+'  Global BGFX_STATE_DEFAULT (0            \
+'  			| BGFX_STATE_WRITE_RGB       \
+'  			| BGFX_STATE_WRITE_A         \
+'  			| BGFX_STATE_WRITE_Z         \
+'  			| BGFX_STATE_DEPTH_TEST_LESS \
+'  			| BGFX_STATE_CULL_CW         \
+'  			| BGFX_STATE_MSAA            \
+'  			)
+Global BGFX_STATE_DEFAULT                 :Int[] = [ $01000050, $0000001F ]  '!< Enable depth write.
+
+'/ Alpha reference value.
+'  Const BGFX_STATE_ALPHA_REF(_ref)   ( ( (uint64_t)(_ref )<<BGFX_STATE_ALPHA_REF_SHIFT )&BGFX_STATE_ALPHA_REF_MASK)
+
+'/ Point size value.
+'  Const BGFX_STATE_POINT_SIZE(_size) ( ( (uint64_t)(_size)<<BGFX_STATE_POINT_SIZE_SHIFT)&BGFX_STATE_POINT_SIZE_MASK)
+
+'/ Blend function separate.
+'  Const BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA) (UINT64_C(0) \
+'  			| ( ( (uint64_t)(_srcRGB)|( (uint64_t)(_dstRGB)<<4) )   )               \
+'  			| ( ( (uint64_t)(_srcA  )|( (uint64_t)(_dstA  )<<4) )<<8)               \
+'  			)
+
+'/ Blend equation separate.
+'  Const BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA) ( (uint64_t)(_equationRGB)|( (uint64_t)(_equationA)<<3) )
+
+'/ Blend function.
+'  Const BGFX_STATE_BLEND_FUNC(_src, _dst)    BGFX_STATE_BLEND_FUNC_SEPARATE(_src, _dst, _src, _dst)
+
+'/ Blend equation.
+'  Const BGFX_STATE_BLEND_EQUATION(_equation) BGFX_STATE_BLEND_EQUATION_SEPARATE(_equation, _equation)
+
+'/ Utility predefined blend modes.
+
+'/ Additive blending.
+'  Const BGFX_STATE_BLEND_ADD (0                                         \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE) \
+'  	)
+
+'/ Alpha blend.
+'  Const BGFX_STATE_BLEND_ALPHA (0                                                       \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) \
+'  	)
+
+'/ Selects darker color of blend.
+'  Const BGFX_STATE_BLEND_DARKEN (0                                      \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE) \
+'  	| BGFX_STATE_BLEND_EQUATION(BGFX_STATE_BLEND_EQUATION_MIN)          \
+'  	)
+
+'/ Selects lighter color of blend.
+'  Const BGFX_STATE_BLEND_LIGHTEN (0                                     \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE) \
+'  	| BGFX_STATE_BLEND_EQUATION(BGFX_STATE_BLEND_EQUATION_MAX)          \
+'  	)
+
+'/ Multiplies colors.
+'  Const BGFX_STATE_BLEND_MULTIPLY (0                                           \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_DST_COLOR, BGFX_STATE_BLEND_ZERO) \
+'  	)
+
+'/ Opaque pixels will cover the pixels directly below them without any math or algorithm applied to them.
+'  Const BGFX_STATE_BLEND_NORMAL (0                                                \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA) \
+'  	)
+
+'/ Multiplies the inverse of the blend and base colors.
+'  Const BGFX_STATE_BLEND_SCREEN (0                                                \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_COLOR) \
+'  	)
+
+'/ Decreases the brightness of the base color based on the value of the blend color.
+'  Const BGFX_STATE_BLEND_LINEAR_BURN (0                                                 \
+'  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_DST_COLOR, BGFX_STATE_BLEND_INV_DST_COLOR) \
+'  	| BGFX_STATE_BLEND_EQUATION(BGFX_STATE_BLEND_EQUATION_SUB)                          \
+'  	)
+
+'/
+'  Const BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst) (0               \
+'  			| ( (uint32_t)( (_src)>>BGFX_STATE_BLEND_SHIFT)       \
+'  			| ( (uint32_t)( (_dst)>>BGFX_STATE_BLEND_SHIFT)<<4) ) \
+'  			)
+
+'  Const BGFX_STATE_BLEND_FUNC_RT_xE(_src, _dst, _equation) (0               \
+'  			| BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst)                        \
+'  			| ( (uint32_t)( (_equation)>>BGFX_STATE_BLEND_EQUATION_SHIFT)<<8) \
+'  			)
+
+'  Const BGFX_STATE_BLEND_FUNC_RT_1(_src, _dst)  (BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst)<< 0)
+'  Const BGFX_STATE_BLEND_FUNC_RT_2(_src, _dst)  (BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst)<<11)
+'  Const BGFX_STATE_BLEND_FUNC_RT_3(_src, _dst)  (BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst)<<22)
+
+'  Const BGFX_STATE_BLEND_FUNC_RT_1E(_src, _dst, _equation) (BGFX_STATE_BLEND_FUNC_RT_xE(_src, _dst, _equation)<< 0)
+'  Const BGFX_STATE_BLEND_FUNC_RT_2E(_src, _dst, _equation) (BGFX_STATE_BLEND_FUNC_RT_xE(_src, _dst, _equation)<<11)
+'  Const BGFX_STATE_BLEND_FUNC_RT_3E(_src, _dst, _equation) (BGFX_STATE_BLEND_FUNC_RT_xE(_src, _dst, _equation)<<22)
+
+'/
+Const BGFX_STENCIL_FUNC_REF_SHIFT         :Int = 0          '!<
+Const BGFX_STENCIL_FUNC_REF_MASK          :Int = $000000ff  '!<
+Const BGFX_STENCIL_FUNC_RMASK_SHIFT       :Int = 8          '!<
+Const BGFX_STENCIL_FUNC_RMASK_MASK        :Int = $0000ff00  '!<
+
+Const BGFX_STENCIL_TEST_LESS              :Int = $00010000  '!< Enable stencil test, less.
+Const BGFX_STENCIL_TEST_LEQUAL            :Int = $00020000  '!< Enable stencil test, less or equal.
+Const BGFX_STENCIL_TEST_EQUAL             :Int = $00030000  '!< Enable stencil test, equal.
+Const BGFX_STENCIL_TEST_GEQUAL            :Int = $00040000  '!< Enable stencil test, greater or equal.
+Const BGFX_STENCIL_TEST_GREATER           :Int = $00050000  '!< Enable stencil test, greater.
+Const BGFX_STENCIL_TEST_NOTEQUAL          :Int = $00060000  '!< Enable stencil test, not equal.
+Const BGFX_STENCIL_TEST_NEVER             :Int = $00070000  '!< Enable stencil test, never.
+Const BGFX_STENCIL_TEST_ALWAYS            :Int = $00080000  '!< Enable stencil test, always.
+Const BGFX_STENCIL_TEST_SHIFT             :Int = 16         '!< Stencil test bit shift.
+Const BGFX_STENCIL_TEST_MASK              :Int = $000f0000  '!< Stencil test bit mask.
+
+Const BGFX_STENCIL_OP_FAIL_S_ZERO         :Int = $00000000  '!< Zero.
+Const BGFX_STENCIL_OP_FAIL_S_KEEP         :Int = $00100000  '!< Keep.
+Const BGFX_STENCIL_OP_FAIL_S_REPLACE      :Int = $00200000  '!< Replace.
+Const BGFX_STENCIL_OP_FAIL_S_INCR         :Int = $00300000  '!< Increment and wrap.
+Const BGFX_STENCIL_OP_FAIL_S_INCRSAT      :Int = $00400000  '!< Increment and clamp.
+Const BGFX_STENCIL_OP_FAIL_S_DECR         :Int = $00500000  '!< Decrement and wrap.
+Const BGFX_STENCIL_OP_FAIL_S_DECRSAT      :Int = $00600000  '!< Decrement and clamp.
+Const BGFX_STENCIL_OP_FAIL_S_INVERT       :Int = $00700000  '!< Invert.
+Const BGFX_STENCIL_OP_FAIL_S_SHIFT        :Int = 20         '!< Stencil operation fail bit shift.
+Const BGFX_STENCIL_OP_FAIL_S_MASK         :Int = $00f00000  '!< Stencil operation fail bit mask.
+
+Const BGFX_STENCIL_OP_FAIL_Z_ZERO         :Int = $00000000  '!< Zero.
+Const BGFX_STENCIL_OP_FAIL_Z_KEEP         :Int = $01000000  '!< Keep.
+Const BGFX_STENCIL_OP_FAIL_Z_REPLACE      :Int = $02000000  '!< Replace.
+Const BGFX_STENCIL_OP_FAIL_Z_INCR         :Int = $03000000  '!< Increment and wrap.
+Const BGFX_STENCIL_OP_FAIL_Z_INCRSAT      :Int = $04000000  '!< Increment and clamp.
+Const BGFX_STENCIL_OP_FAIL_Z_DECR         :Int = $05000000  '!< Decrement and wrap.
+Const BGFX_STENCIL_OP_FAIL_Z_DECRSAT      :Int = $06000000  '!< Decrement and clamp.
+Const BGFX_STENCIL_OP_FAIL_Z_INVERT       :Int = $07000000  '!< Invert.
+Const BGFX_STENCIL_OP_FAIL_Z_SHIFT        :Int = 24         '!< Stencil operation depth fail bit shift
+Const BGFX_STENCIL_OP_FAIL_Z_MASK         :Int = $0f000000  '!< Stencil operation depth fail bit mask.
+
+Const BGFX_STENCIL_OP_PASS_Z_ZERO         :Int = $00000000  '!< Zero.
+Const BGFX_STENCIL_OP_PASS_Z_KEEP         :Int = $10000000  '!< Keep.
+Const BGFX_STENCIL_OP_PASS_Z_REPLACE      :Int = $20000000  '!< Replace.
+Const BGFX_STENCIL_OP_PASS_Z_INCR         :Int = $30000000  '!< Increment and wrap.
+Const BGFX_STENCIL_OP_PASS_Z_INCRSAT      :Int = $40000000  '!< Increment and clamp.
+Const BGFX_STENCIL_OP_PASS_Z_DECR         :Int = $50000000  '!< Decrement and wrap.
+Const BGFX_STENCIL_OP_PASS_Z_DECRSAT      :Int = $60000000  '!< Decrement and clamp.
+Const BGFX_STENCIL_OP_PASS_Z_INVERT       :Int = $70000000  '!< Invert.
+Const BGFX_STENCIL_OP_PASS_Z_SHIFT        :Int = 28         '!< Stencil operation depth pass bit shift
+Const BGFX_STENCIL_OP_PASS_Z_MASK         :Int = $f0000000  '!< Stencil operation depth pass bit mask.
+
+Const BGFX_STENCIL_NONE                   :Int = $00000000  '!<
+Const BGFX_STENCIL_MASK                   :Int = $ffffffff  '!<
+Const BGFX_STENCIL_DEFAULT                :Int = $00000000  '!<
+
+'/ Set stencil ref value.
+'  Const BGFX_STENCIL_FUNC_REF(_ref) ( ((uint32_t)(_ref)<<BGFX_STENCIL_FUNC_REF_SHIFT)&BGFX_STENCIL_FUNC_REF_MASK)
+
+'/ Set stencil rmask value.
+'  Const BGFX_STENCIL_FUNC_RMASK(_mask) ( ((uint32_t)(_mask)<<BGFX_STENCIL_FUNC_RMASK_SHIFT)&BGFX_STENCIL_FUNC_RMASK_MASK)
+
+'/
+Const BGFX_CLEAR_NONE                     :Int = $0000  '!< No clear flags.
+Const BGFX_CLEAR_COLOR                    :Int = $0001  '!< Clear color.
+Const BGFX_CLEAR_DEPTH                    :Int = $0002  '!< Clear depth.
+Const BGFX_CLEAR_STENCIL                  :Int = $0004  '!< Clear stencil.
+Const BGFX_CLEAR_DISCARD_COLOR_0          :Int = $0008  '!< Discard frame buffer attachment 0.
+Const BGFX_CLEAR_DISCARD_COLOR_1          :Int = $0010  '!< Discard frame buffer attachment 1.
+Const BGFX_CLEAR_DISCARD_COLOR_2          :Int = $0020  '!< Discard frame buffer attachment 2.
+Const BGFX_CLEAR_DISCARD_COLOR_3          :Int = $0040  '!< Discard frame buffer attachment 3.
+Const BGFX_CLEAR_DISCARD_COLOR_4          :Int = $0080  '!< Discard frame buffer attachment 4.
+Const BGFX_CLEAR_DISCARD_COLOR_5          :Int = $0100  '!< Discard frame buffer attachment 5.
+Const BGFX_CLEAR_DISCARD_COLOR_6          :Int = $0200  '!< Discard frame buffer attachment 6.
+Const BGFX_CLEAR_DISCARD_COLOR_7          :Int = $0400  '!< Discard frame buffer attachment 7.
+Const BGFX_CLEAR_DISCARD_DEPTH            :Int = $0800  '!< Discard frame buffer depth attachment.
+Const BGFX_CLEAR_DISCARD_STENCIL          :Int = $1000  '!< Discard frame buffer stencil attachment.
+
+Const BGFX_CLEAR_DISCARD_COLOR_MASK:Int = ( 0    |
+			BGFX_CLEAR_DISCARD_COLOR_0    |
+			BGFX_CLEAR_DISCARD_COLOR_1    |
+			BGFX_CLEAR_DISCARD_COLOR_2    |
+			BGFX_CLEAR_DISCARD_COLOR_3    |
+			BGFX_CLEAR_DISCARD_COLOR_4    |
+			BGFX_CLEAR_DISCARD_COLOR_5    |
+			BGFX_CLEAR_DISCARD_COLOR_6    |
+			BGFX_CLEAR_DISCARD_COLOR_7    )
+
+Const BGFX_CLEAR_DISCARD_MASK:Int = ( 0          |
+			BGFX_CLEAR_DISCARD_COLOR_MASK |
+			BGFX_CLEAR_DISCARD_DEPTH      |
+			BGFX_CLEAR_DISCARD_STENCIL    )
+
+
+'/
+Const BGFX_DEBUG_NONE                     :Int = $00000000  '!< No debug.
+Const BGFX_DEBUG_WIREFRAME                :Int = $00000001  '!< Enable wireframe for all primitives.
+Const BGFX_DEBUG_IFH                      :Int = $00000002  '!< Enable infinitely fast hardware test. No draw calls will be submitted to driver. It’s useful when profiling to quickly assess bottleneck between CPU and GPU.
+Const BGFX_DEBUG_STATS                    :Int = $00000004  '!< Enable statistics display.
+Const BGFX_DEBUG_TEXT                     :Int = $00000008  '!< Enable debug text display.
+Const BGFX_DEBUG_PROFILER                 :Int = $00000010  '!< Enable profiler.
+
+'/
+Const BGFX_BUFFER_NONE                    :Int = $0000  '!<
+
+Const BGFX_BUFFER_COMPUTE_FORMAT_8x1      :Int = $0001  '!< 1 8-bit value
+Const BGFX_BUFFER_COMPUTE_FORMAT_8x2      :Int = $0002  '!< 2 8-bit values
+Const BGFX_BUFFER_COMPUTE_FORMAT_8x4      :Int = $0003  '!< 4 8-bit values
+Const BGFX_BUFFER_COMPUTE_FORMAT_16x1     :Int = $0004  '!< 1 16-bit value
+Const BGFX_BUFFER_COMPUTE_FORMAT_16x2     :Int = $0005  '!< 2 16-bit values
+Const BGFX_BUFFER_COMPUTE_FORMAT_16x4     :Int = $0006  '!< 4 16-bit values
+Const BGFX_BUFFER_COMPUTE_FORMAT_32x1     :Int = $0007  '!< 1 32-bit value
+Const BGFX_BUFFER_COMPUTE_FORMAT_32x2     :Int = $0008  '!< 2 32-bit values
+Const BGFX_BUFFER_COMPUTE_FORMAT_32x4     :Int = $0009  '!< 4 32-bit values
+Const BGFX_BUFFER_COMPUTE_FORMAT_SHIFT    :Int = 0      '!<
+Const BGFX_BUFFER_COMPUTE_FORMAT_MASK     :Int = $000f  '!<
+
+Const BGFX_BUFFER_COMPUTE_TYPE_INT        :Int = $0010  '!< Type `int`.
+Const BGFX_BUFFER_COMPUTE_TYPE_UINT       :Int = $0020  '!< Type `uint`.
+Const BGFX_BUFFER_COMPUTE_TYPE_FLOAT      :Int = $0030  '!< Type `float`.
+Const BGFX_BUFFER_COMPUTE_TYPE_SHIFT      :Int = 4      '!<
+Const BGFX_BUFFER_COMPUTE_TYPE_MASK       :Int = $0030  '!<
+
+Const BGFX_BUFFER_COMPUTE_READ            :Int = $0100  '!< Buffer will be read by shader.
+Const BGFX_BUFFER_COMPUTE_WRITE           :Int = $0200  '!< Buffer will be used for writing.
+Const BGFX_BUFFER_DRAW_INDIRECT           :Int = $0400  '!< Buffer will be used for storing draw indirect commands.
+Const BGFX_BUFFER_ALLOW_RESIZE            :Int = $0800  '!< Allow dynamic index/vertex buffer resize during update.
+Const BGFX_BUFFER_INDEX32                 :Int = $1000  '!< Index buffer contains 32-bit indices.
+
+Const BGFX_BUFFER_COMPUTE_READ_WRITE:Int = ( 0 |
+			BGFX_BUFFER_COMPUTE_READ    |
+			BGFX_BUFFER_COMPUTE_WRITE   )
+
+
+'/ Texture creation flags.
+Global BGFX_TEXTURE_NONE                  :Int[] = [ $00000000, $00000000 ]  '!<
+Global BGFX_TEXTURE_MSAA_SAMPLE           :Int[] = [ $00000008, $00000000 ]  '!< Texture will be used for MSAA sampling.
+Global BGFX_TEXTURE_RT                    :Int[] = [ $00000010, $00000000 ]  '!< Render target no MSAA.
+Global BGFX_TEXTURE_RT_MSAA_X2            :Int[] = [ $00000020, $00000000 ]  '!< Render target MSAAx2 mode.
+Global BGFX_TEXTURE_RT_MSAA_X4            :Int[] = [ $00000030, $00000000 ]  '!< Render target MSAAx4 mode.
+Global BGFX_TEXTURE_RT_MSAA_X8            :Int[] = [ $00000040, $00000000 ]  '!< Render target MSAAx8 mode.
+Global BGFX_TEXTURE_RT_MSAA_X16           :Int[] = [ $00000050, $00000000 ]  '!< Render target MSAAx16 mode.
+Const BGFX_TEXTURE_RT_MSAA_SHIFT          :Int = 36                          '!<
+Global BGFX_TEXTURE_RT_MSAA_MASK          :Int[] = [ $00000070, $00000000 ]  '!<
+Global BGFX_TEXTURE_RT_WRITE_ONLY         :Int[] = [ $00000080, $00000000 ]  '!< Render target will be used for writing only.
+Global BGFX_TEXTURE_RT_MASK               :Int[] = [ $000000f0, $00000000 ]  '!<
+Global BGFX_TEXTURE_COMPUTE_WRITE         :Int[] = [ $00001000, $00000000 ]  '!< Texture will be used for compute write.
+Global BGFX_TEXTURE_SRGB                  :Int[] = [ $00002000, $00000000 ]  '!< Sample texture as sRGB.
+Global BGFX_TEXTURE_BLIT_DST              :Int[] = [ $00004000, $00000000 ]  '!< Texture will be used as blit destination.
+Global BGFX_TEXTURE_READ_BACK             :Int[] = [ $00008000, $00000000 ]  '!< Texture will be used for read back from GPU.
+
+'/ Sampler flags.
+Const BGFX_SAMPLER_NONE                   :Int = $00000000  '!<
+Const BGFX_SAMPLER_U_MIRROR               :Int = $00000001  '!< Wrap U mode: Mirror
+Const BGFX_SAMPLER_U_CLAMP                :Int = $00000002  '!< Wrap U mode: Clamp
+Const BGFX_SAMPLER_U_BORDER               :Int = $00000003  '!< Wrap U mode: Border
+Const BGFX_SAMPLER_U_SHIFT                :Int = 0          '!<
+Const BGFX_SAMPLER_U_MASK                 :Int = $00000003  '!<
+Const BGFX_SAMPLER_V_MIRROR               :Int = $00000004  '!< Wrap V mode: Mirror
+Const BGFX_SAMPLER_V_CLAMP                :Int = $00000008  '!< Wrap V mode: Clamp
+Const BGFX_SAMPLER_V_BORDER               :Int = $0000000c  '!< Wrap V mode: Border
+Const BGFX_SAMPLER_V_SHIFT                :Int = 2          '!<
+Const BGFX_SAMPLER_V_MASK                 :Int = $0000000c  '!<
+Const BGFX_SAMPLER_W_MIRROR               :Int = $00000010  '!< Wrap W mode: Mirror
+Const BGFX_SAMPLER_W_CLAMP                :Int = $00000020  '!< Wrap W mode: Clamp
+Const BGFX_SAMPLER_W_BORDER               :Int = $00000030  '!< Wrap W mode: Border
+Const BGFX_SAMPLER_W_SHIFT                :Int = 4          '!<
+Const BGFX_SAMPLER_W_MASK                 :Int = $00000030  '!<
+Const BGFX_SAMPLER_MIN_POINT              :Int = $00000040  '!< Min sampling mode: Point
+Const BGFX_SAMPLER_MIN_ANISOTROPIC        :Int = $00000080  '!< Min sampling mode: Anisotropic
+Const BGFX_SAMPLER_MIN_SHIFT              :Int = 6          '!<
+Const BGFX_SAMPLER_MIN_MASK               :Int = $000000c0  '!<
+Const BGFX_SAMPLER_MAG_POINT              :Int = $00000100  '!< Mag sampling mode: Point
+Const BGFX_SAMPLER_MAG_ANISOTROPIC        :Int = $00000200  '!< Mag sampling mode: Anisotropic
+Const BGFX_SAMPLER_MAG_SHIFT              :Int = 8          '!<
+Const BGFX_SAMPLER_MAG_MASK               :Int = $00000300  '!<
+Const BGFX_SAMPLER_MIP_POINT              :Int = $00000400  '!< Mip sampling mode: Point
+Const BGFX_SAMPLER_MIP_SHIFT              :Int = 10         '!<
+Const BGFX_SAMPLER_MIP_MASK               :Int = $00000400  '!<
+Const BGFX_SAMPLER_COMPARE_LESS           :Int = $00010000  '!< Compare when sampling depth texture: less.
+Const BGFX_SAMPLER_COMPARE_LEQUAL         :Int = $00020000  '!< Compare when sampling depth texture: less or equal.
+Const BGFX_SAMPLER_COMPARE_EQUAL          :Int = $00030000  '!< Compare when sampling depth texture: equal.
+Const BGFX_SAMPLER_COMPARE_GEQUAL         :Int = $00040000  '!< Compare when sampling depth texture: greater or equal.
+Const BGFX_SAMPLER_COMPARE_GREATER        :Int = $00050000  '!< Compare when sampling depth texture: greater.
+Const BGFX_SAMPLER_COMPARE_NOTEQUAL       :Int = $00060000  '!< Compare when sampling depth texture: not equal.
+Const BGFX_SAMPLER_COMPARE_NEVER          :Int = $00070000  '!< Compare when sampling depth texture: never.
+Const BGFX_SAMPLER_COMPARE_ALWAYS         :Int = $00080000  '!< Compare when sampling depth texture: always.
+Const BGFX_SAMPLER_COMPARE_SHIFT          :Int = 16         '!<
+Const BGFX_SAMPLER_COMPARE_MASK           :Int = $000f0000  '!<
+Const BGFX_SAMPLER_SAMPLE_STENCIL         :Int = $00100000  '!< Sample stencil instead of depth.
+Const BGFX_SAMPLER_BORDER_COLOR_SHIFT     :Int = 24         '!<
+Const BGFX_SAMPLER_BORDER_COLOR_MASK      :Int = $0f000000  '!<
+Const BGFX_SAMPLER_RESERVED_SHIFT         :Int = 28         '!<
+Const BGFX_SAMPLER_RESERVED_MASK          :Int = $f0000000  '!<
+
+'  Const BGFX_SAMPLER_BORDER_COLOR(_index) ( (_index << BGFX_SAMPLER_BORDER_COLOR_SHIFT) & BGFX_SAMPLER_BORDER_COLOR_MASK)
+
+Const BGFX_SAMPLER_BITS_MASK:Int = ( 0 |
+			BGFX_SAMPLER_U_MASK         |
+			BGFX_SAMPLER_V_MASK         |
+			BGFX_SAMPLER_W_MASK         |
+			BGFX_SAMPLER_MIN_MASK       |
+			BGFX_SAMPLER_MAG_MASK       |
+			BGFX_SAMPLER_MIP_MASK       |
+			BGFX_SAMPLER_COMPARE_MASK   )
+
+
+'/
+Const BGFX_RESET_NONE                     :Int = $00000000  '!< No reset flags.
+Const BGFX_RESET_FULLSCREEN               :Int = $00000001  '!< Not supported yet.
+Const BGFX_RESET_FULLSCREEN_SHIFT         :Int = 0          '!< Fullscreen bit shift.
+Const BGFX_RESET_FULLSCREEN_MASK          :Int = $00000001  '!< Fullscreen bit mask.
+Const BGFX_RESET_MSAA_X2                  :Int = $00000010  '!< Enable 2x MSAA.
+Const BGFX_RESET_MSAA_X4                  :Int = $00000020  '!< Enable 4x MSAA.
+Const BGFX_RESET_MSAA_X8                  :Int = $00000030  '!< Enable 8x MSAA.
+Const BGFX_RESET_MSAA_X16                 :Int = $00000040  '!< Enable 16x MSAA.
+Const BGFX_RESET_MSAA_SHIFT               :Int = 4          '!< MSAA mode bit shift.
+Const BGFX_RESET_MSAA_MASK                :Int = $00000070  '!< MSAA mode bit mask.
+Const BGFX_RESET_VSYNC                    :Int = $00000080  '!< Enable V-Sync.
+Const BGFX_RESET_MAXANISOTROPY            :Int = $00000100  '!< Turn on/off max anisotropy.
+Const BGFX_RESET_CAPTURE                  :Int = $00000200  '!< Begin screen capture.
+Const BGFX_RESET_FLUSH_AFTER_RENDER       :Int = $00002000  '!< Flush rendering after submitting to GPU.
+Const BGFX_RESET_FLIP_AFTER_RENDER        :Int = $00004000  '!< This flag  specifies where flip occurs. Default behavior is that flip occurs before rendering new frame. This flag only has effect when `BGFX_CONFIG_MULTITHREADED=0`.
+Const BGFX_RESET_SRGB_BACKBUFFER          :Int = $00008000  '!< Enable sRGB backbuffer.
+Const BGFX_RESET_HDR10                    :Int = $00010000  '!< Enable HDR10 rendering.
+Const BGFX_RESET_HIDPI                    :Int = $00020000  '!< Enable HiDPI rendering.
+Const BGFX_RESET_DEPTH_CLAMP              :Int = $00040000  '!< Enable depth clamp.
+Const BGFX_RESET_SUSPEND                  :Int = $00080000  '!< Suspend rendering.
+
+Const BGFX_RESET_RESERVED_SHIFT           :Int = 31         '!< Internal bits shift.
+Const BGFX_RESET_RESERVED_MASK            :Int = $80000000  '!< Internal bits mask.
+
+'/
+Global BGFX_CAPS_ALPHA_TO_COVERAGE        :Int[] = [ $00000000, $00000001 ]  '!< Alpha to coverage is supported.
+Global BGFX_CAPS_BLEND_INDEPENDENT        :Int[] = [ $00000000, $00000002 ]  '!< Blend independent is supported.
+Global BGFX_CAPS_COMPUTE                  :Int[] = [ $00000000, $00000004 ]  '!< Compute shaders are supported.
+Global BGFX_CAPS_CONSERVATIVE_RASTER      :Int[] = [ $00000000, $00000008 ]  '!< Conservative rasterization is supported.
+Global BGFX_CAPS_DRAW_INDIRECT            :Int[] = [ $00000000, $00000010 ]  '!< Draw indirect is supported.
+Global BGFX_CAPS_FRAGMENT_DEPTH           :Int[] = [ $00000000, $00000020 ]  '!< Fragment depth is accessible in fragment shader.
+Global BGFX_CAPS_FRAGMENT_ORDERING        :Int[] = [ $00000000, $00000040 ]  '!< Fragment ordering is available in fragment shader.
+Global BGFX_CAPS_GRAPHICS_DEBUGGER        :Int[] = [ $00000000, $00000080 ]  '!< Graphics debugger is present.
+Global BGFX_CAPS_HDR10                    :Int[] = [ $00000000, $00000100 ]  '!< HDR10 rendering is supported.
+Global BGFX_CAPS_HIDPI                    :Int[] = [ $00000000, $00000400 ]  '!< HiDPI rendering is supported.
+Global BGFX_CAPS_INDEX32                  :Int[] = [ $00000000, $00000800 ]  '!< 32-bit indices are supported.
+Global BGFX_CAPS_INSTANCING               :Int[] = [ $00000000, $00001000 ]  '!< Instancing is supported.
+Global BGFX_CAPS_OCCLUSION_QUERY          :Int[] = [ $00000000, $00002000 ]  '!< Occlusion query is supported.
+Global BGFX_CAPS_RENDERER_MULTITHREADED   :Int[] = [ $00000000, $00004000 ]  '!< Renderer is on separate thread.
+Global BGFX_CAPS_SWAP_CHAIN               :Int[] = [ $00000000, $00008000 ]  '!< Multiple windows are supported.
+Global BGFX_CAPS_TEXTURE_2D_ARRAY         :Int[] = [ $00000000, $00010000 ]  '!< 2D texture array is supported.
+Global BGFX_CAPS_TEXTURE_3D               :Int[] = [ $00000000, $00020000 ]  '!< 3D textures are supported.
+Global BGFX_CAPS_TEXTURE_BLIT             :Int[] = [ $00000000, $000c0000 ]  '!< Texture blit is supported.
+Global BGFX_CAPS_TEXTURE_COMPARE_ALL      :Int[] = [ $00000000, $00080000 ]  '!< All texture compare modes are supported.
+Global BGFX_CAPS_TEXTURE_COMPARE_LEQUAL   :Int[] = [ $00000000, $00100000 ]  '!< Texture compare less equal mode is supported.
+Global BGFX_CAPS_TEXTURE_CUBE_ARRAY       :Int[] = [ $00000000, $00200000 ]  '!< Cubemap texture array is supported.
+Global BGFX_CAPS_TEXTURE_DIRECT_ACCESS    :Int[] = [ $00000000, $00400000 ]  '!< CPU direct access to GPU texture memory.
+Global BGFX_CAPS_TEXTURE_READ_BACK        :Int[] = [ $00000000, $00800000 ]  '!< Read-back texture is supported.
+Global BGFX_CAPS_VERTEX_ATTRIB_HALF       :Int[] = [ $00000000, $00800000 ]  '!< Vertex attribute half-float is supported.
+Global BGFX_CAPS_VERTEX_ATTRIB_UINT10     :Int[] = [ $00000000, $01000000 ]  '!< Vertex attribute 10_10_10_2 is supported.
+Global BGFX_CAPS_VERTEX_ID                :Int[] = [ $00000000, $02000000 ]  '!< Rendering with VertexID only is supported.
+
+'/
+Const BGFX_CAPS_FORMAT_TEXTURE_NONE             :Int = $0000  '!< Texture format is not supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_2D               :Int = $0001  '!< Texture format is supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_2D_SRGB          :Int = $0002  '!< Texture as sRGB format is supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_2D_EMULATED      :Int = $0004  '!< Texture format is emulated.
+Const BGFX_CAPS_FORMAT_TEXTURE_3D               :Int = $0008  '!< Texture format is supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_3D_SRGB          :Int = $0010  '!< Texture as sRGB format is supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_3D_EMULATED      :Int = $0020  '!< Texture format is emulated.
+Const BGFX_CAPS_FORMAT_TEXTURE_CUBE             :Int = $0040  '!< Texture format is supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_CUBE_SRGB        :Int = $0080  '!< Texture as sRGB format is supported.
+Const BGFX_CAPS_FORMAT_TEXTURE_CUBE_EMULATED    :Int = $0100  '!< Texture format is emulated.
+Const BGFX_CAPS_FORMAT_TEXTURE_VERTEX           :Int = $0200  '!< Texture format can be used from vertex shader.
+Const BGFX_CAPS_FORMAT_TEXTURE_IMAGE            :Int = $0400  '!< Texture format can be used as image from compute shader.
+Const BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER      :Int = $0800  '!< Texture format can be used as frame buffer.
+Const BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA :Int = $1000  '!< Texture format can be used as MSAA frame buffer.
+Const BGFX_CAPS_FORMAT_TEXTURE_MSAA             :Int = $2000  '!< Texture can be sampled as MSAA.
+Const BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN      :Int = $4000  '!< Texture format supports auto-generated mips.
+
+'/
+Const BGFX_VIEW_NONE                      :Int = $00  '!<
+Const BGFX_VIEW_STEREO                    :Int = $01  '!< View will be rendered in stereo mode.
+
+'/
+Const BGFX_SUBMIT_EYE_LEFT                :Int = $01  '!< Submit to left eye.
+Const BGFX_SUBMIT_EYE_RIGHT               :Int = $02  '!< Submit to right eye.
+Const BGFX_SUBMIT_EYE_MASK                :Int = $03  '!<
+Const BGFX_SUBMIT_EYE_FIRST               :Int = BGFX_SUBMIT_EYE_LEFT
+
+Const BGFX_SUBMIT_RESERVED_SHIFT          :Int = 7    '!< Internal bits shift.
+Const BGFX_SUBMIT_RESERVED_MASK           :Int = $80  '!< Internal bits mask.
+
+'/
+Const BGFX_PCI_ID_NONE                    :Int = $0000  '!< Autoselect adapter.
+Const BGFX_PCI_ID_SOFTWARE_RASTERIZER     :Int = $0001  '!< Software rasterizer.
+Const BGFX_PCI_ID_AMD                     :Int = $1002  '!< AMD adapter.
+Const BGFX_PCI_ID_INTEL                   :Int = $8086  '!< Intel adapter.
+Const BGFX_PCI_ID_NVIDIA                  :Int = $10de  '!< nVidia adapter.
+
+'/
+Const BGFX_CUBE_MAP_POSITIVE_X            :Int = $00  '!< Cubemap +x.
+Const BGFX_CUBE_MAP_NEGATIVE_X            :Int = $01  '!< Cubemap -x.
+Const BGFX_CUBE_MAP_POSITIVE_Y            :Int = $02  '!< Cubemap +y.
+Const BGFX_CUBE_MAP_NEGATIVE_Y            :Int = $03  '!< Cubemap -y.
+Const BGFX_CUBE_MAP_POSITIVE_Z            :Int = $04  '!< Cubemap +z.
+Const BGFX_CUBE_MAP_NEGATIVE_Z            :Int = $05  '!< Cubemap -z.
+
+'  #endif ' BGFX_DEFINES_H_HEADER_GUARD
+
+'  Function BGFX_STATE_WRITE_RGB:Void( state:Int[] )
+'  
+'  	state[0] |= BGFX_STATE_WRITE_R[0]
+'  	state[1] |= BGFX_STATE_WRITE_R[1]
+'  
+'  	state[0] |= BGFX_STATE_WRITE_G[0]
+'  	state[1] |= BGFX_STATE_WRITE_G[1]
+'  
+'  	state[0] |= BGFX_STATE_WRITE_B[0]
+'  	state[1] |= BGFX_STATE_WRITE_B[1]
+'  End
+'  
+'  Function BGFX_STATE_WRITE_RGB:Void( state:Int[] )
+'  
+'  	BGFX_STATE_WRITE_RGB( state )
+'  
+'  	state[0] |= BGFX_STATE_WRITE_A[0]
+'  	state[1] |= BGFX_STATE_WRITE_A[1]
+'  
+'  	state[0] |= BGFX_STATE_WRITE_Z[0]
+'  	state[1] |= BGFX_STATE_WRITE_Z[1]
+'  End
+
+'/ Blend function separate.
+Function BGFX_STATE_BLEND_FUNC_SEPARATE:Void( state:Int[], _srcRGB:Int[], _dstRGB:Int[], _srcA:Int[], _dstA:Int[] )
+	' (UINT64_C(0) \
+	'		| ( ( (uint64_t)(_srcRGB)|( (uint64_t)(_dstRGB)<<4) )   )               \
+	'		| ( ( (uint64_t)(_srcA  )|( (uint64_t)(_dstA  )<<4) )<<8)               \
+	state[1] |= _srcRGB[1] | (_dstRGB[1] Shl 4) | (_srcA[1] Shl 8) | (_dstA[1] Shl 12)
+End
+
+'/ Blend equation separate.
+Function BGFX_STATE_BLEND_EQUATION_SEPARATE:Void( state:Int[], _equationRGB:Int[], _equationA:Int[] )
+	' ( (uint64_t)(_equationRGB)|( (uint64_t)(_equationA)<<3) )
+	state[0] |= ((_equationA[1] Shr (BGFX_STATE_BLEND_EQUATION_SHIFT+1)) & 3)
+	state[1] |= _equationRGB[1] | (_equationA[1] Shl 3)
+End
+
+'/ Blend function.
+Function BGFX_STATE_BLEND_FUNC:Void( state:Int[], _src:Int[], _dst:Int[] )
+	BGFX_STATE_BLEND_FUNC_SEPARATE( state, _src, _dst, _src, _dst )
+End
+
+'/ Blend equation.
+Function BGFX_STATE_BLEND_EQUATION:Void( state:Int[], _equation:Int[] )
+	BGFX_STATE_BLEND_EQUATION_SEPARATE( state, _equation, _equation )
+End
+
