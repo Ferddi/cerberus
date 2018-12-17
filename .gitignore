@@ -1,3 +1,5 @@
+/3rdparty/*
+
 /bin/*
 !/bin/*.txt
 !/bin/themes
