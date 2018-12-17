@@ -1,0 +1,4 @@
+
+#TARGET_NAME="Glfw3+bgfx"
+#TARGET_SYSTEM="glfw"
+#TARGET_BUILDER="glfw"
