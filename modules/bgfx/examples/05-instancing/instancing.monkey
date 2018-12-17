@@ -1,0 +1,290 @@
+
+' using DrawText to draw some bgfx debug text
+'  Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+Import mojo.app
+Import bgfx
+
+Class PosColorVertex
+
+	Field m_x:Float
+	Field m_y:Float
+	Field m_z:Float
+
+	Field m_abgr:Int
+
+	Method New(m_x:Float, m_y:Float, m_z:Float, m_abgr:Int)
+
+		Self.m_x = m_x
+		Self.m_y = m_y
+		Self.m_z = m_z
+
+		Self.m_abgr = m_abgr
+	End
+
+	Global ms_decl:BgfxVertexDecl = New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0, 4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global s_cubeVertices:PosColorVertex[] = [
+	New PosColorVertex( -1.0,  1.0,  1.0, $ff000000 ),
+	New PosColorVertex(  1.0,  1.0,  1.0, $ff0000ff ),
+	New PosColorVertex( -1.0, -1.0,  1.0, $ff00ff00 ),
+	New PosColorVertex(  1.0, -1.0,  1.0, $ff00ffff ),
+	New PosColorVertex( -1.0,  1.0, -1.0, $ffff0000 ),
+	New PosColorVertex(  1.0,  1.0, -1.0, $ffff00ff ),
+	New PosColorVertex( -1.0, -1.0, -1.0, $ffffff00 ),
+	New PosColorVertex(  1.0, -1.0, -1.0, $ffffffff ) ]
+
+Global s_cubeIndices:Int[] = [
+	0, 1, 2, ' 0
+	1, 3, 2,
+	4, 6, 5, ' 2
+	5, 6, 7,
+	0, 2, 4, ' 4
+	4, 2, 6,
+	1, 5, 3, ' 6
+	5, 7, 3,
+	0, 4, 1, ' 8
+	4, 5, 1,
+	2, 3, 6, ' 10
+	6, 3, 7]
+
+Class MeshExample Extends App
+
+'  	Field debug:Int = BGFX_DEBUG_NONE
+	Field debug:Int = BGFX_DEBUG_TEXT
+
+	Field m_timeOffset:Int
+	Field m_program:BgfxProgramHandle
+
+	Field m_vbh:BgfxVertexBufferHandle
+	Field m_ibh:BgfxIndexBufferHandle
+
+	Field sCubeVerticesBuffer:DataBuffer
+	Field sCubeIndicesBuffer:DataBuffer
+
+	Method MakeDataBuffers:Void()
+
+		Local address:Int
+		Local length:Int
+
+		' s_cubeVertices to sCubeVerticesBuffer
+
+		address = 0
+		length = s_cubeVertices.Length()
+
+		sCubeVerticesBuffer = New DataBuffer( length * 16 )
+		For Local i:Int = 0 Until length
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_x ); address += 4
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_y ); address += 4
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_z ); address += 4
+			sCubeVerticesBuffer.PokeInt( address, s_cubeVertices[i].m_abgr ); address += 4
+		Next
+
+		' s_cubeIndices to sCubeIndicesBuffer
+
+		address = 0
+		length = s_cubeIndices.Length()
+
+		sCubeIndicesBuffer = New DataBuffer( length * 2 )
+		For Local i:Int = 0 Until length
+			sCubeIndicesBuffer.PokeShort( address, s_cubeIndices[i] ); address += 2
+		Next
+	End
+
+	Method OnCreate:Int()
+
+		SetUpdateRate(60)
+
+		' Enable debug text.
+		bgfxSetDebug(debug)
+
+		' Set view 0 clear state.
+		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
+
+		' Create vertex stream declaration.
+		PosColorVertex.Init()
+
+		MakeDataBuffers()
+
+		' Create static vertex buffer.
+		m_vbh = bgfxUtilsCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosColorVertex.ms_decl )
+
+		' Create static index buffer.
+		m_ibh = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
+
+		' Create program from shaders.
+		m_program = bgfxUtilsLoadProgram("vs_instancing", "fs_instancing")
+
+		m_timeOffset = Millisecs()
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	Field at:Float[]  = [ 0.0, 0.0,   0.0 ]
+	Field eye:Float[] = [ 0.0, 0.0, -35.0 ]
+
+	Field bgfxCaps:BgfxCaps = New BgfxCaps()
+
+'  	Field iden:Float[] = [
+'  		1.0, 0.0, 0.0, 0.0,
+'  		0.0, 1.0, 0.0, 0.0,
+'  		0.0, 0.0, 1.0, 0.0,
+'  		0.0, 0.0, 0.0, 1.0]
+
+	Field view:Float[16]
+	Field proj:Float[16]
+
+	Field mtx:Float[16]
+
+	Field supported:Int[2]
+
+	Field idb:BgfxInstanceDataBuffer = New BgfxInstanceDataBuffer()
+
+	Method OnRender:Int()
+
+		Local m_width:Int = DeviceWidth()
+		Local m_height:Int = DeviceHeight()
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect(0, 0, 0, m_width, m_height)
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch(0)
+
+		Local time:Float = Float( (Millisecs() - m_timeOffset) * 0.001 ) ' / 1000.0 )
+
+		' Get renderer capabilities info.
+		bgfxGetCaps(bgfxCaps)
+		bgfxCaps.GetSupported(supported)
+
+		If (supported[1] & BGFX_CAPS_INSTANCING[1]) = 0 Then
+
+			Local blink:Int = Int(time * 3.0) & 1
+			Local blinkAttr:Int
+
+			If blink Then
+				blinkAttr = $4f
+			Else
+				blinkAttr = $04
+			Endif
+
+			bgfxDbgTextPrintf(0, 0, blink, " Instancing is not supported by GPU. ")
+		Else
+
+			' Set view and projection matrix for view 0.
+			'{
+				bxMtxLookAt(view, eye, at)
+
+				bxMtxProj(proj, 60.0, Float(m_width) / Float(m_height), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth())
+				bgfxSetViewTransform(0, view, proj)
+
+				' Set view 0 default viewport.
+				bgfxSetViewRect(0, 0, 0, m_width, m_height)
+			'}
+
+			' 80 bytes stride = 64 bytes for 4x4 matrix + 16 bytes for RGBA color.
+			Const instanceStride:Int = 80
+			' 11x11 cubes
+			Const numInstances:Int   = 121
+
+			If numInstances = bgfxGetAvailInstanceDataBuffer(numInstances, instanceStride) Then
+
+				bgfxAllocInstanceDataBuffer(idb, numInstances, instanceStride)
+
+				Local address:Int = 0
+
+				' Write instance data for 11x11 cubes.
+				For Local yy:Int = 0 Until 11
+					For Local xx:Int = 0 Until 11
+
+						bxMtxRotateXY(mtx, time + xx * 0.21, time * 0.37)
+
+						idb.PokeFloat(address, mtx[ 0]); address += 4
+						idb.PokeFloat(address, mtx[ 1]); address += 4
+						idb.PokeFloat(address, mtx[ 2]); address += 4
+						idb.PokeFloat(address, mtx[ 3]); address += 4
+
+						idb.PokeFloat(address, mtx[ 4]); address += 4
+						idb.PokeFloat(address, mtx[ 5]); address += 4
+						idb.PokeFloat(address, mtx[ 6]); address += 4
+						idb.PokeFloat(address, mtx[ 7]); address += 4
+
+						idb.PokeFloat(address, mtx[ 8]); address += 4
+						idb.PokeFloat(address, mtx[ 9]); address += 4
+						idb.PokeFloat(address, mtx[10]); address += 4
+						idb.PokeFloat(address, mtx[11]); address += 4
+
+						' idb.PokeFloat(address, mtx[12]); address += 4
+						idb.PokeFloat(address, -15.0 + Float(xx) * 3.0); address += 4
+
+						' idb.PokeFloat(address, mtx[13]); address += 4
+						idb.PokeFloat(address, -15.0 + Float(yy) * 3.0); address += 4
+
+						' idb.PokeFloat(address, mtx[14]); address += 4
+						idb.PokeFloat(address, 0.0); address += 4
+
+						idb.PokeFloat(address, mtx[15]); address += 4
+
+						' float* color = (float*)&data[64];
+						' color[0] = bx::sin(time+float(xx)/11.0f)*0.5f+0.5f;
+						idb.PokeFloat(address, Sinr(time + Float(xx) / 11.0) * 0.5 + 0.5); address += 4
+
+						' color[1] = bx::cos(time+float(yy)/11.0f)*0.5f+0.5f;
+						idb.PokeFloat(address, Cosr(time + Float(yy) / 11.0) * 0.5 + 0.5); address += 4
+
+						' color[2] = bx::sin(time*3.0f)*0.5f+0.5f;
+						idb.PokeFloat(address, Sinr(time * 3.0) * 0.5 + 0.5); address += 4
+
+						' color[3] = 1.0f;
+						idb.PokeFloat(address, 1.0); address += 4
+					Next
+				Next
+
+				' Set vertex and index buffer.
+				bgfxSetVertexBuffer(0, m_vbh)
+				bgfxSetIndexBuffer(m_ibh)
+
+				' Set instance data buffer.
+				bgfxSetInstanceDataBuffer(idb)
+
+				' Set render states.
+				bgfxSetState(BGFX_STATE_DEFAULT)
+
+				' Submit primitive for rendering to view 0.
+				bgfxSubmit(0, m_program)
+			Endif
+
+		Endif
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	New MeshExample()
+	Return 0
+End

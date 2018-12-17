@@ -1,0 +1,235 @@
+
+' using DrawText to draw some bgfx debug text
+'  Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+Import mojo.app
+Import bgfx
+
+Class PosColorTexCoord0Vertex
+
+'  	Field m_x:Float
+'  	Field m_y:Float
+'  	Field m_z:Float
+'  
+'  	Field m_abgr:Int
+'  
+'  	Field m_u:Float
+'  	Field m_v:Float
+'  
+'  	Method New(m_x:Float, m_y:Float, m_z:Float, m_abgr:Int, m_u:Float, m_v:Float)
+'  
+'  		Self.m_x = m_x
+'  		Self.m_y = m_y
+'  		Self.m_z = m_z
+'  
+'  		Self.m_abgr = m_abgr
+'  
+'  		Self.m_u = m_u
+'  		Self.m_v = m_v
+'  	End
+
+	Global ms_decl:BgfxVertexDecl = New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0, 4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global _tvb:BgfxTransientVertexBuffer = New BgfxTransientVertexBuffer()
+Global _tib:BgfxTransientIndexBuffer = New BgfxTransientIndexBuffer()
+
+Function RenderScreenSpaceQuad:Void(_view:Int, _program:BgfxProgramHandle, _x:Float, _y:Float, _width:Float, _height:Float)
+
+	If bgfxAllocTransientBuffers(_tvb, PosColorTexCoord0Vertex.ms_decl, 4, _tib, 6) Then
+
+		Local zz:Float = 0.0
+
+		Local minx:Float = _x
+		Local maxx:Float = _x + _width
+		Local miny:Float = _y
+		Local maxy:Float = _y + _height
+
+		Local minu:Float = -1.0
+		Local minv:Float = -1.0
+		Local maxu:Float =  1.0
+		Local maxv:Float =  1.0
+
+		Local address:Int = 0
+
+		_tvb.PokeFloat(address, minx); address += 4
+		_tvb.PokeFloat(address, miny); address += 4
+		_tvb.PokeFloat(address, zz); address += 4
+		_tvb.PokeInt(address, $ff0000ff); address += 4
+		_tvb.PokeFloat(address, minu); address += 4
+		_tvb.PokeFloat(address, minv); address += 4
+
+		_tvb.PokeFloat(address, maxx); address += 4
+		_tvb.PokeFloat(address, miny); address += 4
+		_tvb.PokeFloat(address, zz); address += 4
+		_tvb.PokeInt(address, $ff00ff00); address += 4
+		_tvb.PokeFloat(address, maxu); address += 4
+		_tvb.PokeFloat(address, minv); address += 4
+
+		_tvb.PokeFloat(address, maxx); address += 4
+		_tvb.PokeFloat(address, maxy); address += 4
+		_tvb.PokeFloat(address, zz); address += 4
+		_tvb.PokeInt(address, $ffff0000); address += 4
+		_tvb.PokeFloat(address, maxu); address += 4
+		_tvb.PokeFloat(address, maxv); address += 4
+
+		_tvb.PokeFloat(address, minx); address += 4
+		_tvb.PokeFloat(address, maxy); address += 4
+		_tvb.PokeFloat(address, zz); address += 4
+		_tvb.PokeInt(address, $ffffffff); address += 4
+		_tvb.PokeFloat(address, minu); address += 4
+		_tvb.PokeFloat(address, maxv); address += 4
+
+		address = 0
+
+		_tib.PokeShort(address, 0); address += 2
+		_tib.PokeShort(address, 2); address += 2
+		_tib.PokeShort(address, 1); address += 2
+		_tib.PokeShort(address, 0); address += 2
+		_tib.PokeShort(address, 3); address += 2
+		_tib.PokeShort(address, 2); address += 2
+
+		bgfxSetState(BGFX_STATE_DEFAULT)
+		bgfxSetTransientIndexBuffer(_tib)
+		bgfxSetTransientVertexBuffer(0, _tvb)
+		bgfxSubmit(_view, _program)
+	Endif
+End
+
+Class RaymarchExample Extends App
+
+	Field m_timeOffset:Int
+
+	Field debug:Int = BGFX_DEBUG_NONE
+'  	Field debug:Int = BGFX_DEBUG_TEXT
+
+	Field u_mtx:BgfxUniformHandle = New BgfxUniformHandle()
+	Field u_lightDirTime:BgfxUniformHandle = New BgfxUniformHandle()
+
+	Field m_program:BgfxProgramHandle
+
+	Method OnCreate:Int()
+
+		SetUpdateRate(60)
+
+		' Enable debug text.
+		bgfxSetDebug(debug)
+
+		' Set view 0 clear state.
+		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
+
+		' Create vertex stream declaration.
+		PosColorTexCoord0Vertex.Init()
+
+		bgfxCreateUniform(u_mtx,          "u_mtx",          BGFX_UNIFORM_TYPE_MAT4)
+		bgfxCreateUniform(u_lightDirTime, "u_lightDirTime", BGFX_UNIFORM_TYPE_VEC4)
+
+		' Create program from shaders.
+		m_program = bgfxUtilsLoadProgram("vs_raymarching", "fs_raymarching")
+
+		m_timeOffset = Millisecs()
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	Field at:Float[]  = [ 0.0, 0.0,   0.0 ]
+	Field eye:Float[] = [ 0.0, 0.0, -15.0 ]
+
+	Field bgfxCaps:BgfxCaps = New BgfxCaps()
+
+	Field iden:Float[] = [
+		1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.0, 0.0, 0.0, 1.0]
+
+	Field view:Float[16]
+	Field proj:Float[16]
+	Field ortho:Float[16]
+
+	Field vp:Float[16] ' view * projection matrix
+	Field mtx:Float[16]
+	Field mtxInv:Float[16]
+
+	Field lightDirModel:Float[] = [ -0.4, -0.5, -1.0, 0.0 ]
+	Field lightDirModelN:Float[4]
+	Field lightDirTime:Float[4]
+
+	Field mvp:Float[16]
+	Field invMvp:Float[16]
+
+	Method OnRender:Int()
+
+		Local m_width:Int = DeviceWidth()
+		Local m_height:Int = DeviceHeight()
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect(0, 0, 0, m_width, m_height)
+
+		' Set view 1 default viewport.
+		bgfxSetViewRect(1, 0, 0, m_width, m_height)
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch(0)
+
+		bxMtxLookAt(view, eye, at)
+
+		bgfxGetCaps(bgfxCaps)
+		bxMtxProj(proj, 60.0, float(m_width) / float(m_height), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth())
+
+		' Set view and projection matrix for view 0.
+		bgfxSetViewTransform(0, view, proj)
+
+		bxMtxOrtho(ortho, 0.0, m_width, m_height, 0.0, 0.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth())
+
+		' Set view and projection matrix for view 1.
+		bgfxSetViewTransform(1, iden, ortho)
+
+		Local time:Float = Float(Millisecs() - m_timeOffset) / 1000.0
+
+		bxMtxMul(vp, view, proj)
+		bxMtxRotateXY(mtx, time, time * 0.37)
+		bxMtxInverse(mtxInv, mtx)
+		bxVec3Norm(lightDirModelN, lightDirModel)
+		bxVec4MulMtx(lightDirTime, lightDirModelN, mtxInv)
+		lightDirTime[3] = time
+		bgfxSetUniform(u_lightDirTime, lightDirTime)
+
+		bxMtxMul(mvp, mtx, vp)
+
+		bxMtxInverse(invMvp, mvp)
+		bgfxSetUniform(u_mtx, invMvp)
+
+		RenderScreenSpaceQuad(1, m_program, 0.0, 0.0, m_width, m_height)
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame() 
+
+		Return 0
+	End
+End
+
+Function Main:Int()
+	New RaymarchExample()
+	Return 0
+End
