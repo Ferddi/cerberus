@@ -27,7 +27,8 @@ HTML_PLAYER="${CERBERUSDIR}\bin\cserver_winnt.exe"
 '***** DO NOT use mingw64-5.1.0 as it has a linker bug *****
 
 '***** 64 bit mingw *****
-MINGW_PATH="D:\Applications\Compilers\TDM-GCC-64"
+'MINGW_PATH="D:\Applications\Compilers\TDM-GCC-64"
+MINGW_PATH="..\3rdparty\x86_64-8.1.0-release-posix-seh-rt_v6-rev0\mingw64\bin"
 '--------------------
 
 '--------------------
@@ -93,7 +94,7 @@ PSM_PATH="d:\devtools\PSM_SDK"
 '
 'MSBUILD_PATH="${PROGRAMFILES}\MSBuild\14.0\Bin\MSBuild.exe"
 'MSBUILD_PATH="${PROGRAMFILES}\MSBuild\12.0\Bin\MSBuild.exe"
-MSBUILD_PATH="${WINDIR}\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe"
+'MSBUILD_PATH="${WINDIR}\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe"
 '--------------------
 
 '--------------------
