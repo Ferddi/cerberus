@@ -17,10 +17,6 @@ Class MojoGame Extends App
 
 		SetUpdateRate(60)
 
-		InitTools()
-
-		Print "Randomi()=" + Randomi()
-
 		Local len:Int = s_Logo.Length()
 		sLogoBuffer = New DataBuffer( len )
 		For Local i:Int = 0 Until len

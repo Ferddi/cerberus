@@ -1,0 +1,3 @@
+MINGW_PATH="${CERBERUSDIR}/3rdparty/x86_64-8.1.0-release-posix-seh-rt_v6-rev0/mingw64"
+
+The above line is from config.winnt.txt.  Mingw-w64 needs to be in this 3rdparty directory.

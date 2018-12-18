@@ -1,4 +1,5 @@
 /3rdparty/*
+!/3rdparty/place_mingw-w64_here.txt
 
 /bin/*
 !/bin/*.txt

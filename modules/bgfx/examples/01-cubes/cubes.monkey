@@ -202,8 +202,6 @@ Class MojoGame Extends App
 
 		SetUpdateRate(60)
 
-'  		InitTools()
-
 		MakeDataBuffers()
 
 		' Enable debug text.
