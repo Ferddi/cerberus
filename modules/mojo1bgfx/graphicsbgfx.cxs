@@ -2286,14 +2286,14 @@ Class DrawList
 	Method DrawImageAlign:Void( image:Image, tx:Float, ty:Float, sourceX:Int, sourceY:Int, sourceWidth:Int, sourceHeight:Int, alignX:Float, alignY:Float, frame:Int=0 )
 		PushMatrix
 		Translate tx,ty
-		DrawImageHandle image,sourceX,sourceY,sourceWidth,sourceHeight,alignX,alignY,frame
+		DrawImageAlign image,sourceX,sourceY,sourceWidth,sourceHeight,alignX,alignY,frame
 		PopMatrix
 	End
 
 	Method DrawImageAlign:Void( image:Image, tx:Float, ty:Float, sourceX:Int, sourceY:Int, sourceWidth:Int, sourceHeight:Int, rz:Float, sx:Float, sy:Float, alignX:Float, alignY:Float, frame:Int=0 )
 		PushMatrix
 		TranslateRotateScale tx,ty,rz,sx,sy
-		DrawImageHandle image,sourceX,sourceY,sourceWidth,sourceHeight,alignX,alignY,frame
+		DrawImageAlign image,sourceX,sourceY,sourceWidth,sourceHeight,alignX,alignY,frame
 		PopMatrix
 	End
 
