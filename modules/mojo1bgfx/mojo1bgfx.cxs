@@ -22,6 +22,7 @@
 
 #Endif
 
+Import mojo1bgfx.graphicsatlas
 Import mojo1bgfx.graphicsfont
 Import mojo1bgfx.graphicsimage
 Import mojo1bgfx.wrapper

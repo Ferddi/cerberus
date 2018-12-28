@@ -1,0 +1,344 @@
+
+Import mojo1bgfx
+
+Const ATLAS_NULL:Int = -1
+
+Class AtlasPage
+	Field pageImage:Image
+	Field width:Float
+	Field height:Float
+'  	Field useMipMaps:Bool
+'  	Field format:Int
+'  	Field minFilter:Int
+'  	Field magFilter:Int
+'  	Field clamp:Int
+'  	Field repeatX:Int
+'  	Field repeatY:Int
+End
+
+Class AtlasImage
+
+	Field page:AtlasPage
+
+	Field name:String
+
+	Field rotate:Bool
+
+	Field srcImage:Image		' = AtlasPage.pageImage (this is a cache)
+	Field srcLeft:Int
+	Field srcTop:Int
+	Field srcWidth:Int
+	Field srcHeight:Int
+
+	' TODO splits and pads
+'  	Field splits:Int[]
+'  	Field pads:Int[]
+
+	Field originalWidth:Int
+	Field originalHeight:Int
+
+	Field handleX:Int
+	Field handleY:Int
+
+	Field alignX:Float
+	Field alignY:Float
+
+	Field index:Int
+	
+	Method Draw:Void(x:Float, y:Float)
+		DrawImageAlign(srcImage, x, y, srcLeft, srcTop, srcWidth, srcHeight, alignX, alignY)
+	End
+
+	Method Draw:Void(x:Float, y:Float, rotation:Float, scaleX:Float, scaleY:Float)
+		DrawImageAlign(srcImage, x, y, srcLeft, srcTop, srcWidth, srcHeight, rotation, scaleX, scaleY, alignX, alignY)
+	End
+End
+
+Class Atlas
+
+	Field images:Stack<AtlasImage> = New Stack<AtlasImage>()
+
+	Method New()
+
+	End
+
+	Method CountImages:Int()
+		Return images.Length()
+	End
+
+	Method GetImage:AtlasImage(index:Int)
+		Return images.Get(index)
+	End
+
+	Method AddImage:Void(atlasImage:AtlasImage)
+		images.Push(atlasImage)
+	End
+
+	' globals
+
+	Global _atlases:Stack<Atlas> = New Stack<Atlas>()
+
+	Function Get:AtlasImage(atlasIndex:Int, name:String)
+
+		Local atlas:Atlas = _atlases.Get(atlasIndex)
+		Local count:Int = atlas.CountImages()
+
+		For Local ii:Int = 0 Until count
+			Local atlasImage:AtlasImage = atlas.GetImage(ii)
+			If atlasImage.name = name Then
+				Return atlasImage
+			Endif
+		Next
+
+		Return Null
+	End
+
+	Global _scriptLines:String[]
+	Global _currentLine:String
+	Global _lineValues:String[]
+	Global _lineIndex:Int
+
+	Function GetNextLine:Void()
+		_currentLine = _scriptLines[ _lineIndex ].Trim()
+		_lineIndex += 1
+	End
+
+	Function GetNextLineValues:Int()
+		GetNextLine()
+		Local colon:String[] = _currentLine.Split(":")
+		If colon.Length() <= 1 Then Return -1
+		_lineValues = colon[1].Split(",")
+		For Local ii:Int = 0 Until _lineValues.Length()
+			_lineValues[ii] = _lineValues[ii].Trim()
+		Next
+		Return _lineValues.Length()
+	End
+
+	Function Load:Int(filePath:String)
+
+		Local scriptRaw:String = LoadString(filePath)
+
+		If scriptRaw.Trim().Length() > 0 Then
+
+			Local atlas:Atlas = New Atlas()
+
+			Local script:String = scriptRaw.Replace("~r~n", "~n")
+
+			_scriptLines = script.Split("~n")
+			_lineIndex = 0
+
+			Local atlasPage:AtlasPage
+
+			While _lineIndex < _scriptLines.Length()
+
+				GetNextLine()
+
+				If _currentLine.Trim().Length() = 0 Then
+					' if there is an empty line it means there is another page!
+					atlasPage = Null
+
+				Else If atlasPage = Null Then
+
+					atlasPage = New AtlasPage()
+
+					atlasPage.pageImage = LoadImage( _currentLine )
+
+					GetNextLineValues()
+
+					' size: 512,256
+					If _currentLine.Contains("size") Then
+						atlasPage.width = Int(_lineValues[0])
+						atlasPage.height = Int(_lineValues[1])
+						GetNextLine() ' format: RGBA8888
+					Endif
+
+					GetNextLine() ' filter: Nearest,Nearest OR filter: Linear,Linear
+					GetNextLine() ' repeat: none, repeat: x, repeat: y OR repeat: xy
+
+					' TODO format, filter and repeat
+'  						GetNextLineValues()
+'  					Endif
+'  
+'  					' format: RGBA8888
+'  					atlasPage.format = _lineValues[0]
+'  
+'  					GetNextLineValues()
+'  
+'  					' filter: Nearest,Nearest
+'  					Select _lineValues[0]
+'  					Case "Linear"
+'  						atlasPage.minFilter = Texture.Filter
+'  					Case "Nearest"
+'  						atlasPage.minFilter = 0
+'  					End
+'  
+'  					Select _lineValues[1]
+'  					Case "Linear"
+'  						atlasPage.magFilter = Texture.Filter
+'  					Case "Nearest"
+'  						atlasPage.magFilter = 0
+'  					End
+'  
+'  					GetNextLineValues()
+'  
+'  					Select _lineValues[0]
+'  					Case "x"
+'  						' repeat: x
+'  						atlasPage.clamp = Texture.ClampT
+'  					Case "y"
+'  						' repeat: y
+'  						atlasPage.clamp = Texture.ClampS
+'  					Case "xy"
+'  						' repeat: xy
+'  						atlasPage.clamp = 0
+'  					Default
+'  						' repeat: none
+'  						atlasPage.clamp = Texture.ClampST
+'  					End
+
+				Else
+
+					Local atlasImage:AtlasImage = New AtlasImage()
+
+					atlasImage.page = atlasPage
+					atlasImage.srcImage = atlasPage.pageImage
+
+					atlasImage.name = _currentLine
+
+					GetNextLineValues()
+
+					If _lineValues[0] = "true" Then
+						atlasImage.rotate = True
+					Else
+						atlasImage.rotate = False
+					Endif
+
+					GetNextLineValues()
+
+					atlasImage.srcLeft = Int(_lineValues[0])
+					atlasImage.srcTop = Int(_lineValues[1])
+
+					GetNextLineValues()
+
+					atlasImage.srcWidth = Int(_lineValues[0])
+					atlasImage.srcHeight = Int(_lineValues[1])
+
+					If atlasImage.rotate Then
+						' if rotate then swap srcWidth and srcHeight
+						Local temp:Int = atlasImage.srcWidth
+						atlasImage.srcWidth = atlasImage.srcHeight
+						atlasImage.srcHeight = temp
+					Endif
+
+					GetNextLineValues()
+
+					' TODO splits and pads
+
+					' split is optional
+					If _currentLine.Contains("split") Then
+
+'  						atlasImage.splits = New Int[4]
+'  						atlasImage.splits[0] = Int(_lineValues[0])
+'  						atlasImage.splits[1] = Int(_lineValues[1])
+'  						atlasImage.splits[2] = Int(_lineValues[2])
+'  						atlasImage.splits[3] = Int(_lineValues[3])
+
+						GetNextLineValues()
+
+						' pad is optional but split must appear first
+						If _currentLine.Contains("pad") Then
+
+'  							atlasImage.pads = New Int[4]
+'  							atlasImage.pads[0] = Int(_lineValues[0])
+'  							atlasImage.pads[1] = Int(_lineValues[1])
+'  							atlasImage.pads[2] = Int(_lineValues[2])
+'  							atlasImage.pads[3] = Int(_lineValues[3])
+
+							GetNextLineValues()
+						Endif
+
+					Endif
+
+					atlasImage.originalWidth  = Int(_lineValues[0])
+					atlasImage.originalHeight = Int(_lineValues[1])
+
+					GetNextLineValues()
+
+					atlasImage.handleX = Int(_lineValues[0])
+					atlasImage.handleY = Int(_lineValues[1])
+
+					' @Cleanup: test alignX and alignY
+					atlasImage.alignX = atlasImage.handleX / atlasImage.originalWidth
+					atlasImage.alignY = atlasImage.handleY / atlasImage.originalHeight
+
+					GetNextLineValues()
+
+					atlasImage.index = Int(_lineValues[0])
+
+					atlas.AddImage(atlasImage)
+
+				Endif
+			Wend
+
+			_atlases.Push(atlas)
+			Return _atlases.Length() - 1
+
+		Endif
+
+		Print "error loading atlas: " + filePath
+
+		Return ATLAS_NULL
+	End
+
+End
+
+Function LoadAtlas:Int(filePath:String)
+	Return Atlas.Load(filePath)
+End
+
+'  Function DrawImageAlign:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, alignX:Float, alignY:Float, frame:Int=0 )
+'  	_activeCanvas.DrawImageHandlef( image, x, y, srcX, srcY, srcWidth, srcHeight, alignX, alignY, frame )
+'  End
+
+'  Function DrawImageAlign:Void( image:Image, x:Float, y:Float, srcX:Int, srcY:Int, srcWidth:Int, srcHeight:Int, rotation:Float, scaleX:Float, scaleY:Float, alignX:Float, alignY:Float, frame:Int=0 )
+'  	_activeCanvas.DrawImageHandlef( image, x, y, srcX, srcY, srcWidth, srcHeight, rotation, scaleX, scaleY, alignX, alignY, frame )
+'  End
+
+Function LoadAtlasImage:AtlasImage(atlasIndex:Int, filePath:String)
+
+	Local filePathSplit:String[] = filePath.Split("/")
+	Local name:String = filePathSplit[filePathSplit.Length()-1].Split(".")[0]
+	Local atlasImage:AtlasImage
+
+	If atlasIndex > ATLAS_NULL Then
+		atlasImage = Atlas.Get(atlasIndex, name)
+	Endif
+
+	If Not atlasImage Then
+
+		Local img:Image = LoadImage(filePath)
+
+		If img Then
+			atlasImage = New AtlasImage()
+			atlasImage.srcImage = img
+			atlasImage.srcLeft = 0
+			atlasImage.srcTop = 0
+			atlasImage.srcWidth = img.Width()
+			atlasImage.srcHeight = img.Height()
+			atlasImage.handleX = 0
+			atlasImage.handleY = 0
+			atlasImage.alignX = 0.0
+			atlasImage.alignY = 0.0
+		Endif
+	Endif
+
+	Return atlasImage
+End
+
+Function DrawAtlasImage:Void(atlasImage:AtlasImage, x:Float, y:Float)
+	atlasImage.Draw(x, y)
+End
+
+Function DrawAtlasImage:Void(atlasImage:AtlasImage, x:Float, y:Float, rotation:Float, scaleX:Float, scaleY:Float)
+	atlasImage.Draw(x, y, rotation, scaleX, scaleY)
+End
