@@ -1,0 +1,900 @@
+
+' using DrawText to draw some bgfx debug text
+'  Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+Import mojo.app
+Import bgfx
+
+Class PosTexcoordVertex
+
+	Field m_x:Float
+	Field m_y:Float
+	Field m_z:Float
+
+	Field m_u:Float
+	Field m_v:Float
+	Field m_w:Float
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_u:Float, m_v:Float, m_w:Float )
+
+		Self.m_x = m_x
+		Self.m_y = m_y
+		Self.m_z = m_z
+
+		Self.m_u = m_u
+		Self.m_v = m_v
+		Self.m_w = m_w
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global s_cubeVertices:PosTexcoordVertex[] = [
+	New PosTexcoordVertex( -1.0,  1.0,  1.0, -1.0,  1.0,  1.0 ),
+	New PosTexcoordVertex(  1.0,  1.0,  1.0,  1.0,  1.0,  1.0 ),
+	New PosTexcoordVertex( -1.0, -1.0,  1.0, -1.0, -1.0,  1.0 ),
+	New PosTexcoordVertex(  1.0, -1.0,  1.0,  1.0, -1.0,  1.0 ),
+
+	New PosTexcoordVertex( -1.0,  1.0, -1.0, -1.0,  1.0, -1.0 ),
+	New PosTexcoordVertex(  1.0,  1.0, -1.0,  1.0,  1.0, -1.0 ),
+	New PosTexcoordVertex( -1.0, -1.0, -1.0, -1.0, -1.0, -1.0 ),
+	New PosTexcoordVertex(  1.0, -1.0, -1.0,  1.0, -1.0, -1.0 ),
+
+	New PosTexcoordVertex( -1.0,  1.0,  1.0, -1.0,  1.0,  1.0 ),
+	New PosTexcoordVertex( -1.0,  1.0, -1.0, -1.0,  1.0, -1.0 ),
+	New PosTexcoordVertex( -1.0, -1.0,  1.0, -1.0, -1.0,  1.0 ),
+	New PosTexcoordVertex( -1.0, -1.0, -1.0, -1.0, -1.0, -1.0 ),
+
+	New PosTexcoordVertex(  1.0,  1.0,  1.0,  1.0,  1.0,  1.0 ),
+	New PosTexcoordVertex(  1.0, -1.0,  1.0,  1.0, -1.0,  1.0 ),
+	New PosTexcoordVertex(  1.0,  1.0, -1.0,  1.0,  1.0, -1.0 ),
+	New PosTexcoordVertex(  1.0, -1.0, -1.0,  1.0, -1.0, -1.0 ),
+
+	New PosTexcoordVertex( -1.0,  1.0,  1.0, -1.0,  1.0,  1.0 ),
+	New PosTexcoordVertex(  1.0,  1.0,  1.0,  1.0,  1.0,  1.0 ),
+	New PosTexcoordVertex( -1.0,  1.0, -1.0, -1.0,  1.0, -1.0 ),
+	New PosTexcoordVertex(  1.0,  1.0, -1.0,  1.0,  1.0, -1.0 ),
+
+	New PosTexcoordVertex( -1.0, -1.0,  1.0, -1.0, -1.0,  1.0 ),
+	New PosTexcoordVertex( -1.0, -1.0, -1.0, -1.0, -1.0, -1.0 ),
+	New PosTexcoordVertex(  1.0, -1.0,  1.0,  1.0, -1.0,  1.0 ),
+	New PosTexcoordVertex(  1.0, -1.0, -1.0,  1.0, -1.0, -1.0 ),
+
+	New PosTexcoordVertex( -1.0,  1.0,  1.0, -2.0,  2.0,  2.0 ),
+	New PosTexcoordVertex(  1.0,  1.0,  1.0,  2.0,  2.0,  2.0 ),
+	New PosTexcoordVertex( -1.0, -1.0,  1.0, -2.0, -2.0,  2.0 ),
+	New PosTexcoordVertex(  1.0, -1.0,  1.0,  2.0, -2.0,  2.0 )]
+
+Global s_cubeIndices:Int[] = [
+	 0,  1,  2, ' 0
+	 1,  3,  2,
+	 4,  6,  5, ' 2
+	 5,  6,  7,
+	 8, 10,  9, ' 4
+	 9, 10, 11,
+	12, 14, 13, ' 6
+	14, 15, 13,
+	16, 18, 17, ' 8
+	18, 19, 17,
+	20, 22, 21, ' 10
+	21, 22, 23]
+
+Global _updateTextureMem := New BgfxMemory()
+
+Function UpdateTextureCubeRectBgra8:Void( _handle:BgfxTextureHandle, 
+                                           _size:Int,
+                                           _x:Int,
+                                           _y:Int,
+                                           _width:Int,
+                                           _height:Int,
+                                           _r:Int,
+                                           _g:Int,
+                                           _b:Int,
+                                           _a:Int=$ff )
+
+	Local ti := New BgfxTextureInfo()
+	bgfxCalcTextureSize( ti, _width, _height, 1, False, False, 1, BGFX_TEXTURE_FORMAT_BGRA8 )
+
+
+	bgfxAlloc( _updateTextureMem, ti.GetStorageSize() )
+
+	Local num:Int = ti.GetStorageSize() * 8 / ti.GetBitsPerPixel()
+	Local data:Int = 0
+
+	For Local ii:Int = 0 Until num
+		_updateTextureMem.PokeByte( data, _b )
+		_updateTextureMem.PokeByte( data, _g )
+		_updateTextureMem.PokeByte( data, _r )
+		_updateTextureMem.PokeByte( data, _a )
+		data += 4
+	Next
+
+	bgfxUpdateTextureCube( _handle, 0, _size, 0, _x, _y, _width, _height, _updateTextureMem )
+End
+
+'
+' @Cleanup: move this to bgfxutils.cxs
+'
+Function bgfxUtilsIsCapsSupported:Bool( supported:Int[], definesCaps:Int[] )
+
+	If definesCaps[0] <> 0 Then
+		Return (supported[0] & definesCaps[0]) <> 0
+	Endif
+
+	' Else If definesCaps[1] <> 0 Then
+	Return (supported[1] & definesCaps[1]) <> 0
+End
+
+'
+' @Cleanup: move this to defines.cxs
+'
+Function BGFX_SAMPLER_BORDER_COLOR:Int( _index:Int )
+	Return ( (_index Shl BGFX_SAMPLER_BORDER_COLOR_SHIFT) & BGFX_SAMPLER_BORDER_COLOR_MASK )
+End
+
+'
+' @Cleanup: move these to packrect.cxs
+'
+Class Pack2D
+	Field m_x      :Int
+	Field m_y      :Int
+	Field m_width  :Int
+	Field m_height :Int
+End
+
+Class PackCube
+	Field m_rect := New Pack2D()
+	Field m_side :Int
+End
+
+'
+' @Cleanup: RectPack2DT needs to be pooled
+'
+
+Class RectPack2DT
+
+	Field numBlocks :Int
+
+	Field m_mem     :Int[] ' uint64_t m_mem[numBlocks];
+	Field m_bw      :Int
+	Field m_bh      :Int
+
+	Method New( numBlocks:Int, _width:Int, _height:Int )
+
+		Self.numBlocks = numBlocks
+		Self.m_mem     = New Int[ numBlocks ]
+
+		Reset( _width, _height )
+	End
+
+	Method Reset:Void( _width:Int, _height:Int )
+
+		m_bw = _width  / 32
+		m_bh = _height / numBlocks
+
+		For Local ii:Int = 0 Until m_mem.Length()
+			m_mem[ii] = $ffffffff
+		Next
+	End
+
+	Method Find:Bool( _width:Int, _height:Int, _pack:Pack2D )
+
+		Local width  :Int = Min( 32,        (_width  + m_bw - 1) / m_bw )
+		Local height :Int = Min( numBlocks, (_height + m_bh - 1) / m_bh )
+		Local numx   :Int = 32        - width
+		Local numy   :Int = numBlocks - height
+
+		Local scan   :Int = $ffffffff
+
+		If width = 32 Then
+			scan = (1 Shl width) - 1
+		Endif
+
+		For Local starty:Int = 0 To numy
+
+			Local mem:Int = m_mem[ starty ]
+			Local ntz:Int = bxCntTZ( mem )
+			Local mask:Int = scan Shl ntz
+
+			For Local xx:Int = ntz To numx
+
+				Local yy:Int = starty
+
+				If (mem & mask) = mask Then
+
+					Local endy:Int = starty + height
+
+					While yy < endy And (m_mem[ yy ] & mask) = mask
+						yy += 1
+					Wend
+
+					If yy = endy Then
+
+						Local cmask:Int = ~ mask
+
+						For Local yy:Int = starty Until endy
+							m_mem[ yy ] &= cmask
+						Next
+
+						_pack.m_x      = xx     * m_bw
+						_pack.m_y      = starty * m_bh
+						_pack.m_width  = width  * m_bw
+						_pack.m_height = height * m_bh
+
+						Return True
+					Endif
+
+				Endif
+
+				mask Shl= 1
+			Next
+
+		Next
+
+		Return False
+	End
+
+	Method Clear:Void( _pack:Pack2D )
+
+		Local startx :Int = Min( 63,             _pack.m_x / m_bw )
+		Local starty :Int = Min( numBlocks - 1,  _pack.m_y / m_bh )
+
+		Local endx   :Int = Min( 64,            (_pack.m_width  + m_bw - 1) / m_bw + startx )
+		Local endy   :Int = Min( numBlocks,     (_pack.m_height + m_bh - 1) / m_bh + starty )
+
+		Local width  :Int = endx - startx
+
+		Local mask   :Int = $ffffffff
+
+		If width = 64 Then
+			mask = ( (1 Shl width) - 1 ) Shl startx
+		Endif
+
+		For Local yy:Int = starty Until endy
+			m_mem[ yy ] |= mask
+		Next
+	End
+
+End
+
+Class RectPackCubeT
+
+	Field m_ra  :RectPack2DT[6]
+	Field m_mru :Int[6]
+
+	Method New( numBlocks:Int, _side:Int )
+
+		For Local ii:Int = 0 Until 6
+			m_ra[ ii ] = New RectPack2DT( numBlocks, _side, _side )
+		Next
+
+		Reset( _side )
+	End
+
+	Method Reset:Void( _side:Int )
+		For Local ii:Int = 0 Until 6
+			m_mru[ ii ] = ii
+			m_ra[ ii ].Reset( _side, _side )
+		Next
+	End
+
+	Method Find:Bool( _width:Int, _height:Int, _pack:PackCube )
+
+		Local found := False
+
+		For Local ii:Int = 0 Until 6
+
+			Local side:Int = m_mru[ ii ]
+			found = m_ra[ side ].Find( _width, _height, _pack.m_rect )
+
+			If found Then
+
+				_pack.m_side = side
+				m_mru[ ii ] = m_mru[ 0 ]
+				m_mru[ 0 ] = side
+
+				Return True
+			Endif
+
+		Next
+
+		Return False
+	End
+
+	Method Clear:Void( _pack:PackCube )
+
+		Local side:Int = _pack.m_side
+
+		Local ii:Int = 0
+		While ii < 6 And m_mru[ ii ] <> side
+			ii += 1
+		Wend
+
+		m_mru[ ii ] = m_mru[ 0 ]
+		m_mru[ 0 ] = side
+
+		m_ra[ side ].Clear( _pack.m_rect )
+	End
+End
+
+Const TEXTURE_SIDE     :Int = 512
+Const TEXTURE_2D_SIZE  :Int = 256
+
+Const NUMBER_OF_BLOCKS :Int = 256
+
+Class UpdateExample Extends App
+
+	Field m_texture2dData      :DataBuffer ' Int[]
+	Field m_numTextures3d      :Int
+	Field m_texture3DSupported :Bool
+	Field m_blitSupported      :Bool
+	Field m_computeSupported   :Bool
+
+	Field m_quads              := New Stack<PackCube>() ' std::list<PackCube>
+	Field m_cube               := New RectPackCubeT( 256, TEXTURE_SIDE )
+	Field m_updateTime         :Int
+	Field m_timeOffset         :Int
+
+	Field m_hit                :Int
+	Field m_miss               :Int
+
+	Field m_rr                 :Int
+	Field m_gg                 :Int
+	Field m_bb                 :Int
+
+	Field m_textures           :BgfxTextureHandle[12]
+	Field m_textures3d         :BgfxTextureHandle[3]
+	Field m_texture2d          :BgfxTextureHandle
+	Field m_textureCube        :BgfxTextureHandle[3]
+
+	Field m_ibh                :BgfxIndexBufferHandle
+	Field m_vbh                :BgfxVertexBufferHandle
+
+	Field m_program3d          :BgfxProgramHandle
+	Field m_programCmp         :BgfxProgramHandle
+	Field m_programCompute     :BgfxProgramHandle
+	Field m_program            :BgfxProgramHandle
+
+	Field u_time               :BgfxUniformHandle
+	Field s_texColor           :BgfxUniformHandle
+	Field s_texCube            :BgfxUniformHandle
+
+	Field sCubeVerticesBuffer  :DataBuffer
+	Field sCubeIndicesBuffer   :DataBuffer
+
+	Field bgfxCaps             := New BgfxCaps()
+	Field supported            :Int[2]
+	Field formats              :Int[BGFX_TEXTURE_FORMAT_COUNT]
+
+'  	Field debug                :Int = BGFX_DEBUG_NONE
+	Field debug                :Int = BGFX_DEBUG_TEXT
+'  	Field m_timeOffset         :Int
+
+	Method MakeDataBuffers:Void()
+
+		Local address:Int
+		Local length:Int
+
+		' s_cubeVertices to sCubeVerticesBuffer
+
+		address = 0
+		length = s_cubeVertices.Length()
+
+		sCubeVerticesBuffer = New DataBuffer( length * 6 * 4 )
+		For Local i:Int = 0 Until length
+
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_x ); address += 4
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_y ); address += 4
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_z ); address += 4
+
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_u ); address += 4
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_v ); address += 4
+			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_w ); address += 4
+		Next
+
+		' s_cubeIndices to sCubeIndicesBuffer
+
+		address = 0
+		length = s_cubeIndices.Length()
+
+		sCubeIndicesBuffer = New DataBuffer( length * 2 )
+		For Local i:Int = 0 Until length
+			sCubeIndicesBuffer.PokeShort( address, s_cubeIndices[i] ); address += 2
+		Next
+	End
+
+	Method OnCreate:Int()
+
+		Local flags:Int[2]
+
+		SetUpdateRate(60)
+
+		' Enable debug text.
+		bgfxSetDebug(debug)
+
+		' Set view 0 clear state.
+		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
+
+		' Create vertex stream declaration.
+		PosTexcoordVertex.Init()
+
+		m_textures[ 0] = bgfxUtilsLoadTexture( "textures/texture_compression_bc1.ktx", BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP )
+		m_textures[ 1] = bgfxUtilsLoadTexture( "textures/texture_compression_bc2.ktx", BGFX_SAMPLER_U_CLAMP)
+		m_textures[ 2] = bgfxUtilsLoadTexture( "textures/texture_compression_bc3.ktx", BGFX_SAMPLER_V_CLAMP)
+		m_textures[ 3] = bgfxUtilsLoadTexture( "textures/texture_compression_etc1.ktx", BGFX_SAMPLER_U_BORDER | BGFX_SAMPLER_V_BORDER | BGFX_SAMPLER_BORDER_COLOR(1) )
+		m_textures[ 4] = bgfxUtilsLoadTexture( "textures/texture_compression_etc2.ktx")
+		m_textures[ 5] = bgfxUtilsLoadTexture( "textures/texture_compression_ptc12.pvr")
+		m_textures[ 6] = bgfxUtilsLoadTexture( "textures/texture_compression_ptc14.pvr")
+		m_textures[ 7] = bgfxUtilsLoadTexture( "textures/texture_compression_ptc22.pvr")
+		m_textures[ 8] = bgfxUtilsLoadTexture( "textures/texture_compression_ptc24.pvr")
+		m_textures[ 9] = bgfxUtilsLoadTexture( "textures/texture_compression_atc.dds")
+		m_textures[10] = bgfxUtilsLoadTexture( "textures/texture_compression_atci.dds")
+		m_textures[11] = bgfxUtilsLoadTexture( "textures/texture_compression_atce.dds")
+
+		bgfxGetCaps(bgfxCaps)
+		bgfxCaps.GetSupported(supported)
+		m_texture3DSupported = bgfxUtilsIsCapsSupported( supported, BGFX_CAPS_TEXTURE_3D   )
+		m_blitSupported      = bgfxUtilsIsCapsSupported( supported, BGFX_CAPS_TEXTURE_BLIT )
+		m_computeSupported   = bgfxUtilsIsCapsSupported( supported, BGFX_CAPS_COMPUTE      )
+		m_numTextures3d      = 0
+
+		If m_texture3DSupported Then
+
+			Local mem8   := New BgfxMemory()
+			Local mem16f := New BgfxMemory()
+			Local mem32f := New BgfxMemory()
+
+			bgfxAlloc( mem8,   32 * 32 * 32     )
+			bgfxAlloc( mem16f, 32 * 32 * 32 * 2 )
+			bgfxAlloc( mem32f, 32 * 32 * 32 * 4 )
+
+			For Local zz:Int = 0 Until 32
+				For Local yy:Int = 0 Until 32
+					For Local xx:Int = 0 Until 32
+						Local offset :Int = (zz * 32 + yy) * 32 + xx 
+						Local val    :Int = xx ~ yy ~ zz
+						mem8.PokeS8( offset, val Shl 3 )
+						mem16f.PokeF16( offset * 2, Float(val) / 32.0 )
+						mem32f.PokeF32( offset * 4, Float(val) / 32.0 )
+					Next
+				Next
+			Next
+
+			bgfxCaps.GetFormats( formats )
+
+			'
+			' @Cleanup: create bgfxUtilsCreateTexture3D
+			'
+
+			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R8]) Then
+				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
+				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
+				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R8,   flags, mem8   )
+				m_numTextures3d += 1
+			Endif
+
+			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R16F ]) Then
+				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
+				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
+				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R16F, flags, mem16f )
+				m_numTextures3d += 1
+			Endif
+
+			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R32F ]) Then
+				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
+				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
+				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R32F, flags, mem32f )
+				m_numTextures3d += 1
+			Endif
+		Endif
+
+		MakeDataBuffers()
+
+		' Create static vertex buffer.
+		m_vbh = bgfxUtilsCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosTexcoordVertex.ms_decl )
+
+		' Create static index buffer.
+		m_ibh = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
+
+		m_program    = bgfxUtilsLoadProgram("vs_update", "fs_update")
+		m_programCmp = bgfxUtilsLoadProgram("vs_update", "fs_update_cmp")
+
+		If m_texture3DSupported Then
+			m_program3d = bgfxUtilsLoadProgram("vs_update", "fs_update_3d")
+		Else
+			m_program3d = New BgfxProgramHandle()
+			m_program3d.SetHandleToInvalid() ' m_program3d.idx = bgfx::kInvalidHandle;
+		Endif
+
+		If m_computeSupported Then
+			m_programCompute = bgfxUtilsLoadProgram("cs_update", "fs_update_3d")
+		Else
+			m_programCompute = New BgfxProgramHandle()
+			m_programCompute.SetHandleToInvalid() ' m_programCompute.idx = bgfx::kInvalidHandle;
+		Endif
+
+		' Create texture sampler uniforms.
+		s_texCube  = bgfxUtilsCreateUniform("s_texCube",  BGFX_UNIFORM_TYPE_INT1)
+		s_texColor = bgfxUtilsCreateUniform("s_texColor", BGFX_UNIFORM_TYPE_INT1)
+
+		' Create time uniform.
+		u_time = bgfxUtilsCreateUniform("u_time", BGFX_UNIFORM_TYPE_VEC4)
+
+		For Local ii:Int = 0 Until m_textureCube.Length()
+			m_textureCube[ii] = New BgfxTextureHandle()
+			m_textureCube[ii].SetHandleToInvalid() ' m_textureCube[ii].idx = bgfx::kInvalidHandle;
+		Next
+
+		'
+		' @Cleanup: create bgfxUtilsCreateTextureCube
+		'
+
+		flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT
+		bgfxCreateTextureCube( m_textureCube[0], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+
+		If m_blitSupported Then
+			flags[0] = BGFX_TEXTURE_BLIT_DST[0]
+			flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_TEXTURE_BLIT_DST[1]
+			bgfxCreateTextureCube( m_textureCube[1], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+		Endif
+
+		If m_computeSupported Then
+			bgfxCreateTextureCube( m_textureCube[2], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_COMPUTE_WRITE )
+		Endif
+
+		m_texture2d = New BgfxTextureHandle()
+		flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT
+		bgfxCreateTexture2D( m_texture2d, TEXTURE_2D_SIZE, TEXTURE_2D_SIZE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+
+'  		m_texture2dData = (uint8_t*)malloc(TEXTURE_2D_SIZE*TEXTURE_2D_SIZE*4);
+		m_texture2dData = New DataBuffer( TEXTURE_2D_SIZE * TEXTURE_2D_SIZE * 4 )
+
+		m_rr = Rnd(256)
+		m_gg = Rnd(256)
+		m_bb = Rnd(256)
+
+		m_hit  = 0
+		m_miss = 0
+
+		m_updateTime = 0
+		m_timeOffset = Millisecs()
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	Method OnClose:Int()
+
+		' m_texture2dData is managed from main thread, and it's passed to renderer
+		' just as MemoryRef. At this point render might be using it. We must wait
+		' previous frame to finish before we can free it.
+		bgfxFrame()
+
+		' Cleanup.
+'  		free(m_texture2dData)
+
+		For Local ii:Int = 0 Until m_textures.Length()
+			bgfxDestroyTexture( m_textures[ ii ] )
+		Next
+
+		For Local ii:Int = 0 Until m_numTextures3d
+			bgfxDestroyTexture( m_textures3d[ ii ] )
+		Next
+
+		bgfxDestroyTexture( m_texture2d )
+
+		' @Incomplete: bgfx::isValid in include\bgfx\bgfx.h is a macro
+
+		For Local ii:Int = 0 Until m_textureCube.Length()
+'  			if bgfxIsValid(  ) Then
+			If m_textureCube[ ii ].IsValid() Then
+				bgfxDestroyTexture( m_textureCube[ ii ] )
+			Endif
+		Next
+
+		bgfxDestroyIndexBuffer( m_ibh )
+		bgfxDestroyVertexBuffer( m_vbh )
+
+'  		If bgfxIsValid( m_program3d ) Then
+		If m_program3d.IsValid() Then
+			bgfxDestroyProgram( m_program3d )
+		Endif
+
+		bgfxDestroyProgram( m_programCmp )
+
+'  		If bgfxIsValid( m_programCompute ) Then
+		If m_programCompute.IsValid() Then
+			bgfxDestroyProgram( m_programCompute )
+		Endif
+
+		bgfxDestroyProgram( m_program  )
+		bgfxDestroyUniform( u_time     )
+		bgfxDestroyUniform( s_texColor )
+		bgfxDestroyUniform( s_texCube  )
+
+		' Shutdown bgfx.
+		bgfxShutdown()
+	End
+
+'  	Field iden:Float[] = [
+'  		1.0, 0.0, 0.0, 0.0,
+'  		0.0, 1.0, 0.0, 0.0,
+'  		0.0, 0.0, 1.0, 0.0,
+'  		0.0, 0.0, 0.0, 1.0]
+
+	Field at    :Float[] = [ 0.0, 0.0,  0.0 ]
+	Field eye   :Float[] = [ 0.0, 0.0, -5.0 ]
+
+	Field view  :Float[16]
+	Field proj  :Float[16]
+	Field mtx   :Float[16]
+
+	Field state :Int[2]
+
+	Field borderColor:Float[4]
+
+	Field m_texture2dMem := New BgfxMemory()
+
+	Method OnRender:Int()
+
+		Local m_width:Int = DeviceWidth()
+		Local m_height:Int = DeviceHeight()
+
+		borderColor[ 0 ] = Rnd( 256 ) / 255
+		borderColor[ 1 ] = Rnd( 256 ) / 255
+		borderColor[ 2 ] = Rnd( 256 ) / 255
+		borderColor[ 3 ] = Rnd( 256 ) / 255
+
+		bgfxSetPaletteColor( 1, borderColor )
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect( 0, 0, 0, m_width, m_height )
+		bgfxSetViewRect( 1, 0, 0, m_width, m_height )
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch(0)
+
+		Local now  :Float = Millisecs()
+		Local time :Float = Float( (now - m_timeOffset) * 0.001 ) ' / 1000.0 )
+		bgfxSetUniform( u_time, time )
+
+		If now > m_updateTime Then
+
+			Local face := New PackCube()
+
+			Local bw:Int = Max( 1.0, Rnd( TEXTURE_SIDE / 4 ) )
+			Local bh:Int = Max( 1.0, Rnd( TEXTURE_SIDE / 4 ) )
+
+			If m_cube.Find( bw, bh, face ) Then
+
+				m_quads.Push( face )
+
+				m_hit += 1
+
+				Local rect:Pack2D = face.m_rect
+
+				UpdateTextureCubeRectBgra8( m_textureCube[0], face.m_side, rect.m_x, rect.m_y, rect.m_width, rect.m_height, m_rr, m_gg, m_bb)
+
+				If m_blitSupported Then
+					bgfxBlit( 0, m_textureCube[1], 0, rect.m_x, rect.m_y, face.m_side, m_textureCube[0], 0, rect.m_x, rect.m_y, face.m_side, rect.m_width, rect.m_height )
+				Endif
+
+				m_rr = Rnd( 256 )
+				m_gg = Rnd( 256 )
+				m_bb = Rnd( 256 )
+
+			Else
+
+				m_miss += 1
+
+				Local num:Int = Min( 10, m_quads.Length() )
+
+				For Local ii:Int = 0 Until num
+
+					face = m_quads.Get(0) ' face = m_quads.front();
+					Local rect:Pack2D = face.m_rect
+					
+					UpdateTextureCubeRectBgra8( m_textureCube[0], face.m_side, rect.m_x, rect.m_y, rect.m_width, rect.m_height, 0, 0, 0 )
+
+					If m_blitSupported Then
+						bgfxBlit( 0, m_textureCube[1], 0, rect.m_x, rect.m_y, face.m_side, m_textureCube[0], 0, rect.m_x, rect.m_y, face.m_side, rect.m_width, rect.m_height )
+					Endif
+
+					m_cube.Clear( face )
+					m_quads.Remove(0) ' m_quads.pop_front();
+
+				Next
+			Endif
+
+			' {
+				' Fill rect.
+				Local pitch:Int = TEXTURE_2D_SIZE * 4
+
+				Local tw:Int = Rnd( TEXTURE_2D_SIZE )
+				Local th:Int = Rnd( TEXTURE_2D_SIZE )
+				Local tx:Int = Rnd( TEXTURE_2D_SIZE - tw )
+				Local ty:Int = Rnd( TEXTURE_2D_SIZE - th )
+
+				' Using makeRef to pass texture memory without copying.
+				' Local mem:bgfxMemory = bgfxMakeRef(dst, tw * th * 4)
+				bgfxMakeRef( m_texture2dMem, m_texture2dData, tw * th * 4)
+
+				Local dst:Int = (ty * TEXTURE_2D_SIZE + tx) * 4
+				Local nextDst = dst + pitch
+
+				For Local yy:Int = 0 Until th
+					For Local xx:Int = 0 Until tw
+						m_texture2dData.PokeByte( dst, m_bb ) ; dst += 1
+						m_texture2dData.PokeByte( dst, m_gg ) ; dst += 1
+						m_texture2dData.PokeByte( dst, m_rr ) ; dst += 1
+						m_texture2dData.PokeByte( dst, 256 )  ; dst += 1
+					Next
+					dst = nextDst
+					nextDst += pitch
+				Next
+
+				' Pitch here makes possible to pass data from source to destination
+				' without need for m_textures and allocated memory to be the same size.
+				bgfxUpdateTexture2D(m_texture2d, 0, 0, tx, ty, tw, th, m_texture2dMem, pitch)
+			' }
+		Endif
+
+		bxMtxLookAt( view, eye, at )
+		bxMtxProj( proj, 60.0, Float(m_width)/Float(m_height), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+
+		' Set view and projection matrix for view 0.
+		bgfxSetViewTransform( 0, view, proj )
+
+		' Update texturecube using compute shader
+		If m_programCompute.IsValid() Then
+			bgfxSetImage( 0, m_textureCube[2], 0, BGFX_ACCESS_WRITE )
+			bgfxDispatch( 0, m_programCompute, TEXTURE_SIDE / 16, TEXTURE_SIDE / 16 )
+		Endif
+
+		For Local ii:Int = 0 Until m_textureCube.Length()
+
+			If m_textureCube[ ii ].IsValid() Then
+
+				bxMtxSRT( mtx, 0.7, 0.7, 0.7, time, time * 0.37, 0.0, -2.0 + ii * 2.0, 0.0, 0.0 )
+
+				' Set model matrix for rendering.
+				bgfxSetTransform( mtx )
+
+				' Set vertex and index buffer.
+				bgfxSetVertexBuffer( 0, m_vbh )
+				bgfxSetIndexBuffer( m_ibh )
+
+				' Bind texture.
+				bgfxSetTexture( 0, s_texCube, m_textureCube[ ii ] )
+
+				' Set render states.
+				bgfxSetState( BGFX_STATE_DEFAULT )
+
+				' Submit primitive for rendering to view 0.
+				bgfxSubmit( 0, m_program )
+			Endif
+		Next
+
+		' Set view and projection matrix for view 1.
+		Local aspectRatio :Float = Float(m_height) / Float(m_width)
+		Local margin      :Float = 0.7
+		Local sizeX       :Float = 0.5 * m_textures.Length() * 2.1 + margin
+		Local sizeY       :Float = sizeX * aspectRatio
+
+		bgfxGetCaps( bgfxCaps )
+		bxMtxOrtho( proj, -sizeX, sizeX, sizeY, -sizeY, 0.0, 1000.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+		bgfxSetViewTransformProj( 1, proj )
+
+		' float mtx[16];
+		bxMtxTranslate( mtx, -sizeX + margin + 1.0, 1.9, 0.0 )
+
+		' Set model matrix for rendering.
+		bgfxSetTransform( mtx )
+
+		' Set vertex and index buffer.
+		bgfxSetVertexBuffer( 0, m_vbh )
+		bgfxSetIndexBuffer( m_ibh )
+
+		' Bind texture.
+		bgfxSetTexture( 0, s_texColor, m_texture2d )
+
+		' Set render states.
+		bgfxSetState( BGFX_STATE_DEFAULT )
+
+		' Submit primitive for rendering to view 1.
+		bgfxSubmit( 1, m_programCmp )
+
+		Local xpos:Float = -sizeX + margin + 1.0
+
+		For Local ii:Int = 0 Until m_textures.Length()
+
+			bxMtxTranslate( mtx, xpos + ii * 2.1, sizeY - margin - 1.0, 0.0 )
+
+			' Set model matrix for rendering.
+			bgfxSetTransform( mtx )
+
+			' Set vertex and index buffer.
+			bgfxSetVertexBuffer( 0, m_vbh )
+			bgfxSetIndexBuffer( m_ibh, 0, 6 )
+
+			' Bind texture.
+			bgfxSetTexture( 0, s_texColor, m_textures[ii] )
+
+			' Set render states.
+			bgfxSetState( BGFX_STATE_DEFAULT )
+
+			' Submit primitive for rendering to view 1.
+			bgfxSubmit( 1, m_programCmp )
+		Next
+
+		For Local ii:Int = 0 Until m_numTextures3d
+
+			Local x:Float = xpos + (ii + (m_textures.Length() - m_numTextures3d) * 0.5) * 2.1
+			Local y:Float = -sizeY + margin + 1.0
+			bxMtxTranslate( mtx, x, y, 0.0 )
+
+			' Set model matrix for rendering.
+			bgfxSetTransform( mtx )
+
+			' Set vertex and index buffer.
+			bgfxSetVertexBuffer(0, m_vbh)
+			bgfxSetIndexBuffer(m_ibh, 0, 6)
+
+			' Bind texture.
+			bgfxSetTexture(0, s_texColor, m_textures3d[ii])
+
+			' Set render states.
+			bgfxSetState(BGFX_STATE_DEFAULT)
+
+			' Submit primitive for rendering to view 1.
+			bgfxSubmit(1, m_program3d)
+		Next
+
+		For Local ii:Int = 0 Until 4
+
+			bxMtxTranslate( mtx, sizeX - margin - 1.0, -sizeY + margin + 1.0 + ii * 2.1, 0.0 )
+
+			' Set model matrix for rendering.
+			bgfxSetTransform( mtx )
+
+			' Set vertex and index buffer.
+			bgfxSetVertexBuffer( 0, m_vbh, 24, 4 )
+			bgfxSetIndexBuffer( m_ibh, 0, 6 )
+
+			' Bind texture.
+			bgfxSetTexture( 0, s_texColor, m_textures[ii] )
+
+			' Set render states.
+			bgfxSetState( BGFX_STATE_DEFAULT )
+
+			' Submit primitive for rendering to view 1.
+			bgfxSubmit( 1, m_programCmp )
+		Next
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		bgfxFrame()
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 08-update"
+	Print "Description: Updating textures."
+	New UpdateExample()
+	Return 0
+End

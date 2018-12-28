@@ -272,6 +272,16 @@ public:
 	~bgfx_program_handle_object()
 	{
 	}
+
+	void SetHandleToInvalid()
+	{
+		_handle.cpp.idx = bgfx::kInvalidHandle;
+	}
+
+	bool IsValid()
+	{
+		return bgfx::kInvalidHandle != _handle.cpp.idx;
+	}
 };
 
 class bgfx_shader_handle_object : public Object
@@ -297,6 +307,16 @@ public:
 	}
 	~bgfx_texture_handle_object()
 	{
+	}
+
+	void SetHandleToInvalid()
+	{
+		_handle.idx = bgfx::kInvalidHandle;
+	}
+
+	bool IsValid()
+	{
+		return bgfx::kInvalidHandle != _handle.idx;
 	}
 };
 
@@ -356,6 +376,77 @@ public:
 	~bgfx_memory_object()
 	{
 	}
+
+	void PokeByte( int addr, int value )
+	{
+		*(_mem->data + addr) = value;
+	}
+
+	void PokeShort( int addr, int value )
+	{
+		*(short *)(_mem->data + addr) = value;
+	}
+
+	void PokeInt( int addr, int value )
+	{
+		*(int *)(_mem->data + addr) = value;
+	}
+
+	void PokeFloat( int addr, float value )
+	{
+		*(float *)(_mem->data + addr) = value;
+	}
+
+	int PeekByte( int addr )
+	{
+		return *(_mem->data + addr);
+	}
+
+	int PeekShort( int addr )
+	{
+		return *(short *)(_mem->data + addr);
+	}
+
+	int PeekInt( int addr )
+	{
+		return *(int *)(_mem->data + addr);
+	}
+
+	float PeekFloat( int addr )
+	{
+		return *(float *)(_mem->data + addr);
+	}
+
+	void PokeS8( int addr, int value )
+	{
+		*(_mem->data + addr) = value;
+	}
+
+	void PokeS16( int addr, int value )
+	{
+		*(short *)(_mem->data + addr) = value;
+	}
+
+	void PokeS32( int addr, int value )
+	{
+		*(int *)(_mem->data + addr) = value;
+	}
+
+	void PokeF16( int addr, int value )
+	{
+		*(short *)(_mem->data + addr) = bx::halfFromFloat(value);
+	}
+
+	void PokeF32( int addr, float value )
+	{
+		*(float *)(_mem->data + addr) = value;
+	}
+
+	// float PeekF16( int addr )
+	// {
+		// return *(short *)(_mem->data + addr);
+	// }
+
 };
 
 class bgfx_transform_object : public Object
@@ -612,13 +703,22 @@ public:
 class bgfx_texture_info_object : public Object
 {
 public:
-	bgfx_texture_info_t * _info;
+	bgfx_texture_info_t _info;
 
 	bgfx_texture_info_object()
 	{
 	}
 	~bgfx_texture_info_object()
 	{
+	}
+
+	int GetStorageSize()
+	{
+		return _info.storageSize;
+	}
+	int GetBitsPerPixel()
+	{
+		return _info.bitsPerPixel;
 	}
 };
 
@@ -698,7 +798,7 @@ public:
 	{
 	}
 
-	virtual void GetSupported(Array<int> supported)
+	virtual void GetSupported( Array<int> supported )
 	{
 		put_uint64_to_int32_array( _caps->supported, supported );
 	}
@@ -706,6 +806,14 @@ public:
 	virtual bool GetHomogeneousDepth()
 	{
 		return _caps->homogeneousDepth;
+	}
+
+	virtual void GetFormats( Array<int> formats )
+	{
+		for(int ii = 0; ii < BGFX_TEXTURE_FORMAT_COUNT; ii++)
+		{
+			formats[ ii ] = _caps->formats[ ii ];
+		}
 	}
 };
 
@@ -880,9 +988,7 @@ void _bx_vec3_norm( Array<float> _result, Array<float> _a )
 
 void _bx_mtx_mul( Array<float> _result, Array<float> _a, Array<float> _b )
 {
-{
 	bx::mtxMul( &_result[0], &_a[0], &_b[0] );
-}
 }
 
 void _bx_mtx_inverse( Array<float> _result, Array<float> _a )
@@ -893,6 +999,21 @@ void _bx_mtx_inverse( Array<float> _result, Array<float> _a )
 void _bx_vec4_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
 {
 	bx::vec4MulMtx( &_result[0], &_vec[0], &_mat[0] );
+}
+
+int _bx_cnt_t_z( int _val )
+{
+	return bx::uint32_cnttz( _val );
+}
+
+void _bx_mtx_s_r_t( Array<float> _result, float _sx, float _sy, float _sz, float _ax, float _ay, float _az, float _tx, float _ty, float _tz)
+{
+	bx::mtxSRT( &_result[0], _sx, _sy, _sz, _ax, _ay, _az, _tx, _ty, _tz );
+}
+
+void _bx_mtx_translate( Array<float> _result, float _tx, float _ty, float _tz )
+{
+	bx::mtxTranslate( &_result[0], _tx, _ty, _tz );
 }
 
 void _calc_tangents(void* _vertices, uint16_t _numVertices, bgfx_vertex_decl_t * _decl, const uint16_t* _indices, uint32_t _numIndices)
@@ -1660,7 +1781,7 @@ bool _bgfx_is_texture_valid( int _depth, bool _cubeMap, int _numLayers, int _for
 // BGFX_C_API void bgfx_calc_texture_size(bgfx_texture_info_t* _info, uint16_t _width, uint16_t _height, uint16_t _depth, bool _cubeMap, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format);
 void _bgfx_calc_texture_size( bgfx_texture_info_object * _info, int _width, int _height, int _depth, bool _cubeMap, bool _hasMips, int _numLayers, int _format )
 {
-	bgfx_calc_texture_size( _info->_info, _width, _height, _depth, _cubeMap, _hasMips, _numLayers, (bgfx_texture_format_t)_format );
+	bgfx_calc_texture_size( &_info->_info, _width, _height, _depth, _cubeMap, _hasMips, _numLayers, (bgfx_texture_format_t)_format );
 }
 
 // Function bgfxCreateTexture:Void( _handle:BgfxTextureHandle, _mem:BgfxMemory, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _skip:Int=0, _info:BgfxTextureInfo=Null )="_bgfx_create_texture"
@@ -1673,7 +1794,7 @@ void _bgfx_create_texture( bgfx_texture_handle_object * _handle, bgfx_memory_obj
 }
 void _bgfx_create_texture( bgfx_texture_handle_object * _handle, bgfx_memory_object * _mem, Array<int> _flags, int _skip, bgfx_texture_info_object * _info )
 {
-	_handle->_handle = bgfx_create_texture( _mem->_mem, get_uint64_from_int32_array( _flags ), _skip, _info->_info );
+	_handle->_handle = bgfx_create_texture( _mem->_mem, get_uint64_from_int32_array( _flags ), _skip, &_info->_info );
 }
 
 // Function bgfxCreateTexture2d:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_2d"
@@ -1682,11 +1803,15 @@ void _bgfx_create_texture( bgfx_texture_handle_object * _handle, bgfx_memory_obj
 // BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_2d(uint16_t _width, uint16_t _height, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
 void _bgfx_create_texture_2d( bgfx_texture_handle_object * _handle, int _width, int _height, bool _hasMips, int _numLayers, int _format )
 {
-	_handle->_handle = bgfx_create_texture_2d( _width, _height, _hasMips, _numLayers, (bgfx_texture_format_t)_format, BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, NULL);
+	_handle->_handle = bgfx_create_texture_2d( _width, _height, _hasMips, _numLayers, (bgfx_texture_format_t)_format, BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, NULL );
+}
+void _bgfx_create_texture_2d( bgfx_texture_handle_object * _handle, int _width, int _height, bool _hasMips, int _numLayers, int _format, Array<int> _flags )
+{
+	_handle->_handle = bgfx_create_texture_2d( _width, _height, _hasMips, _numLayers, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), NULL );
 }
 void _bgfx_create_texture_2d( bgfx_texture_handle_object * _handle, int _width, int _height, bool _hasMips, int _numLayers, int _format, Array<int> _flags, bgfx_memory_object * _mem )
 {
-	_handle->_handle = bgfx_create_texture_2d( _width, _height, _hasMips, _numLayers, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), _mem->_mem);
+	_handle->_handle = bgfx_create_texture_2d( _width, _height, _hasMips, _numLayers, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), _mem->_mem );
 }
 
 // Function bgfxCreateTexture2dScaled:Void( _handle:BgfxTextureHandle, _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE )="_bgfx_create_texture_2d_scaled"
@@ -1710,6 +1835,10 @@ void _bgfx_create_texture_3d( bgfx_texture_handle_object * _handle, int _width, 
 {
 	_handle->_handle = bgfx_create_texture_3d( _width, _height, _depth, _hasMips, (bgfx_texture_format_t)_format, BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, NULL );
 }
+void _bgfx_create_texture_3d( bgfx_texture_handle_object * _handle, int _width, int _height, int _depth, bool _hasMips, int _format, Array<int> _flags )
+{
+	_handle->_handle = bgfx_create_texture_3d( _width, _height, _depth, _hasMips, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), NULL );
+}
 void _bgfx_create_texture_3d( bgfx_texture_handle_object * _handle, int _width, int _height, int _depth, bool _hasMips, int _format, Array<int> _flags, bgfx_memory_object * _mem )
 {
 	_handle->_handle = bgfx_create_texture_3d( _width, _height, _depth, _hasMips, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), _mem->_mem );
@@ -1723,7 +1852,11 @@ void _bgfx_create_texture_cube( bgfx_texture_handle_object * _handle, int _size,
 {
 	_handle->_handle = bgfx_create_texture_cube( _size, _hasMips, _numLayers, (bgfx_texture_format_t)_format, BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, NULL );
 }
-void _bgfx_create_texture_cube( bgfx_texture_handle_object * _handle, int _size, bool _hasMips, int _numLayers, int _format, Array<int> _flags, const bgfx_memory_object * _mem )
+void _bgfx_create_texture_cube( bgfx_texture_handle_object * _handle, int _size, bool _hasMips, int _numLayers, int _format, Array<int> _flags )
+{
+	_handle->_handle = bgfx_create_texture_cube( _size, _hasMips, _numLayers, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), NULL );
+}
+void _bgfx_create_texture_cube( bgfx_texture_handle_object * _handle, int _size, bool _hasMips, int _numLayers, int _format, Array<int> _flags, bgfx_memory_object * _mem )
 {
 	_handle->_handle = bgfx_create_texture_cube( _size, _hasMips, _numLayers, (bgfx_texture_format_t)_format, get_uint64_from_int32_array( _flags ), _mem->_mem );
 }
@@ -1948,6 +2081,14 @@ void _bgfx_set_view_transform( int _id, Array<float> _view, Array<float> _proj )
 {
 	bgfx_set_view_transform( (bgfx_view_id_t)_id, &_view[0], &_proj[0] );
 }
+void _bgfx_set_view_transform_view( int _id, Array<float> _view )
+{
+	bgfx_set_view_transform( (bgfx_view_id_t)_id, &_view[0], NULL );
+}
+void _bgfx_set_view_transform_proj( int _id, Array<float> _proj )
+{
+	bgfx_set_view_transform( (bgfx_view_id_t)_id, NULL, &_proj[0] );
+}
 
 // Function bgfxSetViewTransformStereo:Void( _id:Int, _view:Float[], _projL:Float[], _flags:Int=BGFX_VIEW_STEREO, _projR:Float[]=Null )="_bgfx_set_view_transform_stereo"
 // Function bgfxSetViewTransformStereo:Void( _id:Int, _view:Float[], _projL:Float[], _flags:Int=BGFX_VIEW_STEREO )="_bgfx_set_view_transform_stereo"
@@ -2055,6 +2196,18 @@ int _bgfx_alloc_transform( bgfx_transform_object * _transform, int _num )
 
 // Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Float[], _num:Int=1 )="_bgfx_set_uniform"
 // BGFX_C_API void bgfx_set_uniform(bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
+void _bgfx_set_uniform( bgfx_uniform_handle_object * _handle, int _value, int _num )
+{
+	bgfx_set_uniform( _handle->_handle, &_value, _num );
+}
+void _bgfx_set_uniform( bgfx_uniform_handle_object * _handle, Array<int> _value, int _num )
+{
+	bgfx_set_uniform( _handle->_handle, &_value[0], _num );
+}
+void _bgfx_set_uniform( bgfx_uniform_handle_object * _handle, float _value, int _num )
+{
+	bgfx_set_uniform( _handle->_handle, &_value, _num );
+}
 void _bgfx_set_uniform( bgfx_uniform_handle_object * _handle, Array<float> _value, int _num )
 {
 	bgfx_set_uniform( _handle->_handle, &_value[0], _num );

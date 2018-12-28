@@ -390,12 +390,16 @@ Class BgfxOcclusionQueryHandle="bgfx_occlusion_query_handle_object"
 End
 
 Class BgfxProgramHandle="bgfx_program_handle_object"
+	Method SetHandleToInvalid:Void()
+	Method IsValid:Bool()
 End
 
 Class BgfxShaderHandle="bgfx_shader_handle_object"
 End
 
 Class BgfxTextureHandle="bgfx_texture_handle_object"
+	Method SetHandleToInvalid:Void()
+	Method IsValid:Bool()
 End
 
 Class BgfxUniformHandle="bgfx_uniform_handle_object"
@@ -408,6 +412,30 @@ Class BgfxVertexDeclHandle="bgfx_vertex_decl_handle_object"
 End
 
 Class BgfxMemory="bgfx_memory_object"
+
+	Method Length  :Int() Property
+
+	Method PokeByte  :Void( addr:Int, value:Int )
+	Method PokeShort :Void( addr:Int, value:Int )
+	Method PokeInt   :Void( addr:Int, value:Int )
+	Method PokeFloat :Void( addr:Int, value:Float )
+
+	Method PeekByte  :Int( addr:Int )
+	Method PeekShort :Int( addr:Int )
+	Method PeekInt   :Int( addr:Int )
+	Method PeekFloat :Float( addr:Int )
+
+	Method PokeS8  :Void( addr:Int,value:Int )
+	Method PokeS16 :Void( addr:Int,value:Int )
+	Method PokeS32 :Void( addr:Int,value:Int )
+	Method PokeF16 :Void( addr:Int,value:Float )
+	Method PokeF32 :Void( addr:Int,value:Float )
+
+'	Method PeekS8  :Int( addr:Int )
+'	Method PeekS16 :Int( addr:Int )
+'	Method PeekS32 :Int( addr:Int )
+'	Method PeekF16 :Float( addr:Int )
+'	Method PeekF32 :Float( addr:Int )
 End
 
 Class BgfxTransform="bgfx_transform_object"
@@ -474,6 +502,8 @@ Class BgfxInstanceDataBuffer="bgfx_instance_data_buffer_object"
 End
 
 Class BgfxTextureInfo="bgfx_texture_info_object"
+	Method GetStorageSize:Int()
+	Method GetBitsPerPixel:Int()
 End
 
 Class BgfxUniformInfo="bgfx_uniform_info_object"
@@ -491,6 +521,7 @@ End
 Class BgfxCaps="bgfx_caps_object"
 	Method GetSupported:Void(supported:Int[])
 	Method GetHomogeneousDepth:Bool()
+	Method GetFormats:Void(formats:Int[])
 End
 
 '  Class BgfxCallbackInterface="bgfx_callback_interface_object"
@@ -535,6 +566,9 @@ Function bxVec3Norm:Void( _result:Float[], _a:Float[] )="_bx_vec3_norm"
 Function bxMtxMul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_mtx_mul"
 Function bxMtxInverse:Void( _result:Float[], _a:Float[] )="_bx_mtx_inverse"
 Function bxVec4MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec4_mul_mtx"
+Function bxCntTZ:Int( _value:Int )="_bx_cnt_t_z"
+Function bxMtxSRT:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float, _ax:Float, _ay:Float, _az:Float, _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_s_r_t"
+Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_translate"
 
 Function bgfxReadPixels:Void( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )="_bgfx_read_pixels"
 
@@ -726,7 +760,7 @@ Function bgfxGetUniformInfo:Void( _handle:BgfxUniformHandle, _info:BgfxUniformIn
 Function bgfxSetShaderName:Void( _handle:BgfxShaderHandle, _name:String, _len:Int=INT32_MAX )="_bgfx_set_shader_name"
 
 '  void bgfx_destroy_shader(bgfx_shader_handle_object _handle);
-Function bgfxDestroySshader:Void( _handle:BgfxShaderHandle )="_bgfx_destroy_shader"
+Function bgfxDestroyShader:Void( _handle:BgfxShaderHandle )="_bgfx_destroy_shader"
 
 '  bgfx_program_handle_object bgfx_create_program(bgfx_shader_handle_object _vsh, bgfx_shader_handle_object _fsh, bool _destroyShaders);
 Function bgfxCreateProgram:Void( _handle:BgfxProgramHandle, _vsh:BgfxShaderHandle, _fsh:BgfxShaderHandle, _destroyShaders:Bool=False )="_bgfx_create_program"
@@ -751,7 +785,8 @@ Function bgfxCreateTexture:Void( _handle:BgfxTextureHandle, _mem:BgfxMemory, _fl
 '  bgfx_texture_handle_object bgfx_create_texture_2d(int _width, int _height, bool _hasMips, int _numLayers, int _format, uint64_t _flags, const bgfx_memory_object* _mem);
 '  Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_2d"
 Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_2d"
-Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory=Null )="_bgfx_create_texture_2d"
+Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_2d"
+Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_2d"
 
 '  bgfx_texture_handle_object bgfx_create_texture_2d_scaled(int _ratio, bool _hasMips, int _numLayers, int _format, uint64_t _flags);
 '  Function bgfxCreateTexture2DScaled:Void( _handle:BgfxTextureHandle, _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE )="_bgfx_create_texture_2d_scaled"
@@ -761,12 +796,14 @@ Function bgfxCreateTexture2DScaled:Void( _handle:BgfxTextureHandle, _ratio:Int, 
 '  bgfx_texture_handle_object bgfx_create_texture_3d(int _width, int _height, int _depth, bool _hasMips, int _format, uint64_t _flags, const bgfx_memory_object* _mem);
 '  Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_3d"
 Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int )="_bgfx_create_texture_3d"
-Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[], _mem:BgfxMemory=Null )="_bgfx_create_texture_3d"
+Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[] )="_bgfx_create_texture_3d"
+Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_3d"
 
 '  bgfx_texture_handle_object bgfx_create_texture_cube(int _size, bool _hasMips, int _numLayers, int _format, uint64_t _flags, const bgfx_memory_object* _mem);
 '  Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_cube"
 Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_cube"
-Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory=Null )="_bgfx_create_texture_cube"
+Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_cube"
+Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_cube"
 
 '  void bgfx_update_texture_2d(bgfx_texture_handle_object _handle, int _layer, int _mip, int _x, int _y, int _width, int _height, const bgfx_memory_object* _mem, int _pitch);
 Function bgfxUpdateTexture2D:Void( _handle:BgfxTextureHandle, _layer:Int, _mip:Int, _x:Int, _y:Int, _width:Int, _height:Int, _mem:BgfxMemory, _pitch:Int=UINT16_MAX )="_bgfx_update_texture_2d"
@@ -861,6 +898,8 @@ Function bgfxSetViewFrameBuffer:Void( _id:Int, _handle:BgfxFrameBufferHandle )="
 
 '  void bgfx_set_view_transform(int _id, const void* _view, const void* _proj);
 Function bgfxSetViewTransform:Void( _id:Int, _view:Float[], _proj:Float[] )="_bgfx_set_view_transform"
+Function bgfxSetViewTransformView:Void( _id:Int, _view:Float[] )="_bgfx_set_view_transform_view"
+Function bgfxSetViewTransformProj:Void( _id:Int, _proj:Float[] )="_bgfx_set_view_transform_proj"
 
 '  void bgfx_set_view_transform_stereo(int _id, const void* _view, const void* _projL, int _flags, const void* _projR);
 '  Function bgfxSetViewTransformStereo:Void( _id:Int, _view:Float[], _projL:Float[], _flags:Int=BGFX_VIEW_STEREO, _projR:Float[]=Null )="_bgfx_set_view_transform_stereo"
@@ -903,6 +942,9 @@ Function bgfxAllocTransform:Int( _transform:BgfxTransform, _num:Int )="_bgfx_all
 Function bgfxSetTransformCached:Void( _cache:Int, _num:Int=1 )="bgfx_set_transform_cached"
 
 '  void bgfx_set_uniform(bgfx_uniform_handle_object _handle, const void* _value, int _num);
+Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Int, _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Int[], _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Float, _num:Int=1 )="_bgfx_set_uniform"
 Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Float[], _num:Int=1 )="_bgfx_set_uniform"
 
 '  void bgfx_set_index_buffer(bgfx_index_buffer_handle_object _handle, int _firstIndex, int _numIndices);
@@ -1244,6 +1286,8 @@ Function bgfxUtilsLoadTexture:BgfxTextureHandle( _name:String, _flags:Int=BGFX_S
 
 	Return handle
 End
+
+' Function bgfxUtilsCreateTextureCube:BgfxTextureHandle
 
 '-------------------------------------------------------------------------------
 ' load image
