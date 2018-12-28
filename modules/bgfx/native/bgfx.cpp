@@ -1003,7 +1003,7 @@ void _bx_vec4_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _ma
 
 int _bx_cnt_t_z( int _val )
 {
-	return bx::uint32_cnttz( _val );
+	return bx::uint32_cnttz( (uint32_t)_val );
 }
 
 void _bx_mtx_s_r_t( Array<float> _result, float _sx, float _sy, float _sz, float _ax, float _ay, float _az, float _tx, float _ty, float _tz)

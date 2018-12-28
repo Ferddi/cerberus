@@ -1,10 +1,14 @@
 
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
+
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
 
 ' remove DrawText codes and use these minimal imports
 Import mojo.app
 Import bgfx
+Import packrect
 
 Class PosTexcoordVertex
 
@@ -87,10 +91,11 @@ Global s_cubeIndices:Int[] = [
 	20, 22, 21, ' 10
 	21, 22, 23]
 
+Global _updateTextureTi  := New BgfxTextureInfo()
 Global _updateTextureMem := New BgfxMemory()
 
 Function UpdateTextureCubeRectBgra8:Void( _handle:BgfxTextureHandle, 
-                                           _size:Int,
+                                           _side:Int,
                                            _x:Int,
                                            _y:Int,
                                            _width:Int,
@@ -100,24 +105,21 @@ Function UpdateTextureCubeRectBgra8:Void( _handle:BgfxTextureHandle,
                                            _b:Int,
                                            _a:Int=$ff )
 
-	Local ti := New BgfxTextureInfo()
-	bgfxCalcTextureSize( ti, _width, _height, 1, False, False, 1, BGFX_TEXTURE_FORMAT_BGRA8 )
+	bgfxCalcTextureSize( _updateTextureTi, _width, _height, 1, False, False, 1, BGFX_TEXTURE_FORMAT_BGRA8 )
 
+	bgfxAlloc( _updateTextureMem, _updateTextureTi.GetStorageSize() )
 
-	bgfxAlloc( _updateTextureMem, ti.GetStorageSize() )
-
-	Local num:Int = ti.GetStorageSize() * 8 / ti.GetBitsPerPixel()
-	Local data:Int = 0
+	Local num  :Int = _updateTextureTi.GetStorageSize() * 8 / _updateTextureTi.GetBitsPerPixel()
+	Local data :Int = 0
 
 	For Local ii:Int = 0 Until num
-		_updateTextureMem.PokeByte( data, _b )
-		_updateTextureMem.PokeByte( data, _g )
-		_updateTextureMem.PokeByte( data, _r )
-		_updateTextureMem.PokeByte( data, _a )
-		data += 4
+		_updateTextureMem.PokeByte( data, _b ) ; data += 1
+		_updateTextureMem.PokeByte( data, _g ) ; data += 1
+		_updateTextureMem.PokeByte( data, _r ) ; data += 1
+		_updateTextureMem.PokeByte( data, _a ) ; data += 1
 	Next
 
-	bgfxUpdateTextureCube( _handle, 0, _size, 0, _x, _y, _width, _height, _updateTextureMem )
+	bgfxUpdateTextureCube( _handle, 0, _side, 0, _x, _y, _width, _height, _updateTextureMem )
 End
 
 '
@@ -140,190 +142,8 @@ Function BGFX_SAMPLER_BORDER_COLOR:Int( _index:Int )
 	Return ( (_index Shl BGFX_SAMPLER_BORDER_COLOR_SHIFT) & BGFX_SAMPLER_BORDER_COLOR_MASK )
 End
 
-'
-' @Cleanup: move these to packrect.cxs
-'
-Class Pack2D
-	Field m_x      :Int
-	Field m_y      :Int
-	Field m_width  :Int
-	Field m_height :Int
-End
 
-Class PackCube
-	Field m_rect := New Pack2D()
-	Field m_side :Int
-End
 
-'
-' @Cleanup: RectPack2DT needs to be pooled
-'
-
-Class RectPack2DT
-
-	Field numBlocks :Int
-
-	Field m_mem     :Int[] ' uint64_t m_mem[numBlocks];
-	Field m_bw      :Int
-	Field m_bh      :Int
-
-	Method New( numBlocks:Int, _width:Int, _height:Int )
-
-		Self.numBlocks = numBlocks
-		Self.m_mem     = New Int[ numBlocks ]
-
-		Reset( _width, _height )
-	End
-
-	Method Reset:Void( _width:Int, _height:Int )
-
-		m_bw = _width  / 32
-		m_bh = _height / numBlocks
-
-		For Local ii:Int = 0 Until m_mem.Length()
-			m_mem[ii] = $ffffffff
-		Next
-	End
-
-	Method Find:Bool( _width:Int, _height:Int, _pack:Pack2D )
-
-		Local width  :Int = Min( 32,        (_width  + m_bw - 1) / m_bw )
-		Local height :Int = Min( numBlocks, (_height + m_bh - 1) / m_bh )
-		Local numx   :Int = 32        - width
-		Local numy   :Int = numBlocks - height
-
-		Local scan   :Int = $ffffffff
-
-		If width = 32 Then
-			scan = (1 Shl width) - 1
-		Endif
-
-		For Local starty:Int = 0 To numy
-
-			Local mem:Int = m_mem[ starty ]
-			Local ntz:Int = bxCntTZ( mem )
-			Local mask:Int = scan Shl ntz
-
-			For Local xx:Int = ntz To numx
-
-				Local yy:Int = starty
-
-				If (mem & mask) = mask Then
-
-					Local endy:Int = starty + height
-
-					While yy < endy And (m_mem[ yy ] & mask) = mask
-						yy += 1
-					Wend
-
-					If yy = endy Then
-
-						Local cmask:Int = ~ mask
-
-						For Local yy:Int = starty Until endy
-							m_mem[ yy ] &= cmask
-						Next
-
-						_pack.m_x      = xx     * m_bw
-						_pack.m_y      = starty * m_bh
-						_pack.m_width  = width  * m_bw
-						_pack.m_height = height * m_bh
-
-						Return True
-					Endif
-
-				Endif
-
-				mask Shl= 1
-			Next
-
-		Next
-
-		Return False
-	End
-
-	Method Clear:Void( _pack:Pack2D )
-
-		Local startx :Int = Min( 63,             _pack.m_x / m_bw )
-		Local starty :Int = Min( numBlocks - 1,  _pack.m_y / m_bh )
-
-		Local endx   :Int = Min( 64,            (_pack.m_width  + m_bw - 1) / m_bw + startx )
-		Local endy   :Int = Min( numBlocks,     (_pack.m_height + m_bh - 1) / m_bh + starty )
-
-		Local width  :Int = endx - startx
-
-		Local mask   :Int = $ffffffff
-
-		If width = 64 Then
-			mask = ( (1 Shl width) - 1 ) Shl startx
-		Endif
-
-		For Local yy:Int = starty Until endy
-			m_mem[ yy ] |= mask
-		Next
-	End
-
-End
-
-Class RectPackCubeT
-
-	Field m_ra  :RectPack2DT[6]
-	Field m_mru :Int[6]
-
-	Method New( numBlocks:Int, _side:Int )
-
-		For Local ii:Int = 0 Until 6
-			m_ra[ ii ] = New RectPack2DT( numBlocks, _side, _side )
-		Next
-
-		Reset( _side )
-	End
-
-	Method Reset:Void( _side:Int )
-		For Local ii:Int = 0 Until 6
-			m_mru[ ii ] = ii
-			m_ra[ ii ].Reset( _side, _side )
-		Next
-	End
-
-	Method Find:Bool( _width:Int, _height:Int, _pack:PackCube )
-
-		Local found := False
-
-		For Local ii:Int = 0 Until 6
-
-			Local side:Int = m_mru[ ii ]
-			found = m_ra[ side ].Find( _width, _height, _pack.m_rect )
-
-			If found Then
-
-				_pack.m_side = side
-				m_mru[ ii ] = m_mru[ 0 ]
-				m_mru[ 0 ] = side
-
-				Return True
-			Endif
-
-		Next
-
-		Return False
-	End
-
-	Method Clear:Void( _pack:PackCube )
-
-		Local side:Int = _pack.m_side
-
-		Local ii:Int = 0
-		While ii < 6 And m_mru[ ii ] <> side
-			ii += 1
-		Wend
-
-		m_mru[ ii ] = m_mru[ 0 ]
-		m_mru[ 0 ] = side
-
-		m_ra[ side ].Clear( _pack.m_rect )
-	End
-End
 
 Const TEXTURE_SIDE     :Int = 512
 Const TEXTURE_2D_SIZE  :Int = 256
@@ -476,6 +296,7 @@ Class UpdateExample Extends App
 
 			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R8]) Then
 				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
+				flags[0] = 0
 				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
 				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R8,   flags, mem8   )
 				m_numTextures3d += 1
@@ -483,6 +304,7 @@ Class UpdateExample Extends App
 
 			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R16F ]) Then
 				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
+				flags[0] = 0
 				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
 				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R16F, flags, mem16f )
 				m_numTextures3d += 1
@@ -490,6 +312,7 @@ Class UpdateExample Extends App
 
 			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R32F ]) Then
 				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
+				flags[0] = 0
 				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
 				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R32F, flags, mem32f )
 				m_numTextures3d += 1
@@ -507,6 +330,9 @@ Class UpdateExample Extends App
 		m_program    = bgfxUtilsLoadProgram("vs_update", "fs_update")
 		m_programCmp = bgfxUtilsLoadProgram("vs_update", "fs_update_cmp")
 
+		'
+		' @Cleanup: SetHandleToInvalid should be in load program?
+		'
 		If m_texture3DSupported Then
 			m_program3d = bgfxUtilsLoadProgram("vs_update", "fs_update_3d")
 		Else
@@ -514,11 +340,13 @@ Class UpdateExample Extends App
 			m_program3d.SetHandleToInvalid() ' m_program3d.idx = bgfx::kInvalidHandle;
 		Endif
 
+		'
+		' @Cleanup: create bgfxUtilsCreateComputeProgram?
+		'
+		m_programCompute = New BgfxProgramHandle()
+		m_programCompute.SetHandleToInvalid() ' m_programCompute.idx = bgfx::kInvalidHandle;
 		If m_computeSupported Then
-			m_programCompute = bgfxUtilsLoadProgram("cs_update", "fs_update_3d")
-		Else
-			m_programCompute = New BgfxProgramHandle()
-			m_programCompute.SetHandleToInvalid() ' m_programCompute.idx = bgfx::kInvalidHandle;
+			bgfxCreateComputeProgram( m_programCompute, bgfxUtilsLoadShader("cs_update"), True )
 		Endif
 
 		' Create texture sampler uniforms.
@@ -536,7 +364,7 @@ Class UpdateExample Extends App
 		'
 		' @Cleanup: create bgfxUtilsCreateTextureCube
 		'
-
+		flags[0] = 0
 		flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT
 		bgfxCreateTextureCube( m_textureCube[0], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
 
@@ -551,6 +379,7 @@ Class UpdateExample Extends App
 		Endif
 
 		m_texture2d = New BgfxTextureHandle()
+		flags[0] = 0
 		flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT
 		bgfxCreateTexture2D( m_texture2d, TEXTURE_2D_SIZE, TEXTURE_2D_SIZE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
 
@@ -672,7 +501,7 @@ Class UpdateExample Extends App
 
 		If now > m_updateTime Then
 
-			Local face := New PackCube()
+			Local face := PackCubePool.Allocate()
 
 			Local bw:Int = Max( 1.0, Rnd( TEXTURE_SIDE / 4 ) )
 			Local bh:Int = Max( 1.0, Rnd( TEXTURE_SIDE / 4 ) )
@@ -714,6 +543,7 @@ Class UpdateExample Extends App
 
 					m_cube.Clear( face )
 					m_quads.Remove(0) ' m_quads.pop_front();
+					face.Free()
 
 				Next
 			Endif
@@ -739,7 +569,7 @@ Class UpdateExample Extends App
 						m_texture2dData.PokeByte( dst, m_bb ) ; dst += 1
 						m_texture2dData.PokeByte( dst, m_gg ) ; dst += 1
 						m_texture2dData.PokeByte( dst, m_rr ) ; dst += 1
-						m_texture2dData.PokeByte( dst, 256 )  ; dst += 1
+						m_texture2dData.PokeByte( dst, 255 )  ; dst += 1
 					Next
 					dst = nextDst
 					nextDst += pitch
@@ -758,10 +588,10 @@ Class UpdateExample Extends App
 		bgfxSetViewTransform( 0, view, proj )
 
 		' Update texturecube using compute shader
-		If m_programCompute.IsValid() Then
+'  		If m_programCompute.IsValid() Then
 			bgfxSetImage( 0, m_textureCube[2], 0, BGFX_ACCESS_WRITE )
 			bgfxDispatch( 0, m_programCompute, TEXTURE_SIDE / 16, TEXTURE_SIDE / 16 )
-		Endif
+'  		Endif
 
 		For Local ii:Int = 0 Until m_textureCube.Length()
 
