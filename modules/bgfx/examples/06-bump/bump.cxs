@@ -1,4 +1,7 @@
 
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
+
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
 
@@ -113,13 +116,12 @@ Class BumpExample Extends App
 
 	Field m_numLights:Int
 
-	Field bgfxCaps:BgfxCaps = New BgfxCaps()
+	Field bgfxCaps := New BgfxCaps()
 	Field supported:Int[2]
 	Field m_instancingSupported:Bool
 
-'  	Field debug:Int = BGFX_DEBUG_NONE
-	Field debug:Int = BGFX_DEBUG_TEXT
-	Field m_timeOffset:Int
+	Field m_debug:Int = BGFX_DEBUG_NONE
+	' Field m_debug:Int = BGFX_DEBUG_TEXT
 
 	Method MakeDataBuffers:Void()
 
@@ -161,7 +163,7 @@ Class BumpExample Extends App
 		SetUpdateRate(60)
 
 		' Enable debug text.
-		bgfxSetDebug(debug)
+		bgfxSetDebug(m_debug)
 
 		' Set view 0 clear state.
 		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
@@ -215,8 +217,6 @@ Class BumpExample Extends App
 
 		' Load normal texture.
 		m_textureNormal = bgfxUtilsLoadTexture("textures/fieldstone-n.dds");
-
-		m_timeOffset = Millisecs()
 
 		Return 0
 	End
@@ -278,7 +278,7 @@ Class BumpExample Extends App
 		' if no other draw calls are submitted to view 0.
 		bgfxTouch(0)
 
-		Local time:Float = Float( (Millisecs() - m_timeOffset) * 0.001 ) ' / 1000.0 )
+		Local time:Float = Millisecs() * 0.001
 
 		' Set view and projection matrix for view 0.
 		'{

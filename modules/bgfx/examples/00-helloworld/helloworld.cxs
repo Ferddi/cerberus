@@ -1,30 +1,26 @@
 
-Import mojo.app
-Import tools
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
 
+Import mojo.app
 Import bgfx
 
-Class MojoGame Extends App
+Class HelloWorldGame Extends App
 
-	Field width:Int = 1280
-	Field height:Int = 720
-
-	Field debug:Int = BGFX_DEBUG_TEXT
-
-	Field sLogoBuffer:DataBuffer
+	Field m_debug     :Int = BGFX_DEBUG_TEXT
+	Field sLogoBuffer :DataBuffer
 
 	Method OnCreate:Int()
 
 		SetUpdateRate(60)
 
-		Local len:Int = s_Logo.Length()
-		sLogoBuffer = New DataBuffer( len )
-		For Local i:Int = 0 Until len
-			sLogoBuffer.PokeByte(i, s_Logo[i])
+		sLogoBuffer = New DataBuffer( s_Logo.Length() )
+		For Local ii:Int = 0 Until s_Logo.Length()
+			sLogoBuffer.PokeByte(ii, s_Logo[ii])
 		Next
 
 		' Enable debug text.
-		bgfxSetDebug(debug)
+		bgfxSetDebug(m_debug)
 
 		' Set view 0 clear state.
 		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
@@ -38,8 +34,11 @@ Class MojoGame Extends App
 
 	Method OnRender:Int()
 
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
+
 		' Set view 0 default viewport.
-		bgfxSetViewRect(0, 0, 0, width, height)
+		bgfxSetViewRect(0, 0, 0, m_width, m_height)
 
 		' This dummy draw call is here to make sure that view 0 is cleared
 		' if no other draw calls are submitted to view 0.
@@ -48,7 +47,7 @@ Class MojoGame Extends App
 		' Use debug font to print information about this example.
 		bgfxDbgTextClear(0, False)
 '  		bgfxDbgTextImageArray(Max(width/2/8, 20)-20, Max(height/2/16, 6)-6, 40, 12, _sLogo, 160)
-		bgfxDbgTextImage(Max(width/2/8, 20)-20, Max(height/2/16, 6)-6, 40, 12, sLogoBuffer, 160)
+		bgfxDbgTextImage(Max(m_width/2/8, 20)-20, Max(m_height/2/16, 6)-6, 40, 12, sLogoBuffer, 160)
 		bgfxDbgTextPrintf(0, 1, $4f, "bgfx/examples/25-c99")
 		bgfxDbgTextPrintf(0, 2, $6f, "Description: Initialization and debug text with C99 API.")
 
@@ -61,7 +60,7 @@ Class MojoGame Extends App
 End
 
 Function Main:Int()
-	New MojoGame()
+	New HelloWorldGame()
 	Return 0
 End
 

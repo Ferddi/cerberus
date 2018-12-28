@@ -1,4 +1,7 @@
 
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
+
 ' using DrawText to draw some bgfx debug text
 Import mojo1bgfx
 
@@ -38,7 +41,7 @@ Class PosNormalColorVertex
 '  		Self.m_abgr = m_abgr
 '  	End
 
-	Global ms_decl:BgfxVertexDecl = New BgfxVertexDecl()
+	Global ms_decl := New BgfxVertexDecl()
 
 	Function Init:Void()
 		bgfxVertexDeclBegin( ms_decl )
@@ -52,14 +55,14 @@ End
 Class Grid
 
 	Method New()
-		Self.m_val = 0.0
+		Self.m_val       = 0.0
 		Self.m_normal[0] = 0.0
 		Self.m_normal[1] = 0.0
 		Self.m_normal[2] = 0.0
 	End
 
-	Field m_val:Float
-	Field m_normal:Float[3]
+	Field m_val    :Float
+	Field m_normal :Float[3]
 End
 
 ' Triangulation tables taken from:
@@ -396,8 +399,8 @@ Function VertLerp:Float(_result:Float[], _iso:Float, _idx0:Int, _v0:Float, _idx1
 	Return lerp
 End
 
-Global _verts:Float[12][]
-Global _idx1:Int[] = [ 1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7 ]
+Global _verts :Float[12][]
+Global _idx1  :Int[] = [ 1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7 ]
 
 Function Triangulate:Int(_result:BgfxTransientVertexBuffer, _vertexIndex:Int, _stride:Int, _rgb:Float[], _xyz:Float[], _val:Grid[], _iso:Float)
 
@@ -416,7 +419,7 @@ Function Triangulate:Int(_result:BgfxTransientVertexBuffer, _vertexIndex:Int, _s
 		Return 0
 	Endif
 
-'  	Local verts:Float[12][]
+	' Local verts:Float[12][] ' move to global variable
 	Local flags:Int = s_edges[cubeindex]
 
 	For Local ii:Int = 0 Until 12
@@ -470,28 +473,49 @@ Function Triangulate:Int(_result:BgfxTransientVertexBuffer, _vertexIndex:Int, _s
 	Return num
 End
 
-Class MojoGame Extends App
+Class MetaballsGame Extends App
 
-	Const DIMS:Int = 32
-	Field m_grid:Grid[]
-	Field m_timeOffset:Int
+	Field m_debug     :Int   = BGFX_DEBUG_NONE
+'  	Field m_debug     :Int   = BGFX_DEBUG_TEXT
 
-	Field m_width:Int = 640
-	Field m_height:Int = 480
+	Const DIMS        :Int   = 32
+	Const ypitch      :Int   = DIMS
+	Const zpitch      :Int   = DIMS * DIMS
+	Const invdim      :Float = 1.0 / Float(DIMS - 1)
 
-	Field debug:Int = BGFX_DEBUG_NONE
-'  	Field debug:Int = BGFX_DEBUG_TEXT
+	Const numSpheres  :Int   = 16
+	Const maxVertices :Int   = (32 Shl 10)
 
-	Field m_program:BgfxProgramHandle
+	Field m_grid      :Grid[ DIMS * DIMS * DIMS ]
+	Field val         :Grid[ 8 ]
 
-	Field state:Int[2]
+	Field m_program   :BgfxProgramHandle
+	Field tvb         := New BgfxTransientVertexBuffer()
+	Field bgfxCaps    := New BgfxCaps()
+
+	Field state       :Int[ 2 ]
+
+	Field last        :Int 
+
+	Field at          :Float[] = [ 0.0, 0.0,   0.0 ]
+	Field eye         :Float[] = [ 0.0, 0.0, -50.0 ]
+
+	Field view        :Float[ 16 ]
+	Field proj        :Float[ 16 ]
+	Field mtx         :Float[ 16 ]
+
+	Field normal      :Float[ 3 ]
+	Field rgb         :Float[ 6 ]
+	Field pos         :Float[ 3 ]
+
+	Field sphere      :Float[ numSpheres ][]
 
 	Method OnCreate:Int()
 
 		SetUpdateRate(60)
 
 		' Enable debug text.
-		bgfxSetDebug(debug)
+		bgfxSetDebug(m_debug)
 
 		' Set view 0 clear state.
 		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
@@ -509,21 +533,18 @@ Class MojoGame Extends App
 		' Create program from shaders.
 		m_program = bgfxUtilsLoadProgram("vs_metaballs", "fs_metaballs")
 
-		m_grid = New Grid[DIMS*DIMS*DIMS]
-		m_timeOffset = Millisecs()
-
 		'-------------------------------------------------------------------------
 
 		For Local ii:Int = 0 Until m_grid.Length()
-			m_grid[ii] = New Grid()
+			m_grid[ ii ] = New Grid()
 		Next
 
 		For Local ii:Int = 0 Until numSpheres
-			sphere[ii] = New Float[4]
+			sphere[ ii ] = New Float[ 4 ]
 		Next
 
 		For Local ii:Int = 0 Until _verts.Length()
-			_verts[ii] = New Float[6]
+			_verts[ ii ] = New Float[ 6 ]
 		Next
 
 		Print "maxVertices=" + maxVertices
@@ -532,45 +553,14 @@ Class MojoGame Extends App
 		Return 0
 	End
 
-	Method PrintMatrix:Void(m:Float[])
-		For Local i:Int = 0 Until 16 Step 4
-			Print m[i + 0] + ", " + m[i + 1] + ", " + m[i + 2] + ", " + m[i + 3] + ", "
-		Next
-	End
-
 	Method OnUpdate:Int()
-'  		time += 0.1
 		Return 0
 	End
 
-	Const ypitch:Int = DIMS
-	Const zpitch:Int = DIMS * DIMS
-	Const invdim:Float = 1.0 / Float(DIMS - 1)
-
-	Field last:Int 
-
-	Field at:Float[]  = [ 0.0, 0.0,   0.0 ]
-	Field eye:Float[] = [ 0.0, 0.0, -50.0 ]
-
-	Field bgfxCaps:BgfxCaps = New BgfxCaps()
-
-	Field view:Float[16]
-	Field proj:Float[16]
-	Field mtx:Float[16]
-
-	Const maxVertices:Int = (32 Shl 10)
-
-	Const numSpheres:Int = 16
-	Field sphere:Float[numSpheres][]
-
-	Field normal:Float[3]
-	Field rgb:Float[6]
-	Field pos:Float[3]
-	Field val:Grid[8]
-
-	Field tvb:BgfxTransientVertexBuffer = New BgfxTransientVertexBuffer()
-
 	Method OnRender:Int()
+
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
 
 		' Set view 0 default viewport.
 		bgfxSetViewRect(0, 0, 0, m_width, m_height)
@@ -579,9 +569,9 @@ Class MojoGame Extends App
 		' if no other draw calls are submitted to view 0.
 		bgfxTouch(0)
 
-		Local now:Int = Millisecs()
-		Local frameTime:Int = now - last; last = now
-		Local time:Float = Float(now - m_timeOffset) / 1000.0
+		Local now       :Int   = Millisecs()
+		Local frameTime :Int   = now - last ; last = now
+		Local time      :Float = now * 0.001
 
 		' Set view and projection matrix for view 0.
 		bxMtxLookAt(view, eye, at)
@@ -594,10 +584,10 @@ Class MojoGame Extends App
 		bgfxSetViewRect(0, 0, 0, m_width, m_height)
 
 		' Stats.
-		Local numVertices:Int = 0
-		Local profUpdate:Int = 0
-		Local profNormal:Int = 0
-		Local profTriangulate:Int = 0
+		Local numVertices     :Int = 0
+		Local profUpdate      :Int = 0
+		Local profNormal      :Int = 0
+		Local profTriangulate :Int = 0
 
 		' Allocate 32K vertices in transient vertex buffer.
 		bgfxAllocTransientVertexBuffer(tvb, maxVertices, PosNormalColorVertex.ms_decl)
@@ -617,19 +607,19 @@ Class MojoGame Extends App
 				Local offset:Int = (zz * DIMS + yy) * DIMS
 
 				For Local xx:Int = 0 Until DIMS
-					Local xoffset:Int = offset + xx
+					Local xoffset :Int = offset + xx
 
-					Local dist:Float = 0.0
-					Local prod:Float = 1.0
+					Local dist    :Float = 0.0
+					Local prod    :Float = 1.0
 
 					For Local ii:Int = 0 Until numSpheres
 
-						Local pos:Float[] = sphere[ii]
-						Local dx:Float = pos[0] - (-DIMS * 0.5 + Float(xx) )
-						Local dy:Float = pos[1] - (-DIMS * 0.5 + Float(yy) )
-						Local dz:Float = pos[2] - (-DIMS * 0.5 + Float(zz) )
-						Local invr:Float = pos[3]
-						Local dot:Float = dx * dx + dy * dy + dz * dz
+						Local pos  :Float[] = sphere[ii]
+						Local dx   :Float = pos[0] - (-DIMS * 0.5 + Float(xx) )
+						Local dy   :Float = pos[1] - (-DIMS * 0.5 + Float(yy) )
+						Local dz   :Float = pos[2] - (-DIMS * 0.5 + Float(zz) )
+						Local invr :Float = pos[3]
+						Local dot  :Float = dx * dx + dy * dy + dz * dz
 						dot *= invr * invr
 
 						dist *= dot
@@ -737,11 +727,11 @@ Class MojoGame Extends App
 		bgfxSubmit(0, m_program)
 
 		' it is possible to draw 3d and use mojo1bgfx for 2d, like gui
-		DrawText("Num vertices: " + numVertices + " (" + Float(numVertices) / maxVertices * 100 + "%)", 8, 14 * 1)
-		DrawText("Update: " + Float(profUpdate) + "[ms]", 8, 14 * 2)
-		DrawText("Calc normals: " + Float(profNormal) + "[ms]", 8, 14 * 3)
-		DrawText("Triangulate: " + Float(profTriangulate) + "[ms]", 8, 14 * 4)
-		DrawText("Frame: " + Float(frameTime) + "[ms]", 8, 14 * 5)
+		DrawText("Num vertices : " + numVertices + " (" + Float(numVertices) / maxVertices * 100 + "%)", 8, 14 * 1)
+		DrawText("Update       : " + Float(profUpdate) + "[ms]", 8, 14 * 2)
+		DrawText("Calc normals : " + Float(profNormal) + "[ms]", 8, 14 * 3)
+		DrawText("Triangulate  : " + Float(profTriangulate) + "[ms]", 8, 14 * 4)
+		DrawText("Frame        : " + Float(frameTime) + "[ms]", 8, 14 * 5)
 
 		' Advance to next frame. Rendering thread will be kicked to
 		' process submitted rendering primitives.
@@ -757,6 +747,6 @@ Class MojoGame Extends App
 End
 
 Function Main:Int()
-	New MojoGame()
+	New MetaballsGame()
 	Return 0
 End

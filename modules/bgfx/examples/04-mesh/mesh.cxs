@@ -1,4 +1,7 @@
 
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
+
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
 
@@ -41,58 +44,58 @@ Import bgfx
 '  End
 
 '-------------------------------------------------------------------------------
-' move these to bgfx utils
+' @Cleanup: move these to bgfx utils
 '-------------------------------------------------------------------------------
 
 Class BgfxUtilsAabb
-	Field m_min:Float[3]
-	Field m_max:Float[3]
+	Field m_min :Float[3]
+	Field m_max :Float[3]
 End
 
 Class BgfxUtilsObb
-	Field m_mtx:Float[16]
+	Field m_mtx :Float[16]
 End
 
 Class BgfxUtilsSphere
-	Field m_center:Float[3]
-	Field m_radius:Float
+	Field m_center :Float[3]
+	Field m_radius :Float
 End
 
 Class BgfxUtilsPrimitive
 
-	Field m_startIndex:Int
-	Field m_numIndices:Int
-	Field m_startVertex:Int
-	Field m_numVertices:Int
+	Field m_startIndex  :Int
+	Field m_numIndices  :Int
+	Field m_startVertex :Int
+	Field m_numVertices :Int
 
-	Field m_sphere:BgfxUtilsSphere = New BgfxUtilsSphere()
-	Field m_aabb:BgfxUtilsAabb = New BgfxUtilsAabb()
-	Field m_obb:BgfxUtilsObb = New BgfxUtilsObb()
+	Field m_sphere := New BgfxUtilsSphere()
+	Field m_aabb   := New BgfxUtilsAabb()
+	Field m_obb    := New BgfxUtilsObb()
 End
 
 Class BgfxUtilsGroup
 
-	Field m_vbMem:BgfxMemory = New BgfxMemory()
-	Field m_ibMem:BgfxMemory = New BgfxMemory()
+	Field m_vbMem := New BgfxMemory()
+	Field m_ibMem := New BgfxMemory()
 
-	Field m_vbh:BgfxVertexBufferHandle = New BgfxVertexBufferHandle()
-	Field m_ibh:BgfxIndexBufferHandle = New BgfxIndexBufferHandle()
+	Field m_vbh := New BgfxVertexBufferHandle()
+	Field m_ibh := New BgfxIndexBufferHandle()
 
-	Field m_sphere:BgfxUtilsSphere = New BgfxUtilsSphere()
-	Field m_aabb:BgfxUtilsAabb = New BgfxUtilsAabb()
-	Field m_obb:BgfxUtilsObb = New BgfxUtilsObb()
-	Field m_prims:Stack<BgfxUtilsPrimitive> = New Stack<BgfxUtilsPrimitive>()
+	Field m_sphere := New BgfxUtilsSphere()
+	Field m_aabb   := New BgfxUtilsAabb()
+	Field m_obb    := New BgfxUtilsObb()
+	Field m_prims  := New Stack<BgfxUtilsPrimitive>()
 End
 
 Class BgfxUtilsMesh
-	Field m_decl:BgfxVertexDecl = New BgfxVertexDecl()
-	Field m_groups:Stack<BgfxUtilsGroup> = New Stack<BgfxUtilsGroup>()
+	Field m_decl   := New BgfxVertexDecl()
+	Field m_groups := New Stack<BgfxUtilsGroup>()
 End
 
-Const BGFX_CHUNK_MAGIC_VB:Int = $01204256
-Const BGFX_CHUNK_MAGIC_IB:Int = $00204249
-Const BGFX_CHUNK_MAGIC_IBC:Int = $00434249
-Const BGFX_CHUNK_MAGIC_PRI:Int = $00495250
+Const BGFX_CHUNK_MAGIC_VB  :Int = $01204256
+Const BGFX_CHUNK_MAGIC_IB  :Int = $00204249
+Const BGFX_CHUNK_MAGIC_IBC :Int = $00434249
+Const BGFX_CHUNK_MAGIC_PRI :Int = $00495250
 
 Function bgfxUtilsReadSphere:Int(buffer:DataBuffer, address:Int, sphere:BgfxUtilsSphere)
 
@@ -138,19 +141,19 @@ Function bgfxUtilsReadVertexDecl:Int(buffer:DataBuffer, address:Int, decl:BgfxVe
 	' bgfx\src\vertexdecl.cpp
 	' int32_t read(bx::ReaderI* _reader, VertexDecl& _decl, bx::Error* _err)
 
-	Local numAttrs:Int = buffer.PeekByte(address); address += 1
-	Local stride:Int = buffer.PeekShort(address); address += 2
+	Local numAttrs :Int = buffer.PeekByte(  address ); address += 1
+	Local stride   :Int = buffer.PeekShort( address ); address += 2
 
 	bgfxVertexDeclBegin( decl )
 
-	Print "numAttrs=" + numAttrs + " stride=" + stride
+	' Print "numAttrs=" + numAttrs + " stride=" + stride
 
 	For Local ii:Int = 0 Until numAttrs
 
-		Local offset:Int = buffer.PeekShort(address); address += 2
+		Local offset   :Int = buffer.PeekShort(address); address += 2
 
-		Local attribId:Int = buffer.PeekShort(address); address += 2
-		Local attr:Int = BGFX_ATTRIB_COUNT
+		Local attribId :Int = buffer.PeekShort(address); address += 2
+		Local attr     :Int = BGFX_ATTRIB_COUNT
 
 		Select attribId
 		Case $0001
@@ -191,10 +194,10 @@ Function bgfxUtilsReadVertexDecl:Int(buffer:DataBuffer, address:Int, decl:BgfxVe
 			attr = BGFX_ATTRIB_TEXCOORD7
 		End
 
-		Local num:Int = buffer.PeekByte(address); address += 1
+		Local num          :Int = buffer.PeekByte(address); address += 1
 
-		Local attribTypeId:Int = buffer.PeekShort(address); address += 2
-		Local type:Int = BGFX_ATTRIB_TYPE_COUNT
+		Local attribTypeId :Int = buffer.PeekShort(address); address += 2
+		Local type         :Int = BGFX_ATTRIB_TYPE_COUNT
 
 		Select attribTypeId
 		Case $0001
@@ -209,11 +212,11 @@ Function bgfxUtilsReadVertexDecl:Int(buffer:DataBuffer, address:Int, decl:BgfxVe
 			type = BGFX_ATTRIB_TYPE_FLOAT
 		End
 
-		Local normalizedByte:Int = buffer.PeekByte(address); address += 1
-		Local normalized:Bool = False; If normalizedByte = 1 Then normalized = True
+		Local normalizedByte :Int = buffer.PeekByte(address); address += 1
+		Local normalized     :Bool = False; If normalizedByte = 1 Then normalized = True
 
-		Local asIntByte:Int = buffer.PeekByte(address); address += 1
-		Local asInt:Bool = False; If asIntByte = 1 Then asInt = True
+		Local asIntByte      :Int = buffer.PeekByte(address); address += 1
+		Local asInt          :Bool = False; If asIntByte = 1 Then asInt = True
 
 		' Print "offset=" + offset + " attribId=" + attribId + " num=" + num + " attribTypeId=" + attribTypeId + " normalized=" + normalizedByte + " asInt=" + asIntByte
 
@@ -232,13 +235,13 @@ End
 
 Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 
-	Local buffer:DataBuffer = DataBuffer.Load("cerberus://data/" + _filePath)
+	Local buffer  := DataBuffer.Load("cerberus://data/" + _filePath)
 
-	Local address:Int = 0
-	Local length:Int = buffer.Length()
+	Local address :Int = 0
+	Local length  :Int = buffer.Length()
 
-	Local mesh:BgfxUtilsMesh = New BgfxUtilsMesh()
-	Local group:BgfxUtilsGroup = New BgfxUtilsGroup()
+	Local mesh    := New BgfxUtilsMesh()
+	Local group   := New BgfxUtilsGroup()
 
 '  	mesh.m_groups.Push(group)
 
@@ -257,10 +260,11 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 
 			address = bgfxUtilsReadVertexDecl(buffer, address, mesh.m_decl)
 
-			Local stride:Int = mesh.m_decl.GetStride()
-			Local numVertices:Int = buffer.PeekShort(address); address += 2
+			Local stride      :Int = mesh.m_decl.GetStride()
+			Local numVertices :Int = buffer.PeekShort(address); address += 2
 			If numVertices < 0 Then numVertices = $10000 + numVertices
-			Local size:Int = numVertices * stride
+
+			Local size :Int = numVertices * stride
 
 			' Print "stride=" + stride + " numVertices=" + numVertices + " size=" + size
 
@@ -271,8 +275,8 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 			bgfxCreateVertexBuffer(group.m_vbh, group.m_vbMem, mesh.m_decl)
 
 		Case BGFX_CHUNK_MAGIC_IB
-			Local numIndices:Int = buffer.PeekInt(address); address += 4
-			Local size:Int = numIndices * 2
+			Local numIndices :Int = buffer.PeekInt(address); address += 4
+			Local size       :Int = numIndices * 2
 
 			bgfxAlloc(group.m_ibMem, size)
 			bgfxCopy(group.m_ibMem, buffer, address, size); address += size
@@ -283,11 +287,11 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 			Print "TODO BGFX_CHUNK_MAGIC_IBC"
 
 		Case BGFX_CHUNK_MAGIC_PRI
-			Local len:Int = buffer.PeekShort(address); address += 2
-			Local material:String = buffer.PeekString(address, len); address += len
+			Local len      :Int = buffer.PeekShort(address); address += 2
+			Local material :String = buffer.PeekString(address, len); address += len
 			' Print "material=" + material
 
-			Local num:Int = buffer.PeekShort(address); address += 2
+			Local num      :Int = buffer.PeekShort(address); address += 2
 
 			For Local ii:Int = 0 Until num
 
@@ -295,7 +299,7 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 				Local name:String = buffer.PeekString(address, len); address += len
 				' Print "name=" + name
 
-				Local prim:BgfxUtilsPrimitive = New BgfxUtilsPrimitive()
+				Local prim := New BgfxUtilsPrimitive()
 				prim.m_startIndex = buffer.PeekInt(address); address += 4
 				prim.m_numIndices = buffer.PeekInt(address); address += 4
 				prim.m_startVertex = buffer.PeekInt(address); address += 4
@@ -363,20 +367,19 @@ End
 
 Class MeshExample Extends App
 
-	Field debug:Int = BGFX_DEBUG_NONE
-'  	Field debug:Int = BGFX_DEBUG_TEXT
+	Field m_debug   :Int = BGFX_DEBUG_NONE
+'  	Field m_debug   :Int = BGFX_DEBUG_TEXT
 
-	Field m_timeOffset:Int
-	Field m_mesh:BgfxUtilsMesh
-	Field m_program:BgfxProgramHandle
-	Field u_time:BgfxUniformHandle = New BgfxUniformHandle()
+	Field m_mesh    :BgfxUtilsMesh
+	Field m_program :BgfxProgramHandle
+	Field u_time    := New BgfxUniformHandle()
 
 	Method OnCreate:Int()
 
 		SetUpdateRate(60)
 
 		' Enable debug text.
-		bgfxSetDebug(debug)
+		bgfxSetDebug(m_debug)
 
 		' Set view 0 clear state.
 		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
@@ -388,8 +391,6 @@ Class MeshExample Extends App
 
 		m_mesh = bgfxUtilsMeshLoad("meshes/bunny.bin")
 
-		m_timeOffset = Millisecs()
-
 		Return 0
 	End
 
@@ -397,28 +398,21 @@ Class MeshExample Extends App
 		Return 0
 	End
 
-	Field at:Float[]  = [ 0.0, 1.0,  0.0 ]
-	Field eye:Float[] = [ 0.0, 1.0, -2.5 ]
+	Field bgfxCaps := New BgfxCaps()
 
-	Field bgfxCaps:BgfxCaps = New BgfxCaps()
+	Field at   :Float[] = [ 0.0, 1.0,  0.0 ]
+	Field eye  :Float[] = [ 0.0, 1.0, -2.5 ]
 
-'  	Field iden:Float[] = [
-'  		1.0, 0.0, 0.0, 0.0,
-'  		0.0, 1.0, 0.0, 0.0,
-'  		0.0, 0.0, 1.0, 0.0,
-'  		0.0, 0.0, 0.0, 1.0]
+	Field time :Float[4]
 
-	Field time:Float[4]
-
-	Field view:Float[16]
-	Field proj:Float[16]
-
-	Field mtx:Float[16]
+	Field view :Float[16]
+	Field proj :Float[16]
+	Field mtx  :Float[16]
 
 	Method OnRender:Int()
 
-		Local m_width:Int = DeviceWidth()
-		Local m_height:Int = DeviceHeight()
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
 
 		' Set view 0 default viewport.
 		bgfxSetViewRect(0, 0, 0, m_width, m_height)
@@ -427,7 +421,7 @@ Class MeshExample Extends App
 		' if no other draw calls are submitted to view 0.
 		bgfxTouch(0)
 
-		time[0] = Float( (Millisecs() - m_timeOffset) * 0.001 ) ' / 1000.0 )
+		time[0] = Millisecs() * 0.001
 		bgfxSetUniform(u_time, time)
 
 		' Set view and projection matrix for view 0.

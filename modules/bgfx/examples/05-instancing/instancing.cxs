@@ -1,4 +1,7 @@
 
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
+
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
 
@@ -8,11 +11,11 @@ Import bgfx
 
 Class PosColorVertex
 
-	Field m_x:Float
-	Field m_y:Float
-	Field m_z:Float
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
 
-	Field m_abgr:Int
+	Field m_abgr :Int
 
 	Method New(m_x:Float, m_y:Float, m_z:Float, m_abgr:Int)
 
@@ -23,12 +26,12 @@ Class PosColorVertex
 		Self.m_abgr = m_abgr
 	End
 
-	Global ms_decl:BgfxVertexDecl = New BgfxVertexDecl()
+	Global ms_decl := New BgfxVertexDecl()
 
 	Function Init:Void()
 		bgfxVertexDeclBegin( ms_decl )
 		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
-		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0, 4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,   4, BGFX_ATTRIB_TYPE_UINT8, True )
 		bgfxVertexDeclEnd( ms_decl )
 	End
 End
@@ -57,29 +60,39 @@ Global s_cubeIndices:Int[] = [
 	2, 3, 6, ' 10
 	6, 3, 7]
 
-Class MeshExample Extends App
+Class InstancingExample Extends App
 
-'  	Field debug:Int = BGFX_DEBUG_NONE
-	Field debug:Int = BGFX_DEBUG_TEXT
+	Field m_debug   :Int = BGFX_DEBUG_NONE
+'  	Field m_debug   :Int = BGFX_DEBUG_TEXT
 
-	Field m_timeOffset:Int
-	Field m_program:BgfxProgramHandle
+	Field sCubeVerticesBuffer :DataBuffer
+	Field sCubeIndicesBuffer  :DataBuffer
 
-	Field m_vbh:BgfxVertexBufferHandle
-	Field m_ibh:BgfxIndexBufferHandle
+	Field m_vbh     :BgfxVertexBufferHandle
+	Field m_ibh     :BgfxIndexBufferHandle
 
-	Field sCubeVerticesBuffer:DataBuffer
-	Field sCubeIndicesBuffer:DataBuffer
+	Field m_program :BgfxProgramHandle
+	Field bgfxCaps  := New BgfxCaps()
+	Field idb       := New BgfxInstanceDataBuffer()
+
+	Field at        :Float[] = [ 0.0, 0.0,   0.0 ]
+	Field eye       :Float[] = [ 0.0, 0.0, -35.0 ]
+
+	Field view      :Float[16]
+	Field proj      :Float[16]
+	Field mtx       :Float[16]
+
+	Field supported :Int[2]
 
 	Method MakeDataBuffers:Void()
 
-		Local address:Int
-		Local length:Int
+		Local address :Int
+		Local length  :Int
 
 		' s_cubeVertices to sCubeVerticesBuffer
 
 		address = 0
-		length = s_cubeVertices.Length()
+		length  = s_cubeVertices.Length()
 
 		sCubeVerticesBuffer = New DataBuffer( length * 16 )
 		For Local i:Int = 0 Until length
@@ -92,7 +105,7 @@ Class MeshExample Extends App
 		' s_cubeIndices to sCubeIndicesBuffer
 
 		address = 0
-		length = s_cubeIndices.Length()
+		length  = s_cubeIndices.Length()
 
 		sCubeIndicesBuffer = New DataBuffer( length * 2 )
 		For Local i:Int = 0 Until length
@@ -105,7 +118,7 @@ Class MeshExample Extends App
 		SetUpdateRate(60)
 
 		' Enable debug text.
-		bgfxSetDebug(debug)
+		bgfxSetDebug(m_debug)
 
 		' Set view 0 clear state.
 		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
@@ -124,8 +137,6 @@ Class MeshExample Extends App
 		' Create program from shaders.
 		m_program = bgfxUtilsLoadProgram("vs_instancing", "fs_instancing")
 
-		m_timeOffset = Millisecs()
-
 		Return 0
 	End
 
@@ -133,30 +144,10 @@ Class MeshExample Extends App
 		Return 0
 	End
 
-	Field at:Float[]  = [ 0.0, 0.0,   0.0 ]
-	Field eye:Float[] = [ 0.0, 0.0, -35.0 ]
-
-	Field bgfxCaps:BgfxCaps = New BgfxCaps()
-
-'  	Field iden:Float[] = [
-'  		1.0, 0.0, 0.0, 0.0,
-'  		0.0, 1.0, 0.0, 0.0,
-'  		0.0, 0.0, 1.0, 0.0,
-'  		0.0, 0.0, 0.0, 1.0]
-
-	Field view:Float[16]
-	Field proj:Float[16]
-
-	Field mtx:Float[16]
-
-	Field supported:Int[2]
-
-	Field idb:BgfxInstanceDataBuffer = New BgfxInstanceDataBuffer()
-
 	Method OnRender:Int()
 
-		Local m_width:Int = DeviceWidth()
-		Local m_height:Int = DeviceHeight()
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
 
 		' Set view 0 default viewport.
 		bgfxSetViewRect(0, 0, 0, m_width, m_height)
@@ -165,7 +156,7 @@ Class MeshExample Extends App
 		' if no other draw calls are submitted to view 0.
 		bgfxTouch(0)
 
-		Local time:Float = Float( (Millisecs() - m_timeOffset) * 0.001 ) ' / 1000.0 )
+		Local time:Float = Millisecs() * 0.001
 
 		' Get renderer capabilities info.
 		bgfxGetCaps(bgfxCaps)
@@ -285,6 +276,6 @@ Class MeshExample Extends App
 End
 
 Function Main:Int()
-	New MeshExample()
+	New InstancingExample()
 	Return 0
 End

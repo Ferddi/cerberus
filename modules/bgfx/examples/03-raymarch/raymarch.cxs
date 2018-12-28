@@ -1,4 +1,7 @@
 
+#GLFW_WINDOW_WIDTH  = 1280
+#GLFW_WINDOW_HEIGHT = 720
+
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
 
@@ -29,19 +32,19 @@ Class PosColorTexCoord0Vertex
 '  		Self.m_v = m_v
 '  	End
 
-	Global ms_decl:BgfxVertexDecl = New BgfxVertexDecl()
+	Global ms_decl := New BgfxVertexDecl()
 
 	Function Init:Void()
 		bgfxVertexDeclBegin( ms_decl )
-		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
-		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0, 4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
 		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
 		bgfxVertexDeclEnd( ms_decl )
 	End
 End
 
-Global _tvb:BgfxTransientVertexBuffer = New BgfxTransientVertexBuffer()
-Global _tib:BgfxTransientIndexBuffer = New BgfxTransientIndexBuffer()
+Global _tvb := New BgfxTransientVertexBuffer()
+Global _tib := New BgfxTransientIndexBuffer()
 
 Function RenderScreenSpaceQuad:Void(_view:Int, _program:BgfxProgramHandle, _x:Float, _y:Float, _width:Float, _height:Float)
 
@@ -61,42 +64,42 @@ Function RenderScreenSpaceQuad:Void(_view:Int, _program:BgfxProgramHandle, _x:Fl
 
 		Local address:Int = 0
 
-		_tvb.PokeFloat(address, minx); address += 4
-		_tvb.PokeFloat(address, miny); address += 4
-		_tvb.PokeFloat(address, zz); address += 4
-		_tvb.PokeInt(address, $ff0000ff); address += 4
-		_tvb.PokeFloat(address, minu); address += 4
-		_tvb.PokeFloat(address, minv); address += 4
+		_tvb.PokeFloat( address, minx      ); address += 4
+		_tvb.PokeFloat( address, miny      ); address += 4
+		_tvb.PokeFloat( address, zz        ); address += 4
+		_tvb.PokeInt(   address, $ff0000ff ); address += 4
+		_tvb.PokeFloat( address, minu      ); address += 4
+		_tvb.PokeFloat( address, minv      ); address += 4
 
-		_tvb.PokeFloat(address, maxx); address += 4
-		_tvb.PokeFloat(address, miny); address += 4
-		_tvb.PokeFloat(address, zz); address += 4
-		_tvb.PokeInt(address, $ff00ff00); address += 4
-		_tvb.PokeFloat(address, maxu); address += 4
-		_tvb.PokeFloat(address, minv); address += 4
+		_tvb.PokeFloat( address, maxx      ); address += 4
+		_tvb.PokeFloat( address, miny      ); address += 4
+		_tvb.PokeFloat( address, zz        ); address += 4
+		_tvb.PokeInt(   address, $ff00ff00 ); address += 4
+		_tvb.PokeFloat( address, maxu      ); address += 4
+		_tvb.PokeFloat( address, minv      ); address += 4
 
-		_tvb.PokeFloat(address, maxx); address += 4
-		_tvb.PokeFloat(address, maxy); address += 4
-		_tvb.PokeFloat(address, zz); address += 4
-		_tvb.PokeInt(address, $ffff0000); address += 4
-		_tvb.PokeFloat(address, maxu); address += 4
-		_tvb.PokeFloat(address, maxv); address += 4
+		_tvb.PokeFloat( address, maxx      ); address += 4
+		_tvb.PokeFloat( address, maxy      ); address += 4
+		_tvb.PokeFloat( address, zz        ); address += 4
+		_tvb.PokeInt(   address, $ffff0000 ); address += 4
+		_tvb.PokeFloat( address, maxu      ); address += 4
+		_tvb.PokeFloat( address, maxv      ); address += 4
 
-		_tvb.PokeFloat(address, minx); address += 4
-		_tvb.PokeFloat(address, maxy); address += 4
-		_tvb.PokeFloat(address, zz); address += 4
-		_tvb.PokeInt(address, $ffffffff); address += 4
-		_tvb.PokeFloat(address, minu); address += 4
-		_tvb.PokeFloat(address, maxv); address += 4
+		_tvb.PokeFloat( address, minx      ); address += 4
+		_tvb.PokeFloat( address, maxy      ); address += 4
+		_tvb.PokeFloat( address, zz        ); address += 4
+		_tvb.PokeInt(   address, $ffffffff ); address += 4
+		_tvb.PokeFloat( address, minu      ); address += 4
+		_tvb.PokeFloat( address, maxv      ); address += 4
 
 		address = 0
 
-		_tib.PokeShort(address, 0); address += 2
-		_tib.PokeShort(address, 2); address += 2
-		_tib.PokeShort(address, 1); address += 2
-		_tib.PokeShort(address, 0); address += 2
-		_tib.PokeShort(address, 3); address += 2
-		_tib.PokeShort(address, 2); address += 2
+		_tib.PokeShort( address, 0 ); address += 2
+		_tib.PokeShort( address, 2 ); address += 2
+		_tib.PokeShort( address, 1 ); address += 2
+		_tib.PokeShort( address, 0 ); address += 2
+		_tib.PokeShort( address, 3 ); address += 2
+		_tib.PokeShort( address, 2 ); address += 2
 
 		bgfxSetState(BGFX_STATE_DEFAULT)
 		bgfxSetTransientIndexBuffer(_tib)
@@ -107,15 +110,12 @@ End
 
 Class RaymarchExample Extends App
 
-	Field m_timeOffset:Int
-
 	Field debug:Int = BGFX_DEBUG_NONE
 '  	Field debug:Int = BGFX_DEBUG_TEXT
 
-	Field u_mtx:BgfxUniformHandle = New BgfxUniformHandle()
-	Field u_lightDirTime:BgfxUniformHandle = New BgfxUniformHandle()
-
-	Field m_program:BgfxProgramHandle
+	Field u_mtx          := New BgfxUniformHandle()
+	Field u_lightDirTime := New BgfxUniformHandle()
+	Field m_program      :BgfxProgramHandle
 
 	Method OnCreate:Int()
 
@@ -136,8 +136,6 @@ Class RaymarchExample Extends App
 		' Create program from shaders.
 		m_program = bgfxUtilsLoadProgram("vs_raymarching", "fs_raymarching")
 
-		m_timeOffset = Millisecs()
-
 		Return 0
 	End
 
@@ -145,10 +143,10 @@ Class RaymarchExample Extends App
 		Return 0
 	End
 
-	Field at:Float[]  = [ 0.0, 0.0,   0.0 ]
-	Field eye:Float[] = [ 0.0, 0.0, -15.0 ]
+	Field at  :Float[] = [ 0.0, 0.0,   0.0 ]
+	Field eye :Float[] = [ 0.0, 0.0, -15.0 ]
 
-	Field bgfxCaps:BgfxCaps = New BgfxCaps()
+	Field bgfxCaps := New BgfxCaps()
 
 	Field iden:Float[] = [
 		1.0, 0.0, 0.0, 0.0,
@@ -156,25 +154,25 @@ Class RaymarchExample Extends App
 		0.0, 0.0, 1.0, 0.0,
 		0.0, 0.0, 0.0, 1.0]
 
-	Field view:Float[16]
-	Field proj:Float[16]
-	Field ortho:Float[16]
+	Field view   :Float[16]
+	Field proj   :Float[16]
+	Field ortho  :Float[16]
 
-	Field vp:Float[16] ' view * projection matrix
-	Field mtx:Float[16]
-	Field mtxInv:Float[16]
+	Field vp     :Float[16] ' view * projection matrix
+	Field mtx    :Float[16]
+	Field mtxInv :Float[16]
 
-	Field lightDirModel:Float[] = [ -0.4, -0.5, -1.0, 0.0 ]
-	Field lightDirModelN:Float[4]
-	Field lightDirTime:Float[4]
+	Field lightDirModel  :Float[] = [ -0.4, -0.5, -1.0, 0.0 ]
+	Field lightDirModelN :Float[4]
+	Field lightDirTime   :Float[4]
 
-	Field mvp:Float[16]
-	Field invMvp:Float[16]
+	Field mvp    :Float[16]
+	Field invMvp :Float[16]
 
 	Method OnRender:Int()
 
-		Local m_width:Int = DeviceWidth()
-		Local m_height:Int = DeviceHeight()
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
 
 		' Set view 0 default viewport.
 		bgfxSetViewRect(0, 0, 0, m_width, m_height)
@@ -199,7 +197,7 @@ Class RaymarchExample Extends App
 		' Set view and projection matrix for view 1.
 		bgfxSetViewTransform(1, iden, ortho)
 
-		Local time:Float = Float(Millisecs() - m_timeOffset) / 1000.0
+		Local time:Float = Millisecs() * 0.001
 
 		bxMtxMul(vp, view, proj)
 		bxMtxRotateXY(mtx, time, time * 0.37)
