@@ -20,7 +20,7 @@ See LICENSE.TXT for licensing terms.
 
 #include <QHostInfo>
 
-#define TED_VERSION "2018-11-02"
+#define TED_VERSION "2018-12-19"
 
 #define SETTINGS_VERSION 2
 
@@ -248,6 +248,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow( parent ),_ui( new Ui::Mai
     _editorPopupMenu->addAction( _ui->actionEditRedo );
     _editorPopupMenu->addSeparator();
     _editorPopupMenu->addAction( _ui->actionEditUn_Comment_block);
+    _editorPopupMenu->addSeparator();
+    _editorPopupMenu->addAction( _ui->actionEditFind);
     _editorPopupMenu->addSeparator();
     QMenu *bm = new QMenu("Bookmarks",_editorPopupMenu);
     bm->addAction( _ui->actionToggleBookmark );
@@ -1336,7 +1338,14 @@ void MainWindow::onProjectMenu( const QPoint &pos ){
         }
     }else if( action==_ui->actionOpen_on_Desktop ){
 
+        //QDesktopServices::openUrl( "file:/"+info.filePath() );
+
+#ifdef Q_OS_LINUX
+        QDesktopServices::openUrl( "file://"+info.filePath() );
+#else
         QDesktopServices::openUrl( "file:/"+info.filePath() );
+#endif
+
 
     }else if( action==_ui->actionOpen_in_Help ){
 #ifdef Q_OS_WIN
@@ -1870,10 +1879,11 @@ void MainWindow::onEditSelectAll(){
 
 void MainWindow::onEditFind(){
     if( !_codeEditor ) return;
-
+//qDebug() << _codeEditor->identAtCursor();
+//qDebug() << _codeEditor->textCursor().selectedText();
     _findDialog->setModal( true );
 
-    _findDialog->exec();
+    _findDialog->exec(_codeEditor->textCursor().selectedText());
 }
 
 void MainWindow::onEditFindNext(){
