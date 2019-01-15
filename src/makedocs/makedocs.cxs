@@ -24,6 +24,12 @@ makedocs.exe -ignore "brl.admob;reflection"
 
 Changelog (REMEMBER CONST <<VERSION>> WHEN CHANGING)
 --------------------------------------------------------------------------------
+2019-01-08 - Holzchopf
+	- ADDED list ${INDEX_SHORTCUTS}: List of A...Z linking to the first matching
+		anchor in the index, available in indexes. List containing of:
+		IDENT - the display name of the shortcut
+		URL - where the shortcut leads to (will only be set for list items that
+		actually have a matching anchor)
 2018-12-21 - Holzchopf
 	- completely rewritten
 	- ADDED new ${VARS} provided to PageMaker for all decls:
@@ -85,7 +91,7 @@ Import apidoccer
 Import docdoccer
 
 '===============================================================================
-Const VERSION:String		= "2018-12-21"
+Const VERSION:String		= "2019-01-08"
 '===============================================================================
 
 ' path settings
@@ -93,6 +99,7 @@ Const PATH_HTML_BASE:String			= "docs/html"
 Const PATH_HTML_DATA:String			= PATH_HTML_BASE + "/data"
 Const PATH_HTML_EXAMPLES:String		= PATH_HTML_BASE + "/examples"
 Const PATH_DOC_BASE:String			= "docs/cerberusdoc"
+Const PATH_DOC_KEYWORDS:String		= "Programming/Keywords/"
 
 ' "doc" name (as displayed in navigation) for...
 Const LOCATION_3RDPARTY:String		= "3rd Party Docs"
@@ -931,7 +938,7 @@ Class Makedocs Implements ILinkResolver, IPrettifier
 		ClearErrInfo()
 		curdecl = rootmodules
 		' make stack of ALL decls
-		Local alldecls := rootmodules.GetChilds( 0, True )
+		Local alldecls := rootdecl.GetChilds( 0, True )
 		Local txt:String
 		' make index.txt
 		' index.txt format:
@@ -962,6 +969,12 @@ Class Makedocs Implements ILinkResolver, IPrettifier
 					' duplicates redirect to index #ident
 					Local str := "Index.html#" + d.ident
 					idx.Set( d.ident, str )
+				End
+			' language keywords
+			' (assume they're documented under: Programming/Keywords)
+			Case DECL_DOC
+				If d.GetTextOfChild( DECL_UIDENT_SCOPE ) = PATH_DOC_KEYWORDS Then
+					idx.Add( d.ident, BuildDocLink( d ) )
 				End
 			End
 		Next
@@ -1084,6 +1097,8 @@ Class Makedocs Implements ILinkResolver, IPrettifier
 			' derive current location from index name (which can contain "/")
 			linkidents = index.Key.Split("/")
 			linkurls = _LinkUrlsFromIdents( linkidents )
+			' prepare list of shortcuts
+			Local indexshortcuts := New IntMap<String>
 			' set pager lists/strings for index template
 			Local indexname:String = linkidents[ linkidents.Length-1 ]
 			indexpager.Clear()
@@ -1095,8 +1110,22 @@ Class Makedocs Implements ILinkResolver, IPrettifier
 					indexpager.AddItem()
 					curdecl = decl
 					apidoccer.SetPagerStrings(indexpager, decl, True)
+					' check if this item shall get a short cut
+					Local scdest := decl.GetIdent()
+					Local sckey := scdest.ToLower()[0]
+					If Not indexshortcuts.Contains( sckey ) Then
+						indexshortcuts.Add( sckey, "#"+scdest )
+					End
 				Next
 			End
+			indexpager.EndList()
+			' set pager list/strings for shortcuts
+			indexpager.BeginList("INDEX_SHORTCUTS")
+			For Local i:Int = `a` To `z`
+				indexpager.AddItem()
+				indexpager.SetString("IDENT", String.FromChar(i))
+				indexpager.SetString("URL", indexshortcuts.Get(i) )
+			Next
 			indexpager.EndList()
 			' create and save the index
 			page = indexpager.MakePage()
