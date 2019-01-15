@@ -18,33 +18,46 @@ End
 
 Class AtlasImage
 
-	Field page:AtlasPage
+	Field page           :AtlasPage
 
-	Field name:String
+	Field name           :String
 
-	Field rotate:Bool
+	Field rotate         :Bool
 
-	Field srcImage:Image		' = AtlasPage.pageImage (this is a cache)
-	Field srcLeft:Int
-	Field srcTop:Int
-	Field srcWidth:Int
-	Field srcHeight:Int
+	Field srcImage       :Image ' = AtlasPage.pageImage (this is a cache)
+	Field srcLeft        :Int
+	Field srcTop         :Int
+	Field srcWidth       :Int
+	Field srcHeight      :Int
 
 	' TODO splits and pads
-'  	Field splits:Int[]
-'  	Field pads:Int[]
+'  	Field splits         :Int[]
+'  	Field pads           :Int[]
 
-	Field originalWidth:Int
-	Field originalHeight:Int
+	Field originalWidth  :Int
+	Field originalHeight :Int
 
-	Field handleX:Int
-	Field handleY:Int
+	Field handleX        :Int   ' = alignX * srcWidth
+	Field handleY        :Int   ' = alignY * srcHeight
+	Field alignX         :Float ' = handleX / srcWidth
+	Field alignY         :Float ' = handleY / srcHeight
 
-	Field alignX:Float
-	Field alignY:Float
+	Field index          :Int
 
-	Field index:Int
-	
+	Method SetAlign:Void( alignX:Float, alignY:Float )
+		Self.alignX  = alignX
+		Self.alignY  = alignY
+		Self.handleX = alignX * srcWidth
+		Self.handleY = alignY * srcHeight
+	End
+
+	Method SetHandle:Void( handleX:Int, handleY:Int )
+		Self.alignX  = Float(handleX) / srcWidth
+		Self.alignY  = Float(handleY) / srcHeight
+		Self.handleX = handleX
+		Self.handleY = handleY
+	End
+
 	Method Draw:Void(x:Float, y:Float)
 		DrawImageAlign(srcImage, x, y, srcLeft, srcTop, srcWidth, srcHeight, alignX, alignY)
 	End
@@ -268,8 +281,8 @@ Class Atlas
 					atlasImage.handleY = Int(_lineValues[1])
 
 					' @Cleanup: test alignX and alignY
-					atlasImage.alignX = atlasImage.handleX / atlasImage.originalWidth
-					atlasImage.alignY = atlasImage.handleY / atlasImage.originalHeight
+					atlasImage.alignX = Float(atlasImage.handleX) / atlasImage.srcWidth  ' / atlasImage.originalWidth
+					atlasImage.alignY = Float(atlasImage.handleY) / atlasImage.srcHeight ' / atlasImage.originalHeight
 
 					GetNextLineValues()
 
