@@ -378,6 +378,8 @@ Class BgfxDynamicVertexBufferHandle="bgfx_dynamic_vertex_buffer_handle_object"
 End
 
 Class BgfxFrameBufferHandle="bgfx_frame_buffer_handle_object"
+	Method SetHandleToInvalid:Void()
+	Method IsValid:Bool()
 End
 
 Class BgfxIndexBufferHandle="bgfx_index_buffer_handle_object"
@@ -398,6 +400,7 @@ Class BgfxShaderHandle="bgfx_shader_handle_object"
 End
 
 Class BgfxTextureHandle="bgfx_texture_handle_object"
+	Method GetHandle:Int()
 	Method SetHandleToInvalid:Void()
 	Method IsValid:Bool()
 End
@@ -522,6 +525,7 @@ Class BgfxCaps="bgfx_caps_object"
 	Method GetSupported:Void(supported:Int[])
 	Method GetHomogeneousDepth:Bool()
 	Method GetFormats:Void(formats:Int[])
+	Method GetOriginBottomLeft:Bool()
 End
 
 '  Class BgfxCallbackInterface="bgfx_callback_interface_object"
@@ -569,6 +573,11 @@ Function bxVec4MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_v
 Function bxCntTZ:Int( _value:Int )="_bx_cnt_t_z"
 Function bxMtxSRT:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float, _ax:Float, _ay:Float, _az:Float, _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_s_r_t"
 Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_translate"
+Function bxVec3MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx"
+Function bxSquare:Float( _a:Float )="_bx_square"
+
+
+
 
 Function bgfxReadPixels:Void( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )="_bgfx_read_pixels"
 
@@ -836,6 +845,7 @@ Function bgfxCreateFrameBufferScaled:Void( _handle:BgfxFrameBufferHandle, _ratio
 Function bgfxCreateFrameBufferScaled:Void( _handle:BgfxFrameBufferHandle, _ratio:Int, _format:Int, _textureFlags:Int[] )="_bgfx_create_frame_buffer_scaled"
 
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer_from_handles(int _num, const bgfx_texture_handle_object* _handles, bool _destroyTextures);
+Function bgfxCreateFrameBufferFromHandles:Void( _handle:BgfxFrameBufferHandle, _num:Int, _handles:DataBuffer, _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
 '  Function bgfxCreateFrameBufferFromHandles:Void( _handle:BgfxFrameBufferHandle, _num:Int, _handles:BgfxTextureHandle[], _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
 
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer_from_attachment(int _num, const bgfx_attachment_object* _attachment, bool _destroyTextures);
@@ -845,7 +855,7 @@ Function bgfxCreateFrameBufferFromAttachment:Void( _handle:BgfxFrameBufferHandle
 Function bgfxCreateFrameBufferFromNwh:Void( _handle:BgfxFrameBufferHandle, _nwh:BgfxNativeWindowHandle, _width:Int, _height:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT, _depthFormat:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_create_frame_buffer_from_nwh"
 
 '  bgfx_texture_handle_object bgfx_get_texture(bgfx_frame_buffer_handle_object _handle, int _attachment);
-Function bgfxGetTexture:Void( _texture:BgfxTextureHandle, _handle:BgfxFrameBufferHandle, _attachment:Int=0 )="_bgfx_get_texture"
+Function bgfxGetTexture:Void( _result:BgfxTextureHandle, _handle:BgfxFrameBufferHandle, _attachment:Int=0 )="_bgfx_get_texture"
 
 '  void bgfx_destroy_frame_buffer(bgfx_frame_buffer_handle_object _handle);
 Function bgfxDestroyFrameBuffer:Void( _handle:BgfxFrameBufferHandle )="_bgfx_destroy_frame_buffer"
@@ -878,8 +888,8 @@ Function bgfxSetViewName:Void( _id:Int, _name:String )="_bgfx_set_view_name"
 '  void bgfx_set_view_rect(int _id, int _x, int _y, int _width, int _height);
 Function bgfxSetViewRect:Void( _id:Int, _x:Int, _y:Int, _width:Int, _height:Int )="bgfx_set_view_rect"
 
-'  void bgfx_set_view_rect_auto(int _id, int _x, int _y, int _ratio);
-Function bgfxSetViewRectAuto:Void( _id:Int, _x:Int, _y:Int, _ratio:Int )="bgfx_set_view_rect_auto"
+'  void _bgfx_set_view_rect_auto(int _id, int _x, int _y, int _ratio);
+Function bgfxSetViewRectAuto:Void( _id:Int, _x:Int, _y:Int, _ratio:Int )="_bgfx_set_view_rect_auto"
 
 '  void bgfx_set_view_scissor(int _id, int _x, int _y, int _width, int _height);
 Function bgfxSetViewScissor:Void( _id:Int, _x:Int=0, _y:Int=0, _width:Int=0, _height:Int=0 )="bgfx_set_view_scissor"
@@ -906,10 +916,11 @@ Function bgfxSetViewTransformProj:Void( _id:Int, _proj:Float[] )="_bgfx_set_view
 Function bgfxSetViewTransformStereo:Void( _id:Int, _view:Float[], _projL:Float[], _flags:Int=BGFX_VIEW_STEREO )="_bgfx_set_view_transform_stereo"
 Function bgfxSetViewTransformStereo:Void( _id:Int, _view:Float[], _projL:Float[], _flags:Int, _projR:Float[] )="_bgfx_set_view_transform_stereo"
 
+' BGFX_C_API void bgfx_set_view_order(bgfx_view_id_t _id, uint16_t _num, const bgfx_view_id_t* _order)
 '  void bgfx_set_view_order(int _id, int _num, const int* _order);
 '  Function bgfxSetViewOrder:Void( _id:Int, _num:Int=UINT16_MAX, _order/_remap:Int[]=Null )="_bgfx_set_view_order"
 Function bgfxSetViewOrder:Void( _id:Int, _num:Int=UINT16_MAX )="_bgfx_set_view_order"
-Function bgfxSetViewOrder:Void( _id:Int, _num:Int, _order:Int[] )="_bgfx_set_view_order"
+Function bgfxSetViewOrder:Void( _id:Int, _num:Int, _order:DataBuffer )="_bgfx_set_view_order"
 
 '  void bgfx_reset_view(int _id);
 Function bgfxResetView:Void( _id:Int )="bgfx_reset_view"
@@ -934,6 +945,7 @@ Function bgfxSetScissorCached:Void( _cache:Int=UINT16_MAX )="bgfx_set_scissor_ca
 
 '  int bgfx_set_transform(const void* _mtx, int _num);
 Function bgfxSetTransform:Int( _mtx:Float[], _num:Int=1 )="_bgfx_set_transform"
+Function bgfxSetTransformNull:Int()="_bgfx_set_transform_null"
 
 '  int bgfx_alloc_transform(bgfx_transform_object* _transform, int _num);
 Function bgfxAllocTransform:Int( _transform:BgfxTransform, _num:Int )="_bgfx_alloc_transform"
@@ -1177,31 +1189,61 @@ Function bgfxUtilsSet64Bit:Void( numbers:Int[], value:Int[] )
 End
 
 Function bgfxUtilsCreateVertexBuffer:BgfxVertexBufferHandle( _mem:BgfxMemory, _decl:BgfxVertexDecl, _flags=BGFX_BUFFER_NONE )
-	Local _handle:= New BgfxVertexBufferHandle()
+	Local _handle := New BgfxVertexBufferHandle()
 	bgfxCreateVertexBuffer( _handle, _mem, _decl, _flags )
 	Return _handle
 End
 
 Function bgfxUtilsCreateIndexBuffer:BgfxIndexBufferHandle( _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )
-	Local _handle:= New BgfxIndexBufferHandle()
+	Local _handle := New BgfxIndexBufferHandle()
 	bgfxCreateIndexBuffer( _handle, _mem, _flags )
 	Return _handle
 End
 
+Function bgfxUtilsCreateFrameBuffer:BgfxFrameBufferHandle( _width:Int, _height:Int, _format:Int ) ' _textureFlags:Int[] )
+	Local _handle := New BgfxFrameBufferHandle()
+	bgfxCreateFrameBuffer( _handle, _width, _height, _format )
+	Return _handle
+End
+
+Function bgfxUtilsCreateFrameBufferScaled:BgfxFrameBufferHandle( _ratio:Int, _format:Int ) ' _textureFlags:Int[] )
+	Local _handle := New BgfxFrameBufferHandle()
+	bgfxCreateFrameBufferScaled( _handle, _ratio, _format )
+	Return _handle
+End
+
+Function bgfxUtilsCreateTexture2D:BgfxTextureHandle( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int )
+	Local _handle := New BgfxTextureHandle()
+	bgfxCreateTexture2D( _handle, _width, _height, _hasMips, _numLayers, _format )
+	Return _handle
+End
+
+Function bgfxUtilsCreateTexture2D:BgfxTextureHandle( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )
+	Local _handle := New BgfxTextureHandle()
+	bgfxCreateTexture2D( _handle, _width, _height, _hasMips, _numLayers, _format, _flags )
+	Return _handle
+End
+
+Function bgfxUtilsCreateTexture2D:BgfxTextureHandle( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )
+	Local _handle := New BgfxTextureHandle()
+	bgfxCreateTexture2D( _handle, _width, _height, _hasMips, _numLayers, _format, _flags, _mem )
+	Return _handle
+End
+
 Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer )
-	Local _mem:= New BgfxMemory()
+	Local _mem := New BgfxMemory()
 	bgfxMakeRef( _mem, _data )
 	Return _mem
 End
 
 Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer, _size:Int )
-	Local _mem:= New BgfxMemory()
+	Local _mem := New BgfxMemory()
 	bgfxMakeRef( _mem, _data, _size )
 	Return _mem
 End
 
 Function bgfxUtilsCreateUniform:BgfxUniformHandle( _name:String, _type:Int, _num:Int=1 )
-	Local _handle:= New BgfxUniformHandle()
+	Local _handle := New BgfxUniformHandle()
 	bgfxCreateUniform( _handle, _name, _type, _num )
 	Return _handle
 End
@@ -1306,6 +1348,358 @@ End
 '-------------------------------------------------------------------------------
 ' bgfx utils mesh
 '-------------------------------------------------------------------------------
+
+'-------------------------------------------------------------------------------
+' @Cleanup: move these to bgfx utils
+'-------------------------------------------------------------------------------
+
+Class BgfxUtilsAabb
+	Field m_min :Float[3]
+	Field m_max :Float[3]
+End
+
+Class BgfxUtilsObb
+	Field m_mtx :Float[16]
+End
+
+Class BgfxUtilsSphere
+	Field m_center :Float[3]
+	Field m_radius :Float
+End
+
+Class BgfxUtilsPrimitive
+
+	Field m_startIndex  :Int
+	Field m_numIndices  :Int
+	Field m_startVertex :Int
+	Field m_numVertices :Int
+
+	Field m_sphere := New BgfxUtilsSphere()
+	Field m_aabb   := New BgfxUtilsAabb()
+	Field m_obb    := New BgfxUtilsObb()
+End
+
+Class BgfxUtilsGroup
+
+	Field m_vbMem := New BgfxMemory()
+	Field m_ibMem := New BgfxMemory()
+
+	Field m_vbh := New BgfxVertexBufferHandle()
+	Field m_ibh := New BgfxIndexBufferHandle()
+
+	Field m_sphere := New BgfxUtilsSphere()
+	Field m_aabb   := New BgfxUtilsAabb()
+	Field m_obb    := New BgfxUtilsObb()
+	Field m_prims  := New Stack<BgfxUtilsPrimitive>()
+End
+
+Class BgfxUtilsMesh
+	Field m_decl   := New BgfxVertexDecl()
+	Field m_groups := New Stack<BgfxUtilsGroup>()
+End
+
+Const BGFX_CHUNK_MAGIC_VB  :Int = $01204256
+Const BGFX_CHUNK_MAGIC_IB  :Int = $00204249
+Const BGFX_CHUNK_MAGIC_IBC :Int = $00434249
+Const BGFX_CHUNK_MAGIC_PRI :Int = $00495250
+
+Function bgfxUtilsReadSphere:Int(buffer:DataBuffer, address:Int, sphere:BgfxUtilsSphere)
+
+	sphere.m_center[0] = buffer.PeekFloat(address); address += 4
+	sphere.m_center[1] = buffer.PeekFloat(address); address += 4
+	sphere.m_center[2] = buffer.PeekFloat(address); address += 4
+
+	sphere.m_radius = buffer.PeekFloat(address); address += 4
+
+	' Print "cx=" + sphere.m_center[0] + " cy=" + sphere.m_center[1] + " cz=" + sphere.m_center[2] + " radius=" + sphere.m_radius
+
+	Return address
+End
+
+Function bgfxUtilsReadAabb:Int(buffer:DataBuffer, address:Int, aabb:BgfxUtilsAabb)
+
+	aabb.m_min[0] = buffer.PeekFloat(address); address += 4
+	aabb.m_min[1] = buffer.PeekFloat(address); address += 4
+	aabb.m_min[2] = buffer.PeekFloat(address); address += 4
+
+	aabb.m_max[0] = buffer.PeekFloat(address); address += 4
+	aabb.m_max[1] = buffer.PeekFloat(address); address += 4
+	aabb.m_max[2] = buffer.PeekFloat(address); address += 4
+
+	' Print "minx=" + aabb.m_min[0] + " miny=" + aabb.m_min[1] + " minz=" + aabb.m_min[2]
+	' Print "maxx=" + aabb.m_max[0] + " maxy=" + aabb.m_max[1] + " maxz=" + aabb.m_max[2]
+
+	Return address
+End
+
+Function bgfxUtilsReadObb:Int(buffer:DataBuffer, address:Int, obb:BgfxUtilsObb)
+
+	For Local ii:Int = 0 Until 16
+		obb.m_mtx[ii] = buffer.PeekFloat(address); address += 4
+		' Print "ii= " + ii + " mtx=" + obb.m_mtx[ii]
+	Next
+
+	Return address
+End
+
+Function bgfxUtilsReadVertexDecl:Int(buffer:DataBuffer, address:Int, decl:BgfxVertexDecl)
+
+	' bgfx\src\vertexdecl.cpp
+	' int32_t read(bx::ReaderI* _reader, VertexDecl& _decl, bx::Error* _err)
+
+	Local numAttrs :Int = buffer.PeekByte(  address ); address += 1
+	Local stride   :Int = buffer.PeekShort( address ); address += 2
+
+	bgfxVertexDeclBegin( decl )
+
+	' Print "numAttrs=" + numAttrs + " stride=" + stride
+
+	For Local ii:Int = 0 Until numAttrs
+
+		Local offset   :Int = buffer.PeekShort(address); address += 2
+
+		Local attribId :Int = buffer.PeekShort(address); address += 2
+		Local attr     :Int = BGFX_ATTRIB_COUNT
+
+		Select attribId
+		Case $0001
+			attr = BGFX_ATTRIB_POSITION
+		Case $0002
+			attr = BGFX_ATTRIB_NORMAL
+		Case $0003
+			attr = BGFX_ATTRIB_TANGENT
+		Case $0004
+			attr = BGFX_ATTRIB_BITANGENT
+		Case $0005
+			attr = BGFX_ATTRIB_COLOR0
+		Case $0006
+			attr = BGFX_ATTRIB_COLOR1
+		Case $0018
+			attr = BGFX_ATTRIB_COLOR2
+		Case $0019
+			attr = BGFX_ATTRIB_COLOR3
+		Case $000e
+			attr = BGFX_ATTRIB_INDICES
+		Case $000f
+			attr = BGFX_ATTRIB_WEIGHT
+		Case $0010
+			attr = BGFX_ATTRIB_TEXCOORD0
+		Case $0011
+			attr = BGFX_ATTRIB_TEXCOORD1
+		Case $0012
+			attr = BGFX_ATTRIB_TEXCOORD2
+		Case $0013
+			attr = BGFX_ATTRIB_TEXCOORD3
+		Case $0014
+			attr = BGFX_ATTRIB_TEXCOORD4
+		Case $0015
+			attr = BGFX_ATTRIB_TEXCOORD5
+		Case $0016
+			attr = BGFX_ATTRIB_TEXCOORD6
+		Case $0017
+			attr = BGFX_ATTRIB_TEXCOORD7
+		End
+
+		Local num          :Int = buffer.PeekByte(address); address += 1
+
+		Local attribTypeId :Int = buffer.PeekShort(address); address += 2
+		Local type         :Int = BGFX_ATTRIB_TYPE_COUNT
+
+		Select attribTypeId
+		Case $0001
+			type = BGFX_ATTRIB_TYPE_UINT8
+		Case $0005
+			type = BGFX_ATTRIB_TYPE_UINT10
+		Case $0002
+			type = BGFX_ATTRIB_TYPE_INT16
+		Case $0003
+			type = BGFX_ATTRIB_TYPE_HALF
+		Case $0004
+			type = BGFX_ATTRIB_TYPE_FLOAT
+		End
+
+		Local normalizedByte :Int = buffer.PeekByte(address); address += 1
+		Local normalized     :Bool = False; If normalizedByte = 1 Then normalized = True
+
+		Local asIntByte      :Int = buffer.PeekByte(address); address += 1
+		Local asInt          :Bool = False; If asIntByte = 1 Then asInt = True
+
+		' Print "offset=" + offset + " attribId=" + attribId + " num=" + num + " attribTypeId=" + attribTypeId + " normalized=" + normalizedByte + " asInt=" + asIntByte
+
+		If attr <> BGFX_ATTRIB_COUNT And type <> BGFX_ATTRIB_TYPE_COUNT Then
+			bgfxVertexDeclAdd( decl, attr, num, type, normalized, asInt )
+			decl.SetOffset(attr, offset)
+		Endif
+
+	Next
+
+	bgfxVertexDeclEnd( decl )
+	decl.SetStride(stride)
+
+	Return address
+End
+
+Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
+
+	Local buffer  := DataBuffer.Load("cerberus://data/" + _filePath)
+
+	Local address :Int = 0
+	Local length  :Int = buffer.Length()
+
+	Local mesh    := New BgfxUtilsMesh()
+	Local group   := New BgfxUtilsGroup()
+
+'  	mesh.m_groups.Push(group)
+
+	' Print "length=" + length
+
+	While address < length
+
+		Local chunk:Int = buffer.PeekInt(address); address += 4
+
+		Select chunk
+
+		Case BGFX_CHUNK_MAGIC_VB
+			address = bgfxUtilsReadSphere(buffer, address, group.m_sphere)
+			address = bgfxUtilsReadAabb(buffer, address, group.m_aabb)
+			address = bgfxUtilsReadObb(buffer, address, group.m_obb)
+
+			address = bgfxUtilsReadVertexDecl(buffer, address, mesh.m_decl)
+
+			Local stride      :Int = mesh.m_decl.GetStride()
+			Local numVertices :Int = buffer.PeekShort(address); address += 2
+			If numVertices < 0 Then numVertices = $10000 + numVertices
+
+			Local size :Int = numVertices * stride
+
+			' Print "stride=" + stride + " numVertices=" + numVertices + " size=" + size
+
+			bgfxAlloc(group.m_vbMem, size)
+			bgfxCopy(group.m_vbMem, buffer, address, size)
+			address += size
+
+			bgfxCreateVertexBuffer(group.m_vbh, group.m_vbMem, mesh.m_decl)
+
+		Case BGFX_CHUNK_MAGIC_IB
+			Local numIndices :Int = buffer.PeekInt(address); address += 4
+			Local size       :Int = numIndices * 2
+
+			bgfxAlloc(group.m_ibMem, size)
+			bgfxCopy(group.m_ibMem, buffer, address, size); address += size
+
+			bgfxCreateIndexBuffer(group.m_ibh, group.m_ibMem)
+
+		Case BGFX_CHUNK_MAGIC_IBC
+			Print "TODO BGFX_CHUNK_MAGIC_IBC"
+
+		Case BGFX_CHUNK_MAGIC_PRI
+			Local len      :Int = buffer.PeekShort(address); address += 2
+			Local material :String = buffer.PeekString(address, len); address += len
+			' Print "material=" + material
+
+			Local num      :Int = buffer.PeekShort(address); address += 2
+
+			For Local ii:Int = 0 Until num
+
+				len = buffer.PeekShort(address); address += 2
+				Local name:String = buffer.PeekString(address, len); address += len
+				' Print "name=" + name
+
+				Local prim := New BgfxUtilsPrimitive()
+				prim.m_startIndex = buffer.PeekInt(address); address += 4
+				prim.m_numIndices = buffer.PeekInt(address); address += 4
+				prim.m_startVertex = buffer.PeekInt(address); address += 4
+				prim.m_numVertices = buffer.PeekInt(address); address += 4
+
+				address = bgfxUtilsReadSphere(buffer, address, prim.m_sphere)
+				address = bgfxUtilsReadAabb(buffer, address, prim.m_aabb)
+				address = bgfxUtilsReadObb(buffer, address, prim.m_obb)
+
+				group.m_prims.Push(prim)
+			Next
+
+			mesh.m_groups.Push(group)
+			group = New BgfxUtilsGroup()
+
+		Default
+			Print "chunk=" + chunk + " address=" + address
+			Return Null
+		End
+
+	Wend
+
+	Return mesh
+End
+
+Function bgfxUtilsMeshUnload:Void(_mesh:BgfxUtilsMesh)
+	' TODO
+End
+
+Function IntToHex:String(number:Int)
+
+	If number = 0 Then
+		Return "00000000"
+	Endif
+
+	Local str:String
+
+	For Local i:Int = 0 Until 8
+
+		Local digit:Int = number & 15
+		Local charCode:Int = digit + 48 ' Ascii 0
+
+		' hex has A-F
+		If charCode < 48 Or charCode > 57 Then
+			charCode = digit + 65 - 10 ' 65 is Ascii A
+		Endif
+
+		str = String.FromChar( charCode ) + str
+
+		number Shr= 4
+	Next
+
+	Return str
+End
+
+Function bgfxUtilsMeshSubmit:Void(_mesh:BgfxUtilsMesh, _id:Int, _program:BgfxProgramHandle, _mtx:Float[], _state:Int[]=BGFX_STATE_MASK)
+
+	If _state[0] = BGFX_STATE_MASK[0] And _state[1] = BGFX_STATE_MASK[1] Then
+		bgfxUtilsClear64Bit(_state)
+		bgfxUtilsSet64Bit(_state, BGFX_STATE_WRITE_RGB)
+		bgfxUtilsSet64Bit(_state, BGFX_STATE_WRITE_A)
+		bgfxUtilsSet64Bit(_state, BGFX_STATE_WRITE_Z)
+		bgfxUtilsSet64Bit(_state, BGFX_STATE_DEPTH_TEST_LESS)
+		bgfxUtilsSet64Bit(_state, BGFX_STATE_CULL_CCW)
+		bgfxUtilsSet64Bit(_state, BGFX_STATE_MSAA)
+	Endif
+
+	' 0x 01000060 0000001f
+'  	Print "_state=$" + IntToHex(_state[0]) + " $" + IntToHex(_state[1])
+
+'  	If _mtx = [] Then
+		bgfxSetTransformNull()
+'  	Else
+'  		bgfxSetTransform(_mtx)
+'  	Endif
+
+	bgfxSetState(_state)
+
+	Local groups:Stack<BgfxUtilsGroup> = _mesh.m_groups
+	Local length:Int = groups.Length()
+
+	For Local ii:Int = 0 Until length
+
+		Local group:BgfxUtilsGroup = groups.Get(ii)
+
+		bgfxSetIndexBuffer(group.m_ibh)
+		bgfxSetVertexBuffer(0, group.m_vbh)
+		bgfxSubmit(_id, _program, 0, ii <> length -1)
+
+'  		Local _preserveState:Bool = False; If ii <> length -1 Then _preserveState = True
+'  		bgfxSubmit(_id, _program, 0, _preserveState)
+	Next
+End
+
 
 '  Extern
 '  

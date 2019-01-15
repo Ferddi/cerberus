@@ -161,6 +161,8 @@ void bgfx_callback_capture_frame(bgfx_callback_interface_t* _this, const void* _
 // classes
 //-----------------------------------------------------------------------------
 
+#define INVALID_HANDLE UINT16_MAX
+
 class bgfx_dynamic_index_buffer_handle_object : public Object
 {
 public:
@@ -197,6 +199,16 @@ public:
 	}
 	~bgfx_frame_buffer_handle_object()
 	{
+	}
+
+	void SetHandleToInvalid()
+	{
+		_handle.idx = INVALID_HANDLE;
+	}
+
+	bool IsValid()
+	{
+		return (_handle.idx != INVALID_HANDLE);
 	}
 };
 
@@ -307,6 +319,11 @@ public:
 	}
 	~bgfx_texture_handle_object()
 	{
+	}
+
+	int GetHandle()
+	{
+		return _handle.idx;
 	}
 
 	void SetHandleToInvalid()
@@ -815,6 +832,11 @@ public:
 			formats[ ii ] = _caps->formats[ ii ];
 		}
 	}
+
+	virtual bool GetOriginBottomLeft()
+	{
+		return _caps->originBottomLeft;
+	}
 };
 
 // used by bgfx_init_t
@@ -1015,6 +1037,20 @@ void _bx_mtx_translate( Array<float> _result, float _tx, float _ty, float _tz )
 {
 	bx::mtxTranslate( &_result[0], _tx, _ty, _tz );
 }
+
+void _bx_vec3_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtx( &_result[0], &_vec[0], &_mat[0] );
+}
+
+float _bx_square( float _a )
+{
+	return bx::square( _a );
+}
+
+
+
+
 
 void _calc_tangents(void* _vertices, uint16_t _numVertices, bgfx_vertex_decl_t * _decl, const uint16_t* _indices, uint32_t _numIndices)
 {
@@ -1935,10 +1971,17 @@ void _bgfx_create_frame_buffer_scaled( bgfx_frame_buffer_handle_object * _handle
 
 // Function bgfxCreateFrameBufferFromHandles:Void( _handle:BgfxFrameBufferHandle, _num:Int, _handles:BgfxTextureHandle[], _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
 // BGFX_C_API bgfx_frame_buffer_handle_t bgfx_create_frame_buffer_from_handles(uint8_t _num, const bgfx_texture_handle_t* _handles, bool _destroyTextures);
-// void _bgfx_create_frame_buffer_from_handles( bgfx_frame_buffer_handle_object * _handle, int _num, Array<bgfx_texture_handle_object> _handles, bool _destroyTextures )
-// {
-	// _handle->_handle = bgfx_create_frame_buffer_from_handles( _num, &_handles[0], _destroyTextures );
-// }
+void _bgfx_create_frame_buffer_from_handles( bgfx_frame_buffer_handle_object * _handle, int _num, BBDataBuffer * _handles, bool _destroyTextures )
+{
+	_handle->_handle = bgfx_create_frame_buffer_from_handles( _num, (bgfx_texture_handle_t *)_handles->ReadPointer(0), _destroyTextures );
+}
+//void _bgfx_create_frame_buffer_from_handles( bgfx_frame_buffer_handle_object * _handle, int _num, Array<bgfx_texture_handle_object*> _handles, bool _destroyTextures )
+//{
+//	bgfx_texture_handle_t handles[2];
+//	handles[0] = _handles[0]->_handle;
+//	handles[1] = _handles[1]->_handle;
+//	_handle->_handle = bgfx_create_frame_buffer_from_handles( _num, handles, _destroyTextures );
+//}
 
 // Function bgfxCreateFrameBufferFromAttachment:Void( _handle:BgfxFrameBufferHandle, _num:Int, _attachment:BgfxAttachment[], _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_attachment"
 // BGFX_C_API bgfx_frame_buffer_handle_t bgfx_create_frame_buffer_from_attachment(uint8_t _num, const bgfx_attachment_t* _attachment, bool _destroyTextures);
@@ -2034,10 +2077,10 @@ void _bgfx_set_view_name( int _id, String _name )
 
 // Function bgfxSetViewRectAuto:Void( _id:Int, _x:Int, _y:Int, _ratio:Int )="_bgfx_set_view_rect_auto"
 // BGFX_C_API void bgfx_set_view_rect_auto(bgfx_view_id_t _id, uint16_t _x, uint16_t _y, bgfx_backbuffer_ratio_t _ratio);
-// void _bgfx_set_view_rect_auto( int _id, int _x, int _y, int _ratio )
-// {
-	// bgfx_set_view_rect_auto( (bgfx_view_id_t)_id, _x, _y, (bgfx_backbuffer_ratio_t)_ratio );
-// }
+void _bgfx_set_view_rect_auto( int _id, int _x, int _y, int _ratio )
+{
+	bgfx_set_view_rect_auto( (bgfx_view_id_t)_id, _x, _y, (bgfx_backbuffer_ratio_t)_ratio );
+}
 
 // Function bgfxSetViewScissor:Void( _id:Int, _x:Int=0, _y:Int=0, _width:Int=0, _height:Int=0 )="_bgfx_set_view_scissor"
 // BGFX_C_API void bgfx_set_view_scissor(bgfx_view_id_t _id, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height);
@@ -2111,9 +2154,9 @@ void _bgfx_set_view_order( int _id, int _num )
 {
 	bgfx_set_view_order( (bgfx_view_id_t)_id, _num, NULL );
 }
-void _bgfx_set_view_order( int _id, int _num, Array<int> _order )
+void _bgfx_set_view_order( int _id, int _num, BBDataBuffer * _order )
 {
-	bgfx_set_view_order( (bgfx_view_id_t)_id, _num, (bgfx_view_id_t *)&_order[0] );
+	bgfx_set_view_order( (bgfx_view_id_t)_id, _num, (bgfx_view_id_t *)_order->ReadPointer(0) );
 }
 
 // Function bgfxResetView:Void( _id:Int )="_bgfx_reset_view"
@@ -2179,6 +2222,10 @@ void _bgfx_set_condition( bgfx_occlusion_query_handle_object * _handle, bool _vi
 void _bgfx_set_transform( Array<float> _mtx, int _num )
 {
 	bgfx_set_transform( &_mtx[0], _num );
+}
+void _bgfx_set_transform_null()
+{
+	bgfx_set_transform( NULL, 1 );
 }
 
 // Function bgfxAllocTransform:Int( _transform:BgfxTransform, _num:Int )="_bgfx_alloc_transform"
