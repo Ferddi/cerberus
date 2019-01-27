@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
@@ -98,40 +100,57 @@ Global s_cubeIndices:Int[] = [
 
 Class BumpExample Extends App
 
-	Field m_vbh:BgfxVertexBufferHandle
-	Field m_ibh:BgfxIndexBufferHandle
+	Field m_debug               :Int = BGFX_DEBUG_NONE
+'  	Field m_debug               :Int = BGFX_DEBUG_TEXT
 
-	Field sCubeVerticesBuffer:DataBuffer
-	Field sCubeIndicesBuffer:DataBuffer
+	Field sCubeVerticesBuffer   :DataBuffer
+	Field sCubeIndicesBuffer    :DataBuffer
 
-	Field s_texColor:BgfxUniformHandle
-	Field s_texNormal:BgfxUniformHandle
-	Field u_lightPosRadius:BgfxUniformHandle
-	Field u_lightRgbInnerR:BgfxUniformHandle
+	Field m_vbh                 :Int
+	Field m_ibh                 :Int
 
-	Field m_program:BgfxProgramHandle
+	Field s_texColor            :Int
+	Field s_texNormal           :Int
+	Field u_lightPosRadius      :Int
+	Field u_lightRgbInnerR      :Int
 
-	Field m_textureColor:BgfxTextureHandle
-	Field m_textureNormal:BgfxTextureHandle
+	Field m_program             :Int
 
-	Field m_numLights:Int
+	Field m_textureColor        :Int
+	Field m_textureNormal       :Int
 
-	Field bgfxCaps := New BgfxCaps()
-	Field supported:Int[2]
-	Field m_instancingSupported:Bool
+	Field m_numLights           :Int
 
-	Field m_debug:Int = BGFX_DEBUG_NONE
-	' Field m_debug:Int = BGFX_DEBUG_TEXT
+	Field bgfxCaps              := New BgfxCaps()
+	Field supported             :Int[2]
+	Field m_instancingSupported :Bool
+
+	Field at                    :Float[] = [ 0.0, 0.0,  0.0 ]
+	Field eye                   :Float[] = [ 0.0, 0.0, -7.0 ]
+
+	Field view                  :Float[16]
+	Field proj                  :Float[16]
+	Field mtx                   :Float[16]
+
+	Field state                 :Int[2]
+	Field idb                   := New BgfxInstanceDataBuffer()
+
+	Field lightPosRadius        :Float[16]
+	Field lightRgbInnerR        :Float[] = [
+		1.0, 0.7, 0.2, 0.8,
+		0.7, 0.2, 1.0, 0.8,
+		0.2, 1.0, 0.7, 0.8,
+		1.0, 0.4, 0.2, 0.8]
 
 	Method MakeDataBuffers:Void()
 
-		Local address:Int
-		Local length:Int
+		Local address :Int
+		Local length  :Int
 
 		' s_cubeVertices to sCubeVerticesBuffer
 
 		address = 0
-		length = s_cubeVertices.Length()
+		length  = s_cubeVertices.Length()
 
 		sCubeVerticesBuffer = New DataBuffer( length * 7 * 4 )
 		For Local i:Int = 0 Until length
@@ -150,7 +169,7 @@ Class BumpExample Extends App
 		' s_cubeIndices to sCubeIndicesBuffer
 
 		address = 0
-		length = s_cubeIndices.Length()
+		length  = s_cubeIndices.Length()
 
 		sCubeIndicesBuffer = New DataBuffer( length * 2 )
 		For Local i:Int = 0 Until length
@@ -192,18 +211,18 @@ Class BumpExample Extends App
 				s_cubeIndices.Length())
 
 		' Create static vertex buffer.
-		m_vbh = bgfxUtilsCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosNormalTangentTexcoordVertex.ms_decl )
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosNormalTangentTexcoordVertex.ms_decl )
 
 		' Create static index buffer.
-		m_ibh = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
+		m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
 
 		' Create texture sampler uniforms.
-		s_texColor  = bgfxUtilsCreateUniform("s_texColor",  BGFX_UNIFORM_TYPE_INT1)
-		s_texNormal = bgfxUtilsCreateUniform("s_texNormal", BGFX_UNIFORM_TYPE_INT1)
+		s_texColor  = bgfxCreateUniform("s_texColor",  BGFX_UNIFORM_TYPE_INT1)
+		s_texNormal = bgfxCreateUniform("s_texNormal", BGFX_UNIFORM_TYPE_INT1)
 
 		m_numLights = 4
-		u_lightPosRadius = bgfxUtilsCreateUniform("u_lightPosRadius", BGFX_UNIFORM_TYPE_VEC4, m_numLights)
-		u_lightRgbInnerR = bgfxUtilsCreateUniform("u_lightRgbInnerR", BGFX_UNIFORM_TYPE_VEC4, m_numLights)
+		u_lightPosRadius = bgfxCreateUniform("u_lightPosRadius", BGFX_UNIFORM_TYPE_VEC4, m_numLights)
+		u_lightRgbInnerR = bgfxCreateUniform("u_lightRgbInnerR", BGFX_UNIFORM_TYPE_VEC4, m_numLights)
 
 		' Create program from shaders.
 		If m_instancingSupported Then
@@ -213,10 +232,10 @@ Class BumpExample Extends App
 		Endif
 
 		' Load diffuse texture.
-		m_textureColor = bgfxUtilsLoadTexture("textures/fieldstone-rgba.dds");
+		m_textureColor = bgfxUtilsLoadTexture("textures/fieldstone-rgba.dds")
 
 		' Load normal texture.
-		m_textureNormal = bgfxUtilsLoadTexture("textures/fieldstone-n.dds");
+		m_textureNormal = bgfxUtilsLoadTexture("textures/fieldstone-n.dds")
 
 		Return 0
 	End
@@ -225,51 +244,30 @@ Class BumpExample Extends App
 		Return 0
 	End
 
-	Method OnClose:Int()
-
-		' Cleanup.
-		bgfxDestroyIndexBuffer(m_ibh)
-		bgfxDestroyVertexBuffer(m_vbh)
-		bgfxDestroyProgram(m_program)
-		bgfxDestroyTexture(m_textureColor)
-		bgfxDestroyTexture(m_textureNormal)
-		bgfxDestroyUniform(s_texColor)
-		bgfxDestroyUniform(s_texNormal)
-		bgfxDestroyUniform(u_lightPosRadius)
-		bgfxDestroyUniform(u_lightRgbInnerR)
-
-		' Shutdown bgfx.
-		bgfxShutdown()
-	End
-
-	Field at:Float[]  = [ 0.0, 0.0,   0.0 ]
-	Field eye:Float[] = [ 0.0, 0.0, -7.0 ]
-
-'  	Field iden:Float[] = [
-'  		1.0, 0.0, 0.0, 0.0,
-'  		0.0, 1.0, 0.0, 0.0,
-'  		0.0, 0.0, 1.0, 0.0,
-'  		0.0, 0.0, 0.0, 1.0]
-
-	Field view:Float[16]
-	Field proj:Float[16]
-	Field mtx:Float[16]
-
-	Field lightPosRadius:Float[16]
-	Field lightRgbInnerR:Float[] = [
-		1.0, 0.7, 0.2, 0.8,
-		0.7, 0.2, 1.0, 0.8,
-		0.2, 1.0, 0.7, 0.8,
-		1.0, 0.4, 0.2, 0.8]
-
-	Field state:Int[2]
-
-	Field idb := New BgfxInstanceDataBuffer()
+	'
+	' @Bug: these cleanup seems to cause problem:
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		bgfxDestroyIndexBuffer(m_ibh)
+'  		bgfxDestroyVertexBuffer(m_vbh)
+'  		bgfxDestroyProgram(m_program)
+'  		bgfxDestroyTexture(m_textureColor)
+'  		bgfxDestroyTexture(m_textureNormal)
+'  		bgfxDestroyUniform(s_texColor)
+'  		bgfxDestroyUniform(s_texNormal)
+'  		bgfxDestroyUniform(u_lightPosRadius)
+'  		bgfxDestroyUniform(u_lightRgbInnerR)
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
 
 	Method OnRender:Int()
 
-		Local m_width:Int = DeviceWidth()
-		Local m_height:Int = DeviceHeight()
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
 
 		' Set view 0 default viewport.
 		bgfxSetViewRect(0, 0, 0, m_width, m_height)

@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
@@ -94,7 +96,7 @@ Global s_cubeIndices:Int[] = [
 Global _updateTextureTi  := New BgfxTextureInfo()
 Global _updateTextureMem := New BgfxMemory()
 
-Function UpdateTextureCubeRectBgra8:Void( _handle:BgfxTextureHandle, 
+Function UpdateTextureCubeRectBgra8:Void( _handle:Int, 
                                            _side:Int,
                                            _x:Int,
                                            _y:Int,
@@ -142,15 +144,15 @@ Function BGFX_SAMPLER_BORDER_COLOR:Int( _index:Int )
 	Return ( (_index Shl BGFX_SAMPLER_BORDER_COLOR_SHIFT) & BGFX_SAMPLER_BORDER_COLOR_MASK )
 End
 
-
-
-
 Const TEXTURE_SIDE     :Int = 512
 Const TEXTURE_2D_SIZE  :Int = 256
 
 Const NUMBER_OF_BLOCKS :Int = 256
 
 Class UpdateExample Extends App
+
+'  	Field debug                :Int = BGFX_DEBUG_NONE
+	Field debug                :Int = BGFX_DEBUG_TEXT
 
 	Field m_texture2dData      :DataBuffer ' Int[]
 	Field m_numTextures3d      :Int
@@ -170,22 +172,22 @@ Class UpdateExample Extends App
 	Field m_gg                 :Int
 	Field m_bb                 :Int
 
-	Field m_textures           :BgfxTextureHandle[12]
-	Field m_textures3d         :BgfxTextureHandle[3]
-	Field m_texture2d          :BgfxTextureHandle
-	Field m_textureCube        :BgfxTextureHandle[3]
+	Field m_textures           :Int[12]
+	Field m_textures3d         :Int[3]
+	Field m_texture2d          :Int
+	Field m_textureCube        :Int[3]
 
-	Field m_ibh                :BgfxIndexBufferHandle
-	Field m_vbh                :BgfxVertexBufferHandle
+	Field m_ibh                :Int
+	Field m_vbh                :Int
 
-	Field m_program3d          :BgfxProgramHandle
-	Field m_programCmp         :BgfxProgramHandle
-	Field m_programCompute     :BgfxProgramHandle
-	Field m_program            :BgfxProgramHandle
+	Field m_program3d          :Int
+	Field m_programCmp         :Int
+	Field m_programCompute     :Int
+	Field m_program            :Int
 
-	Field u_time               :BgfxUniformHandle
-	Field s_texColor           :BgfxUniformHandle
-	Field s_texCube            :BgfxUniformHandle
+	Field u_time               :Int
+	Field s_texColor           :Int
+	Field s_texCube            :Int
 
 	Field sCubeVerticesBuffer  :DataBuffer
 	Field sCubeIndicesBuffer   :DataBuffer
@@ -194,9 +196,18 @@ Class UpdateExample Extends App
 	Field supported            :Int[2]
 	Field formats              :Int[BGFX_TEXTURE_FORMAT_COUNT]
 
-'  	Field debug                :Int = BGFX_DEBUG_NONE
-	Field debug                :Int = BGFX_DEBUG_TEXT
-'  	Field m_timeOffset         :Int
+	Field at                   :Float[] = [ 0.0, 0.0,  0.0 ]
+	Field eye                  :Float[] = [ 0.0, 0.0, -5.0 ]
+
+	Field view                 :Float[16]
+	Field proj                 :Float[16]
+	Field mtx                  :Float[16]
+
+	Field state                :Int[2]
+
+	Field borderColor          :Float[4]
+
+	Field m_texture2dMem       := New BgfxMemory()
 
 	Method MakeDataBuffers:Void()
 
@@ -295,26 +306,23 @@ Class UpdateExample Extends App
 			'
 
 			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R8]) Then
-				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
 				flags[0] = 0
 				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
-				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R8,   flags, mem8   )
+				m_textures3d[ m_numTextures3d ] = bgfxCreateTexture3D( 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R8,   flags, mem8   )
 				m_numTextures3d += 1
 			Endif
 
 			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R16F ]) Then
-				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
 				flags[0] = 0
 				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
-				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R16F, flags, mem16f )
+				m_textures3d[ m_numTextures3d ] = bgfxCreateTexture3D( 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R16F, flags, mem16f )
 				m_numTextures3d += 1
 			Endif
 
 			If 0 <> (BGFX_CAPS_FORMAT_TEXTURE_3D & formats[ BGFX_TEXTURE_FORMAT_R32F ]) Then
-				m_textures3d[ m_numTextures3d ] = New BgfxTextureHandle()
 				flags[0] = 0
 				flags[1] = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP
-				bgfxCreateTexture3D( m_textures3d[ m_numTextures3d ], 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R32F, flags, mem32f )
+				m_textures3d[ m_numTextures3d ] = bgfxCreateTexture3D( 32, 32, 32, False, BGFX_TEXTURE_FORMAT_R32F, flags, mem32f )
 				m_numTextures3d += 1
 			Endif
 		Endif
@@ -322,10 +330,10 @@ Class UpdateExample Extends App
 		MakeDataBuffers()
 
 		' Create static vertex buffer.
-		m_vbh = bgfxUtilsCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosTexcoordVertex.ms_decl )
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosTexcoordVertex.ms_decl )
 
 		' Create static index buffer.
-		m_ibh = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
+		m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
 
 		m_program    = bgfxUtilsLoadProgram("vs_update", "fs_update")
 		m_programCmp = bgfxUtilsLoadProgram("vs_update", "fs_update_cmp")
@@ -336,29 +344,26 @@ Class UpdateExample Extends App
 		If m_texture3DSupported Then
 			m_program3d = bgfxUtilsLoadProgram("vs_update", "fs_update_3d")
 		Else
-			m_program3d = New BgfxProgramHandle()
-			m_program3d.SetHandleToInvalid() ' m_program3d.idx = bgfx::kInvalidHandle;
+			m_program3d = BGFX_INVALID_HANDLE
 		Endif
 
 		'
 		' @Cleanup: create bgfxUtilsCreateComputeProgram?
 		'
-		m_programCompute = New BgfxProgramHandle()
-		m_programCompute.SetHandleToInvalid() ' m_programCompute.idx = bgfx::kInvalidHandle;
+		m_programCompute = BGFX_INVALID_HANDLE
 		If m_computeSupported Then
-			bgfxCreateComputeProgram( m_programCompute, bgfxUtilsLoadShader("cs_update"), True )
+			m_programCompute = bgfxCreateComputeProgram( bgfxUtilsLoadShader("cs_update"), True )
 		Endif
 
 		' Create texture sampler uniforms.
-		s_texCube  = bgfxUtilsCreateUniform("s_texCube",  BGFX_UNIFORM_TYPE_INT1)
-		s_texColor = bgfxUtilsCreateUniform("s_texColor", BGFX_UNIFORM_TYPE_INT1)
+		s_texCube  = bgfxCreateUniform("s_texCube",  BGFX_UNIFORM_TYPE_INT1)
+		s_texColor = bgfxCreateUniform("s_texColor", BGFX_UNIFORM_TYPE_INT1)
 
 		' Create time uniform.
-		u_time = bgfxUtilsCreateUniform("u_time", BGFX_UNIFORM_TYPE_VEC4)
+		u_time = bgfxCreateUniform("u_time", BGFX_UNIFORM_TYPE_VEC4)
 
 		For Local ii:Int = 0 Until m_textureCube.Length()
-			m_textureCube[ii] = New BgfxTextureHandle()
-			m_textureCube[ii].SetHandleToInvalid() ' m_textureCube[ii].idx = bgfx::kInvalidHandle;
+			m_textureCube[ii] = BGFX_INVALID_HANDLE
 		Next
 
 		'
@@ -366,22 +371,21 @@ Class UpdateExample Extends App
 		'
 		flags[0] = 0
 		flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT
-		bgfxCreateTextureCube( m_textureCube[0], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+		m_textureCube[0] = bgfxCreateTextureCube( TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
 
 		If m_blitSupported Then
 			flags[0] = BGFX_TEXTURE_BLIT_DST[0]
 			flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_TEXTURE_BLIT_DST[1]
-			bgfxCreateTextureCube( m_textureCube[1], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+			m_textureCube[1] = bgfxCreateTextureCube( TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
 		Endif
 
 		If m_computeSupported Then
-			bgfxCreateTextureCube( m_textureCube[2], TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_COMPUTE_WRITE )
+			m_textureCube[2] = bgfxCreateTextureCube( TEXTURE_SIDE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_COMPUTE_WRITE )
 		Endif
 
-		m_texture2d = New BgfxTextureHandle()
 		flags[0] = 0
 		flags[1] = BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT
-		bgfxCreateTexture2D( m_texture2d, TEXTURE_2D_SIZE, TEXTURE_2D_SIZE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+		m_texture2d = bgfxCreateTexture2D( TEXTURE_2D_SIZE, TEXTURE_2D_SIZE, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
 
 '  		m_texture2dData = (uint8_t*)malloc(TEXTURE_2D_SIZE*TEXTURE_2D_SIZE*4);
 		m_texture2dData = New DataBuffer( TEXTURE_2D_SIZE * TEXTURE_2D_SIZE * 4 )
@@ -403,77 +407,56 @@ Class UpdateExample Extends App
 		Return 0
 	End
 
-	Method OnClose:Int()
-
-		' m_texture2dData is managed from main thread, and it's passed to renderer
-		' just as MemoryRef. At this point render might be using it. We must wait
-		' previous frame to finish before we can free it.
-		bgfxFrame()
-
-		' Cleanup.
-'  		free(m_texture2dData)
-
-		For Local ii:Int = 0 Until m_textures.Length()
-			bgfxDestroyTexture( m_textures[ ii ] )
-		Next
-
-		For Local ii:Int = 0 Until m_numTextures3d
-			bgfxDestroyTexture( m_textures3d[ ii ] )
-		Next
-
-		bgfxDestroyTexture( m_texture2d )
-
-		' @Incomplete: bgfx::isValid in include\bgfx\bgfx.h is a macro
-
-		For Local ii:Int = 0 Until m_textureCube.Length()
-'  			if bgfxIsValid(  ) Then
-			If m_textureCube[ ii ].IsValid() Then
-				bgfxDestroyTexture( m_textureCube[ ii ] )
-			Endif
-		Next
-
-		bgfxDestroyIndexBuffer( m_ibh )
-		bgfxDestroyVertexBuffer( m_vbh )
-
+	'
+	' @Bug: crashing when destroying data:
+	'
+'  	Method OnClose:Int()
+'  
+'  		' m_texture2dData is managed from main thread, and it's passed to renderer
+'  		' just as MemoryRef. At this point render might be using it. We must wait
+'  		' previous frame to finish before we can free it.
+'  		bgfxFrame()
+'  
+'  		' Cleanup.
+'  '  		free(m_texture2dData)
+'  
+'  		For Local ii:Int = 0 Until m_textures.Length()
+'  			bgfxDestroyTexture( m_textures[ ii ] )
+'  		Next
+'  
+'  		For Local ii:Int = 0 Until m_numTextures3d
+'  			bgfxDestroyTexture( m_textures3d[ ii ] )
+'  		Next
+'  
+'  		bgfxDestroyTexture( m_texture2d )
+'  
+'  		For Local ii:Int = 0 Until m_textureCube.Length()
+'  			If bgfxIsValid( m_textureCube[ ii ] ) Then
+'  				bgfxDestroyTexture( m_textureCube[ ii ] )
+'  			Endif
+'  		Next
+'  
+'  		bgfxDestroyIndexBuffer( m_ibh )
+'  		bgfxDestroyVertexBuffer( m_vbh )
+'  
 '  		If bgfxIsValid( m_program3d ) Then
-		If m_program3d.IsValid() Then
-			bgfxDestroyProgram( m_program3d )
-		Endif
-
-		bgfxDestroyProgram( m_programCmp )
-
+'  			bgfxDestroyProgram( m_program3d )
+'  		Endif
+'  
+'  		bgfxDestroyProgram( m_programCmp )
+'  
 '  		If bgfxIsValid( m_programCompute ) Then
-		If m_programCompute.IsValid() Then
-			bgfxDestroyProgram( m_programCompute )
-		Endif
-
-		bgfxDestroyProgram( m_program  )
-		bgfxDestroyUniform( u_time     )
-		bgfxDestroyUniform( s_texColor )
-		bgfxDestroyUniform( s_texCube  )
-
-		' Shutdown bgfx.
-		bgfxShutdown()
-	End
-
-'  	Field iden:Float[] = [
-'  		1.0, 0.0, 0.0, 0.0,
-'  		0.0, 1.0, 0.0, 0.0,
-'  		0.0, 0.0, 1.0, 0.0,
-'  		0.0, 0.0, 0.0, 1.0]
-
-	Field at    :Float[] = [ 0.0, 0.0,  0.0 ]
-	Field eye   :Float[] = [ 0.0, 0.0, -5.0 ]
-
-	Field view  :Float[16]
-	Field proj  :Float[16]
-	Field mtx   :Float[16]
-
-	Field state :Int[2]
-
-	Field borderColor:Float[4]
-
-	Field m_texture2dMem := New BgfxMemory()
+'  			bgfxDestroyProgram( m_programCompute )
+'  		Endif
+'  
+'  		bgfxDestroyProgram( m_program  )
+'  		bgfxDestroyUniform( u_time     )
+'  		bgfxDestroyUniform( s_texColor )
+'  		bgfxDestroyUniform( s_texCube  )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
 
 	Method OnRender:Int()
 
@@ -595,7 +578,7 @@ Class UpdateExample Extends App
 
 		For Local ii:Int = 0 Until m_textureCube.Length()
 
-			If m_textureCube[ ii ].IsValid() Then
+			If bgfxIsValid( m_textureCube[ ii ] ) Then
 
 				bxMtxSRT( mtx, 0.7, 0.7, 0.7, time, time * 0.37, 0.0, -2.0 + ii * 2.0, 0.0, 0.0 )
 

@@ -134,14 +134,13 @@ Global _usedVbo:Stack<Mojo2BgfxVBO>
 
 Class Mojo2BgfxVBO
 
-	Field _vbo:BgfxDynamicVertexBufferHandle
-	Field _vboMem:BgfxMemory
+	Field _vbo    :Int
+	Field _vboMem :BgfxMemory
 
 	Method New()
 		_vboMem = New BgfxMemory()
-		_vbo = New BgfxDynamicVertexBufferHandle()
 '  		bgfxCreateDynamicVertexBuffer( _vbo[i], MAX_VERTICES, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE|BGFX_BUFFER_COMPUTE_READ_WRITE )
-		bgfxCreateDynamicVertexBuffer( _vbo, MAX_VERTICES, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE )
+		_vbo = bgfxCreateDynamicVertexBuffer( MAX_VERTICES, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE )
 	End
 End
 
@@ -266,17 +265,17 @@ Global rs_blend:Int=-1
 '  Global rs_ibo:Int
 
 '  Const MAX_VBOS:Int = 32
-'  Global rs_vbo:BgfxDynamicVertexBufferHandle[MAX_VBOS]
+'  Global rs_vbo:Int[MAX_VBOS]
 Global rs_vbo:Mojo2BgfxVBO
 Global rs_vdecl:BgfxVertexDecl
 '  Global rs_vboMem:BgfxMemory[MAX_VBOS]
 Global _data:DataBuffer=New DataBuffer( 4096,True )
 
-Global rs_ibo:BgfxDynamicIndexBufferHandle
+Global rs_ibo:Int
 Global rs_iboMem:BgfxMemory
 Global _idxsData:DataBuffer
 
-Global rs_iboFan:BgfxDynamicIndexBufferHandle
+Global rs_iboFan:Int
 Global rs_iboFanMem:BgfxMemory
 Global _idxsFanData:DataBuffer
 
@@ -333,8 +332,7 @@ Function InitVbos:Void()
 '  	For Local i:Int = 0 Until MAX_VBOS
 '  		rs_vboMem[i] = New BgfxMemory()
 '  '  		bgfxMakeRef( rs_vboMem[i], _data )
-'  		rs_vbo[i] = New BgfxDynamicVertexBufferHandle()
-'  '  		bgfxCreateDynamicVertexBuffer( rs_vbo[i], MAX_VERTICES, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE|BGFX_BUFFER_COMPUTE_READ_WRITE )
+'  '  		rs_vbo[i] = bgfxCreateDynamicVertexBuffer( MAX_VERTICES, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE|BGFX_BUFFER_COMPUTE_READ_WRITE )
 '  		bgfxCreateDynamicVertexBuffer( rs_vbo[i], MAX_VERTICES, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE )
 '  	Next
 '  '  	bgfxCreateDynamicVertexBuffer( rs_vbo, 65536, rs_vdecl, BGFX_BUFFER_ALLOW_RESIZE|BGFX_BUFFER_COMPUTE_READ_WRITE )
@@ -358,8 +356,7 @@ Function InitVbos:Void()
 
 	rs_iboMem = New BgfxMemory()
 	bgfxMakeRef( rs_iboMem, _idxsData )
-	rs_ibo = New BgfxDynamicIndexBufferHandle()
-	bgfxCreateDynamicIndexBufferMem( rs_ibo, rs_iboMem )
+	rs_ibo = bgfxCreateDynamicIndexBufferMem( rs_iboMem )
 
 '  	_idxsData.Discard() ' for bgfx don't discard the index data buffer, it will be used
 
@@ -374,8 +371,7 @@ Function InitVbos:Void()
 
 	rs_iboFanMem = New BgfxMemory()
 	bgfxMakeRef( rs_iboFanMem, _idxsFanData )
-	rs_iboFan = New BgfxDynamicIndexBufferHandle()
-	bgfxCreateDynamicIndexBufferMem( rs_iboFan, rs_iboFanMem )
+	rs_iboFan = bgfxCreateDynamicIndexBufferMem( rs_iboFanMem )
 
 '  	_idxsFanData.Discard() ' for bgfx don't discard the index data buffer, it will be used
 End
@@ -668,10 +664,10 @@ Class Texture Extends RefCounted
 		Return _flat
 	End
 	
-'  	Field _bgfxUniform:BgfxUniformHandle
-	Field _bgfxTextureMem:BgfxMemory = New BgfxMemory()
-	Field _bgfxTexture:BgfxTextureHandle = New BgfxTextureHandle()
-	Field _bgfxFramebuffer:BgfxFrameBufferHandle
+'  	Field _bgfxUniform:Int
+	Field _bgfxTextureMem:= New BgfxMemory()
+	Field _bgfxTexture:Int
+	Field _bgfxFramebuffer:Int
 	Field _bgfxFlags:Int[2]
 
 	Private
@@ -810,12 +806,10 @@ Class Texture Extends RefCounted
 
 			Print "render target is created _width=" + _width + " _height=" + _height
 
-			_bgfxFramebuffer = New BgfxFrameBufferHandle()
-			bgfxCreateFrameBuffer( _bgfxFramebuffer, _width, _height, BGFX_TEXTURE_FORMAT_RGBA8 )
+			_bgfxFramebuffer = bgfxCreateFrameBuffer( _width, _height, BGFX_TEXTURE_FORMAT_RGBA8 )
 
-'  			_bgfxTexture = New BgfxTextureHandle()
-			bgfxGetTexture( _bgfxTexture, _bgfxFramebuffer )
-'  			bgfxCreateTexture2D( _bgfxTexture, _width, _height, False, 1, BGFX_TEXTURE_FORMAT_RGBA8 )
+			_bgfxTexture = bgfxGetTexture( _bgfxFramebuffer )
+'  			_bgfxTexture = bgfxCreateTexture2D( _width, _height, False, 1, BGFX_TEXTURE_FORMAT_RGBA8 )
 '  		Else
 '  
 '  			Print "Texture is created"
@@ -845,14 +839,12 @@ Class Texture Extends RefCounted
 
 		Print "_width=" + _width + " _height=" + _height + " databuf.Length()=" + databuf.Length()
 
-'  		_bgfxUniform = New BgfxUniformHandle()
-'  		bgfxCreateUniform( _bgfxUniform, "ColorTexture",  BGFX_UNIFORM_TYPE_INT1)
+'  		_bgfxUniform = bgfxCreateUniform( "ColorTexture",  BGFX_UNIFORM_TYPE_INT1)
 
 '  		_bgfxTextureMem = New BgfxMemory()
 		bgfxMakeRef( _bgfxTextureMem, databuf )
 
-'  		_bgfxTexture = New BgfxTextureHandle()
-		bgfxCreateTexture2D( _bgfxTexture, _width, _height, False, 1, BGFX_TEXTURE_FORMAT_RGBA8, _bgfxFlags, _bgfxTextureMem )
+		_bgfxTexture = bgfxCreateTexture2D( _width, _height, False, 1, BGFX_TEXTURE_FORMAT_RGBA8, _bgfxFlags, _bgfxTextureMem )
 	End
 
 End
@@ -879,7 +871,7 @@ Class GLUniform
 		Self.type=type
 	End
 
-	Field _handle:BgfxUniformHandle
+	Field _handle:Int
 
 	Method New( id:String, ty:String )
 
@@ -907,8 +899,7 @@ Class GLUniform
 			Print "unknown uniform type: uniform " + ty + " " + id + ";"
 		End
 
-		_handle = New BgfxUniformHandle()
-		bgfxCreateUniform( _handle, id, bgfxUniformType )
+		_handle = bgfxCreateUniform( id, bgfxUniformType )
 
 		Print "Create Uniform id=" + id + " type=" + bgfxUniformType
 	End
@@ -916,8 +907,7 @@ Class GLUniform
 End
 
 Class GLProgram
-'  	Field program:Int
-	Field program:BgfxProgramHandle
+	Field program:Int
 	'material uniforms
 	Field matuniforms:GLUniform[]
 	'hard coded uniform locations
@@ -931,19 +921,8 @@ Class GLProgram
 	Field lightVectors:Int
 	Field shadowTexture:Int
 
-	Field mvpMatrixHandle:BgfxUniformHandle
-	Field mvMatrixHandle:BgfxUniformHandle
-
-	Field clipPosScaleHandle:BgfxUniformHandle
-	Field globalColorHandle:BgfxUniformHandle
-	Field ambientLightHandle:BgfxUniformHandle
-	Field fogColorHandle:BgfxUniformHandle
-	Field lightColorsHandle:BgfxUniformHandle
-	Field lightVectorsHandle:BgfxUniformHandle
-	Field shadowTextureHandle:BgfxUniformHandle
-
 '  	Method New( program:Int,matuniforms:GLUniform[] )
-	Method New( program:BgfxProgramHandle,matuniforms:GLUniform[] )
+	Method New( program:Int, matuniforms:GLUniform[] )
 
 		Self.program=program
 		Self.matuniforms=matuniforms
@@ -959,32 +938,16 @@ Class GLProgram
 '  		lightVectors=glGetUniformLocation( program,"LightVectors" )
 '  		shadowTexture=glGetUniformLocation( program,"ShadowTexture" )
 
-		mvpMatrixHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( mvpMatrixHandle, "ModelViewProjectionMatrix",  BGFX_UNIFORM_TYPE_MAT4)
+		mvpMatrix = bgfxCreateUniform( "ModelViewProjectionMatrix",  BGFX_UNIFORM_TYPE_MAT4)
+		mvMatrix = bgfxCreateUniform( "ModelViewMatrix",  BGFX_UNIFORM_TYPE_MAT4)
 
-		mvMatrixHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( mvMatrixHandle, "ModelViewMatrix",  BGFX_UNIFORM_TYPE_MAT4)
-
-		clipPosScaleHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( clipPosScaleHandle, "ClipPosScale",  BGFX_UNIFORM_TYPE_VEC4)
-
-		globalColorHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( globalColorHandle, "GlobalColor",  BGFX_UNIFORM_TYPE_VEC4)
-
-		fogColorHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( fogColorHandle, "FogColor",  BGFX_UNIFORM_TYPE_VEC4)
-
-		ambientLightHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( ambientLightHandle, "AmbientLight",  BGFX_UNIFORM_TYPE_VEC4)
-
-		lightColorsHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( lightColorsHandle, "LightColors",  BGFX_UNIFORM_TYPE_VEC4)
-
-		lightVectorsHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( lightVectorsHandle, "LightVectors",  BGFX_UNIFORM_TYPE_VEC4)
-
-		shadowTextureHandle = New BgfxUniformHandle()
-		bgfxCreateUniform( shadowTextureHandle, "ShadowTexture",  BGFX_UNIFORM_TYPE_INT1)
+		clipPosScale = bgfxCreateUniform( "ClipPosScale",  BGFX_UNIFORM_TYPE_VEC4)
+		globalColor = bgfxCreateUniform( "GlobalColor",  BGFX_UNIFORM_TYPE_VEC4)
+		fogColor = bgfxCreateUniform( "FogColor",  BGFX_UNIFORM_TYPE_VEC4)
+		ambientLight = bgfxCreateUniform( "AmbientLight",  BGFX_UNIFORM_TYPE_VEC4)
+		lightColors = bgfxCreateUniform( "LightColors",  BGFX_UNIFORM_TYPE_VEC4)
+		lightVectors = bgfxCreateUniform( "LightVectors",  BGFX_UNIFORM_TYPE_VEC4)
+		shadowTexture = bgfxCreateUniform( "ShadowTexture",  BGFX_UNIFORM_TYPE_INT1)
 	End
 	
 	Method Bind:Void()
@@ -1011,14 +974,14 @@ Class GLProgram
 '  Global rs_lightVectors:Float[MAX_LIGHTS*4]
 
 '  		Print "bgfxSetUniform"
-		bgfxSetUniform( mvpMatrixHandle, rs_modelViewProjMatrix )
-		bgfxSetUniform( mvMatrixHandle, rs_modelViewMatrix )
-		bgfxSetUniform( clipPosScaleHandle, rs_clipPosScale )
-		bgfxSetUniform( globalColorHandle, rs_globalColor )
-		bgfxSetUniform( fogColorHandle, rs_fogColor )
-		bgfxSetUniform( ambientLightHandle, rs_ambientLight )
-		bgfxSetUniform( lightColorsHandle, rs_lightColors, rs_numLights )
-		bgfxSetUniform( lightVectorsHandle, rs_lightVectors, rs_numLights )
+		bgfxSetUniform( mvpMatrix, rs_modelViewProjMatrix )
+		bgfxSetUniform( mvMatrix, rs_modelViewMatrix )
+		bgfxSetUniform( clipPosScale, rs_clipPosScale )
+		bgfxSetUniform( globalColor, rs_globalColor )
+		bgfxSetUniform( fogColor, rs_fogColor )
+		bgfxSetUniform( ambientLight, rs_ambientLight )
+		bgfxSetUniform( lightColors, rs_lightColors, rs_numLights )
+		bgfxSetUniform( lightVectors, rs_lightVectors, rs_numLights )
 
 '  		glActiveTexture GL_TEXTURE0+7
 '  		If shadowTexture<>-1 And rs_shadowTexture
@@ -1029,12 +992,12 @@ Class GLProgram
 '  		End
 '  		glActiveTexture GL_TEXTURE0
 
-'  		bgfxSetUniform( shadowTextureHandle, rs_clipPosScale )
+'  		bgfxSetUniform( shadowTexture, rs_clipPosScale )
 		If rs_shadowTexture Then
-			bgfxSetTexture( 7, shadowTextureHandle, rs_shadowTexture._bgfxTexture )
+			bgfxSetTexture( 7, shadowTexture, rs_shadowTexture._bgfxTexture )
 		Else
 '  			Print "rs_shadowTexture is NULL"
-			bgfxSetTexture( 7, shadowTextureHandle, Texture.White()._bgfxTexture )
+			bgfxSetTexture( 7, shadowTexture, Texture.White()._bgfxTexture )
 		Endif
 
 '  		bgfxSetUniform(
@@ -1045,7 +1008,7 @@ End
 
 Public
 
-Function MojoUtilsLoadShader:BgfxShaderHandle( _name:String )
+Function MojoUtilsLoadShader:Int( _name:String )
 
 	Local filePath:String = "cerberus://data/"
 
@@ -1076,22 +1039,23 @@ Function MojoUtilsLoadShader:BgfxShaderHandle( _name:String )
 
 	Print "filePath=" + filePath
 
-	Local handle:= New BgfxShaderHandle()
-	Local data:DataBuffer = DataBuffer.Load( filePath )
+	Local handle :Int
+	Local data   := DataBuffer.Load( filePath )
+
 	If data = Null Then
 		 DebugLog("Error - Unable to load shader: " + filePath)
 	Else
-		bgfxCreateShader( handle, bgfxUtilsMakeRef( data ) )
+		handle = bgfxCreateShader( bgfxUtilsMakeRef( data ) )
 		bgfxSetShaderName( handle, filePath )
 	Endif
 
 	Return handle
 End
 
-Function MojoUtilsLoadProgram:BgfxProgramHandle( _vsName:String, _fsName:String="" )
+Function MojoUtilsLoadProgram:Int( _vsName:String, _fsName:String="" )
 
-	Local vsh:BgfxShaderHandle = MojoUtilsLoadShader( _vsName )
-	Local fsh:BgfxShaderHandle = Null
+	Local vsh:Int = MojoUtilsLoadShader( _vsName )
+	Local fsh:Int = BGFX_INVALID_HANDLE
 
 	If _fsName <> "" Then
 		fsh = MojoUtilsLoadShader( _fsName )
@@ -1099,9 +1063,7 @@ Function MojoUtilsLoadProgram:BgfxProgramHandle( _vsName:String, _fsName:String=
 
 	Local destroyShaders:Bool = True ' destroy shaders when program is destroyed 
 
-	Local handle:= New BgfxProgramHandle()
-	bgfxCreateProgram( handle, vsh, fsh, destroyShaders )
-	Return handle
+	Return bgfxCreateProgram( vsh, fsh, destroyShaders )
 End
 
 Class Shader
@@ -1240,9 +1202,9 @@ Class Shader
 '  
 '  		glLink program
 
-'  		Local program:BgfxProgramHandle = MojoUtilsLoadProgram("vs_cubes", "fs_cubes");
-'  		Local program:BgfxProgramHandle = MojoUtilsLoadProgram("vs_program", "fs_fastshader");
-		Local program:BgfxProgramHandle = MojoUtilsLoadProgram("vs_program", "fs_" + _filename);
+'  		Local program:Int = MojoUtilsLoadProgram("vs_cubes", "fs_cubes");
+'  		Local program:Int = MojoUtilsLoadProgram("vs_program", "fs_fastshader");
+		Local program:Int = MojoUtilsLoadProgram("vs_program", "fs_" + _filename);
 
 		'enumerate program uniforms	
 '  		Local matuniforms:=New Stack<GLUniform>
@@ -3650,8 +3612,8 @@ Class Canvas Extends DrawList
 				rs_numLights+=1
 			Next
 
-'  			bgfxSetUniform( lightColorsHandle, rs_lightColors, rs_numLights )
-'  			bgfxSetUniform( lightVectorsHandle, rs_lightVectors, rs_numLights )
+'  			bgfxSetUniform( lightColors, rs_lightColors, rs_numLights )
+'  			bgfxSetUniform( lightVectors, rs_lightVectors, rs_numLights )
 
 			If _shadowMap
 				rs_shadowTexture=_shadowMap._material._colorTexture

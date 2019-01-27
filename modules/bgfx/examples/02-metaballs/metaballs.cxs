@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 Import mojo1bgfx
@@ -489,7 +491,7 @@ Class MetaballsGame Extends App
 	Field m_grid      :Grid[ DIMS * DIMS * DIMS ]
 	Field val         :Grid[ 8 ]
 
-	Field m_program   :BgfxProgramHandle
+	Field m_program   :Int
 	Field tvb         := New BgfxTransientVertexBuffer()
 	Field bgfxCaps    := New BgfxCaps()
 

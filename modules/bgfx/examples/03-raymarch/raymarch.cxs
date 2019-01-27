@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
@@ -46,7 +48,7 @@ End
 Global _tvb := New BgfxTransientVertexBuffer()
 Global _tib := New BgfxTransientIndexBuffer()
 
-Function RenderScreenSpaceQuad:Void(_view:Int, _program:BgfxProgramHandle, _x:Float, _y:Float, _width:Float, _height:Float)
+Function RenderScreenSpaceQuad:Void(_view:Int, _program:Int, _x:Float, _y:Float, _width:Float, _height:Float)
 
 	If bgfxAllocTransientBuffers(_tvb, PosColorTexCoord0Vertex.ms_decl, 4, _tib, 6) Then
 
@@ -113,9 +115,9 @@ Class RaymarchExample Extends App
 	Field debug:Int = BGFX_DEBUG_NONE
 '  	Field debug:Int = BGFX_DEBUG_TEXT
 
-	Field u_mtx          := New BgfxUniformHandle()
-	Field u_lightDirTime := New BgfxUniformHandle()
-	Field m_program      :BgfxProgramHandle
+	Field u_mtx          :Int
+	Field u_lightDirTime :Int
+	Field m_program      :Int
 
 	Method OnCreate:Int()
 
@@ -130,8 +132,8 @@ Class RaymarchExample Extends App
 		' Create vertex stream declaration.
 		PosColorTexCoord0Vertex.Init()
 
-		bgfxCreateUniform(u_mtx,          "u_mtx",          BGFX_UNIFORM_TYPE_MAT4)
-		bgfxCreateUniform(u_lightDirTime, "u_lightDirTime", BGFX_UNIFORM_TYPE_VEC4)
+		u_mtx          = bgfxCreateUniform("u_mtx",          BGFX_UNIFORM_TYPE_MAT4)
+		u_lightDirTime = bgfxCreateUniform("u_lightDirTime", BGFX_UNIFORM_TYPE_VEC4)
 
 		' Create program from shaders.
 		m_program = bgfxUtilsLoadProgram("vs_raymarching", "fs_raymarching")

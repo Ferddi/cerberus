@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
@@ -68,10 +70,10 @@ Class InstancingExample Extends App
 	Field sCubeVerticesBuffer :DataBuffer
 	Field sCubeIndicesBuffer  :DataBuffer
 
-	Field m_vbh     :BgfxVertexBufferHandle
-	Field m_ibh     :BgfxIndexBufferHandle
+	Field m_vbh     :Int
+	Field m_ibh     :Int
 
-	Field m_program :BgfxProgramHandle
+	Field m_program :Int
 	Field bgfxCaps  := New BgfxCaps()
 	Field idb       := New BgfxInstanceDataBuffer()
 
@@ -129,10 +131,10 @@ Class InstancingExample Extends App
 		MakeDataBuffers()
 
 		' Create static vertex buffer.
-		m_vbh = bgfxUtilsCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosColorVertex.ms_decl )
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosColorVertex.ms_decl )
 
 		' Create static index buffer.
-		m_ibh = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
+		m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubeIndicesBuffer ) )
 
 		' Create program from shaders.
 		m_program = bgfxUtilsLoadProgram("vs_instancing", "fs_instancing")

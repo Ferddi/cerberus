@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
@@ -136,7 +138,7 @@ Function ScreenSpaceQuad:Void( _tvb:BgfxTransientVertexBuffer, _textureWidth:Flo
 	Endif
 End
 
-Function SetOffsets2x2Lum:Void( _handle:BgfxUniformHandle, _width:Int, _height:Int, offsets:Float[] )
+Function SetOffsets2x2Lum:Void( _handle:Int, _width:Int, _height:Int, offsets:Float[] )
 
 	Local du  :Float = 1.0 / _width
 	Local dv  :Float = 1.0 / _height
@@ -154,7 +156,7 @@ Function SetOffsets2x2Lum:Void( _handle:BgfxUniformHandle, _width:Int, _height:I
 	bgfxSetUniform( _handle, offsets, num )
 End
 
-Function SetOffsets4x4Lum:Void( _handle:BgfxUniformHandle, _width:Int, _height:Int, offsets:Float[] )
+Function SetOffsets4x4Lum:Void( _handle:Int, _width:Int, _height:Int, offsets:Float[] )
 
 	Local du:Float = 1.0 / _width
 	Local dv:Float = 1.0 / _height
@@ -179,32 +181,32 @@ End
 
 Class BumpExample Extends App
 
-	Field m_skyProgram     :BgfxProgramHandle
-	Field m_lumProgram     :BgfxProgramHandle
-	Field m_lumAvgProgram  :BgfxProgramHandle
-	Field m_blurProgram    :BgfxProgramHandle
-	Field m_brightProgram  :BgfxProgramHandle
-	Field m_meshProgram    :BgfxProgramHandle
-	Field m_tonemapProgram :BgfxProgramHandle
+	Field m_skyProgram     :Int
+	Field m_lumProgram     :Int
+	Field m_lumAvgProgram  :Int
+	Field m_blurProgram    :Int
+	Field m_brightProgram  :Int
+	Field m_meshProgram    :Int
+	Field m_tonemapProgram :Int
 
-	Field m_uffizi         :BgfxTextureHandle
-	Field s_texCube        :BgfxUniformHandle
-	Field s_texColor       :BgfxUniformHandle
-	Field s_texLum         :BgfxUniformHandle
-	Field s_texBlur        :BgfxUniformHandle
-	Field u_mtx            :BgfxUniformHandle
-	Field u_tonemap        :BgfxUniformHandle
-	Field u_offset         :BgfxUniformHandle
+	Field m_uffizi         :Int
+	Field s_texCube        :Int
+	Field s_texColor       :Int
+	Field s_texLum         :Int
+	Field s_texBlur        :Int
+	Field u_mtx            :Int
+	Field u_tonemap        :Int
+	Field u_offset         :Int
 
 	Field m_mesh           :BgfxUtilsMesh
 
-	Field m_fbtextures     :BgfxTextureHandle[2]
-	Field m_rb             :BgfxTextureHandle
+	Field m_fbtextures     :Int[2]
+	Field m_rb             :Int
 
-	Field m_fbh            :BgfxFrameBufferHandle
-	Field m_lum            :BgfxFrameBufferHandle[5]
-	Field m_bright         :BgfxFrameBufferHandle
-	Field m_blur           :BgfxFrameBufferHandle
+	Field m_fbh            :Int
+	Field m_lum            :Int[5]
+	Field m_bright         :Int
+	Field m_blur           :Int
 
 '  	Field m_width          :Int ' use DeviceWidth directly
 '  	Field m_height         :Int ' use DeviceHeight directly
@@ -230,6 +232,44 @@ Class BumpExample Extends App
 '  	Field m_time           :Float
 	Field m_timeOffset     :Int
 
+	Field iden             :Float[] = [
+		1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.0, 0.0, 0.0, 1.0]
+
+	Field invalid          :Int
+
+	Field proj             :Float[16]
+	Field shuffle          :Int[10]
+	Field order            := New DataBuffer( 10 * 2 )
+	Field at               :Float[] = [  0.0,  1.0,  0.0 ]
+	Field eye              :Float[] = [  0.0,  1.0, -2.5 ]
+	Field mtx              :Float[16]
+	Field temp             :Float[4]
+	Field view             :Float[16]
+	Field tonemap          :Float[4]
+	Field state            :Int[2]
+
+	Field m_fbtexturesHandleDataBuffer := New DataBuffer( 4 )
+
+	Field tvbSkybox        := New BgfxTransientVertexBuffer()
+	Field tvbLuminance     := New BgfxTransientVertexBuffer()
+	Field tvbLumScale0     := New BgfxTransientVertexBuffer()
+	Field tvbLumScale1     := New BgfxTransientVertexBuffer()
+	Field tvbLumScale2     := New BgfxTransientVertexBuffer()
+	Field tvbLumScale3     := New BgfxTransientVertexBuffer()
+	Field tvbBrightness    := New BgfxTransientVertexBuffer()
+	Field tvbVBlur         := New BgfxTransientVertexBuffer()
+	Field tvbHBlur         := New BgfxTransientVertexBuffer()
+
+	Field offsetLuminance  :Float[ 64 ]
+	Field offsetLumScale0  :Float[ 64 ]
+	Field offsetLumScale1  :Float[ 64 ]
+	Field offsetLumScale2  :Float[ 64 ]
+	Field offsetLumScale3  :Float[ 64 ]
+	Field offsetBrightness :Float[ 64 ]
+
 	Method OnCreate:Int()
 
 		SetUpdateRate( 60 )
@@ -250,30 +290,26 @@ Class BumpExample Extends App
 		m_meshProgram    = bgfxUtilsLoadProgram( "vs_hdr_mesh",    "fs_hdr_mesh"    )
 		m_tonemapProgram = bgfxUtilsLoadProgram( "vs_hdr_tonemap", "fs_hdr_tonemap" )
 
-		s_texCube   = bgfxUtilsCreateUniform( "s_texCube",  BGFX_UNIFORM_TYPE_INT1 )
-		s_texColor  = bgfxUtilsCreateUniform( "s_texColor", BGFX_UNIFORM_TYPE_INT1 )
-		s_texLum    = bgfxUtilsCreateUniform( "s_texLum",   BGFX_UNIFORM_TYPE_INT1 )
-		s_texBlur   = bgfxUtilsCreateUniform( "s_texBlur",  BGFX_UNIFORM_TYPE_INT1 )
-		u_mtx       = bgfxUtilsCreateUniform( "u_mtx",      BGFX_UNIFORM_TYPE_MAT4 )
-		u_tonemap   = bgfxUtilsCreateUniform( "u_tonemap",  BGFX_UNIFORM_TYPE_VEC4 )
-		u_offset    = bgfxUtilsCreateUniform( "u_offset",   BGFX_UNIFORM_TYPE_VEC4, 16 )
+		s_texCube   = bgfxCreateUniform( "s_texCube",  BGFX_UNIFORM_TYPE_INT1 )
+		s_texColor  = bgfxCreateUniform( "s_texColor", BGFX_UNIFORM_TYPE_INT1 )
+		s_texLum    = bgfxCreateUniform( "s_texLum",   BGFX_UNIFORM_TYPE_INT1 )
+		s_texBlur   = bgfxCreateUniform( "s_texBlur",  BGFX_UNIFORM_TYPE_INT1 )
+		u_mtx       = bgfxCreateUniform( "u_mtx",      BGFX_UNIFORM_TYPE_MAT4 )
+		u_tonemap   = bgfxCreateUniform( "u_tonemap",  BGFX_UNIFORM_TYPE_VEC4 )
+		u_offset    = bgfxCreateUniform( "u_offset",   BGFX_UNIFORM_TYPE_VEC4, 16 )
 
 		m_mesh = bgfxUtilsMeshLoad( "meshes/bunny.bin" )
 
-		m_fbtextures[0] = New BgfxTextureHandle()
-		m_fbtextures[1] = New BgfxTextureHandle()
+		m_fbh = BGFX_INVALID_HANDLE
 
-		m_fbh = New BgfxFrameBufferHandle()
-		m_fbh.SetHandleToInvalid()
+		m_lum[0] = bgfxCreateFrameBuffer( 128, 128, BGFX_TEXTURE_FORMAT_BGRA8 )
+		m_lum[1] = bgfxCreateFrameBuffer(  64,  64, BGFX_TEXTURE_FORMAT_BGRA8 )
+		m_lum[2] = bgfxCreateFrameBuffer(  16,  16, BGFX_TEXTURE_FORMAT_BGRA8 )
+		m_lum[3] = bgfxCreateFrameBuffer(   4,   4, BGFX_TEXTURE_FORMAT_BGRA8 )
+		m_lum[4] = bgfxCreateFrameBuffer(   1,   1, BGFX_TEXTURE_FORMAT_BGRA8 )
 
-		m_lum[0] = bgfxUtilsCreateFrameBuffer( 128, 128, BGFX_TEXTURE_FORMAT_BGRA8 )
-		m_lum[1] = bgfxUtilsCreateFrameBuffer(  64,  64, BGFX_TEXTURE_FORMAT_BGRA8 )
-		m_lum[2] = bgfxUtilsCreateFrameBuffer(  16,  16, BGFX_TEXTURE_FORMAT_BGRA8 )
-		m_lum[3] = bgfxUtilsCreateFrameBuffer(   4,   4, BGFX_TEXTURE_FORMAT_BGRA8 )
-		m_lum[4] = bgfxUtilsCreateFrameBuffer(   1,   1, BGFX_TEXTURE_FORMAT_BGRA8 )
-
-		m_bright = bgfxUtilsCreateFrameBufferScaled( BGFX_BACKBUFFER_RATIO_HALF,   BGFX_TEXTURE_FORMAT_BGRA8 )
-		m_blur   = bgfxUtilsCreateFrameBufferScaled( BGFX_BACKBUFFER_RATIO_EIGHTH, BGFX_TEXTURE_FORMAT_BGRA8 )
+		m_bright = bgfxCreateFrameBufferScaled( BGFX_BACKBUFFER_RATIO_HALF,   BGFX_TEXTURE_FORMAT_BGRA8 )
+		m_blur   = bgfxCreateFrameBufferScaled( BGFX_BACKBUFFER_RATIO_EIGHTH, BGFX_TEXTURE_FORMAT_BGRA8 )
 
 		m_lumBgra8.PokeInt( 0, 0 )
 
@@ -285,9 +321,9 @@ Class BumpExample Extends App
 		' @Cleanup: is there a better way to do this if statement to check for supported capabilities in CX:
 		'
 		If (BGFX_CAPS_TEXTURE_BLIT[1]|BGFX_CAPS_TEXTURE_READ_BACK[1]) = (supported[1] & (BGFX_CAPS_TEXTURE_BLIT[1]|BGFX_CAPS_TEXTURE_READ_BACK[1]) ) Then
-			m_rb = bgfxUtilsCreateTexture2D( 1, 1, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_READ_BACK )
+			m_rb = bgfxCreateTexture2D( 1, 1, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_READ_BACK )
 		Else
-			m_rb.SetHandleToInvalid()
+			m_rb = BGFX_INVALID_HANDLE
 		Endif
 
 		If BGFX_RENDERER_TYPE_DIRECT3D9 = bgfxGetRendererType() Then
@@ -321,106 +357,61 @@ Class BumpExample Extends App
 		Return 0
 	End
 
-	Method OnClose:Int()
-
-		' Cleanup.
-
-		'
-		' @Incomplete: need to to mesh unload
-		'
-'  		meshUnload(m_mesh);
-
-		For Local ii:Int = 0 Until m_lum.Length()
-			bgfxDestroyFrameBuffer( m_lum[ii] )
-		Next
-
-		bgfxDestroyFrameBuffer( m_bright )
-		bgfxDestroyFrameBuffer( m_blur   )
-
-		If m_fbh.IsValid() Then
-			bgfxDestroyFrameBuffer( m_fbh )
-		Endif
-
-		bgfxDestroyProgram( m_meshProgram    )
-		bgfxDestroyProgram( m_skyProgram     )
-		bgfxDestroyProgram( m_tonemapProgram )
-		bgfxDestroyProgram( m_lumProgram     )
-		bgfxDestroyProgram( m_lumAvgProgram  )
-		bgfxDestroyProgram( m_blurProgram    )
-		bgfxDestroyProgram( m_brightProgram  )
-
-		bgfxDestroyTexture( m_uffizi )
-
-		If m_rb.IsValid() Then
-			bgfxDestroyTexture( m_rb )
-		Endif
-
-		bgfxDestroyUniform( s_texCube  )
-		bgfxDestroyUniform( s_texColor )
-		bgfxDestroyUniform( s_texLum   )
-		bgfxDestroyUniform( s_texBlur  )
-		bgfxDestroyUniform( u_mtx      )
-		bgfxDestroyUniform( u_tonemap  )
-		bgfxDestroyUniform( u_offset   )
-
-		' Shutdown bgfx.
-		bgfxShutdown()
-	End
-
-	Field iden:Float[] = [
-		1.0, 0.0, 0.0, 0.0,
-		0.0, 1.0, 0.0, 0.0,
-		0.0, 0.0, 1.0, 0.0,
-		0.0, 0.0, 0.0, 1.0]
-
-	Field invalid := New BgfxFrameBufferHandle()
-
-	Field proj    :Float[16]
-	Field shuffle :Int[10]
-	Field order   := New DataBuffer( 10 * 2 )
-	Field at      :Float[] = [  0.0,  1.0,  0.0 ]
-	Field eye     :Float[] = [  0.0,  1.0, -2.5 ]
-	Field mtx     :Float[16]
-	Field temp    :Float[4]
-	Field view    :Float[16]
-	Field tonemap :Float[4]
-	Field state   :Int[2]
-
-	Field m_fbtexturesHandleDataBuffer := New DataBuffer( 4 )
-
-	Field textureLum0   := New BgfxTextureHandle()
-	Field textureLum1   := New BgfxTextureHandle()
-	Field textureLum2   := New BgfxTextureHandle()
-	Field textureLum3   := New BgfxTextureHandle()
-	Field textureLum4a  := New BgfxTextureHandle()
-	Field textureLum4b  := New BgfxTextureHandle()
-	Field textureLum4c  := New BgfxTextureHandle()
-	Field textureBright := New BgfxTextureHandle()
-	Field textureBlur   := New BgfxTextureHandle()
-
-	Field tvbSkybox     := New BgfxTransientVertexBuffer()
-	Field tvbLuminance  := New BgfxTransientVertexBuffer()
-	Field tvbLumScale0  := New BgfxTransientVertexBuffer()
-	Field tvbLumScale1  := New BgfxTransientVertexBuffer()
-	Field tvbLumScale2  := New BgfxTransientVertexBuffer()
-	Field tvbLumScale3  := New BgfxTransientVertexBuffer()
-	Field tvbBrightness := New BgfxTransientVertexBuffer()
-	Field tvbVBlur      := New BgfxTransientVertexBuffer()
-	Field tvbHBlur      := New BgfxTransientVertexBuffer()
-
-	Field offsetLuminance:Float[ 64 ]
-	Field offsetLumScale0:Float[ 64 ]
-	Field offsetLumScale1:Float[ 64 ]
-	Field offsetLumScale2:Float[ 64 ]
-	Field offsetLumScale3:Float[ 64 ]
-	Field offsetBrightness:Float[ 64 ]
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  
+'  		'
+'  		' @Incomplete: need to to mesh unload
+'  		'
+'  '  		meshUnload(m_mesh);
+'  
+'  		For Local ii:Int = 0 Until m_lum.Length()
+'  			bgfxDestroyFrameBuffer( m_lum[ii] )
+'  		Next
+'  
+'  		bgfxDestroyFrameBuffer( m_bright )
+'  		bgfxDestroyFrameBuffer( m_blur   )
+'  
+'  		If bgfxIsValid( m_fbh ) Then
+'  			bgfxDestroyFrameBuffer( m_fbh )
+'  		Endif
+'  
+'  		bgfxDestroyProgram( m_meshProgram    )
+'  		bgfxDestroyProgram( m_skyProgram     )
+'  		bgfxDestroyProgram( m_tonemapProgram )
+'  		bgfxDestroyProgram( m_lumProgram     )
+'  		bgfxDestroyProgram( m_lumAvgProgram  )
+'  		bgfxDestroyProgram( m_blurProgram    )
+'  		bgfxDestroyProgram( m_brightProgram  )
+'  
+'  		bgfxDestroyTexture( m_uffizi )
+'  
+'  		If bgfxIsValid( m_rb ) Then
+'  			bgfxDestroyTexture( m_rb )
+'  		Endif
+'  
+'  		bgfxDestroyUniform( s_texCube  )
+'  		bgfxDestroyUniform( s_texColor )
+'  		bgfxDestroyUniform( s_texLum   )
+'  		bgfxDestroyUniform( s_texBlur  )
+'  		bgfxDestroyUniform( u_mtx      )
+'  		bgfxDestroyUniform( u_tonemap  )
+'  		bgfxDestroyUniform( u_offset   )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
 
 	Method OnRender:Int()
 
-		Local m_width:Int = DeviceWidth()
-		Local m_height:Int = DeviceHeight()
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
 
-		If Not m_fbh.IsValid() Or m_oldWidth <> m_width Or m_oldHeight <> m_height Then ' m_oldReset <> m_reset Then
+		If Not bgfxIsValid( m_fbh ) Or m_oldWidth <> m_width Or m_oldHeight <> m_height Then ' m_oldReset <> m_reset Then
 
 			' Recreate variable size render targets when resolution changes.
 			m_oldWidth  = m_width
@@ -432,7 +423,7 @@ Class BumpExample Extends App
 			' m_reset=0x80 msaa=0
 			Local msaa:Int = ( m_reset & BGFX_RESET_MSAA_MASK ) Shr BGFX_RESET_MSAA_SHIFT
 
-			If m_fbh.IsValid() Then
+			If bgfxIsValid( m_fbh ) Then
 				bgfxDestroyFrameBuffer( m_fbh )
 			Endif
 
@@ -447,7 +438,7 @@ Class BumpExample Extends App
 
 			Print "flags=" + IntToHex(flags[0]) + " " + IntToHex(flags[1])
 
-			bgfxCreateTexture2D( m_fbtextures[0], m_width, m_height, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
+			m_fbtextures[0] = bgfxCreateTexture2D( m_width, m_height, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, flags )
 
 			' 0x 00000090 00000000
 			Local textureFlags:Int[2]
@@ -468,15 +459,15 @@ Class BumpExample Extends App
 
 			Print "textureFlags=" + IntToHex(textureFlags[0]) + " " + IntToHex(textureFlags[1]) + " depthFormat=" + IntToHex(depthFormat)
 
-			bgfxCreateTexture2D( m_fbtextures[1], m_width, m_height, False, 1, depthFormat, textureFlags )
+			m_fbtextures[1] = bgfxCreateTexture2D( m_width, m_height, False, 1, depthFormat, textureFlags )
 
-			Print "m_fbtextures[0].GetHandle()=" +  m_fbtextures[0].GetHandle()
-			Print "m_fbtextures[1].GetHandle()=" +  m_fbtextures[1].GetHandle()
+			Print "m_fbtextures[0]=" +  m_fbtextures[0]
+			Print "m_fbtextures[1]=" +  m_fbtextures[1]
 
-			m_fbtexturesHandleDataBuffer.PokeShort( 0, m_fbtextures[0].GetHandle() )
-			m_fbtexturesHandleDataBuffer.PokeShort( 2, m_fbtextures[1].GetHandle() )
+			m_fbtexturesHandleDataBuffer.PokeShort( 0, m_fbtextures[0] )
+			m_fbtexturesHandleDataBuffer.PokeShort( 2, m_fbtextures[1] )
 
-			bgfxCreateFrameBufferFromHandles( m_fbh, m_fbtextures.Length(), m_fbtexturesHandleDataBuffer, True )
+			m_fbh = bgfxCreateFrameBufferFromHandles( m_fbtextures.Length(), m_fbtexturesHandleDataBuffer, True )
 		Endif
 
 		' This dummy draw call is here to make sure that view 0 is cleared
@@ -551,7 +542,7 @@ Class BumpExample Extends App
 
 		bgfxSetViewName( hdrHBlurTonemap, "Blur horizontal + tonemap" )
 		bgfxSetViewRectAuto( hdrHBlurTonemap, 0, 0, BGFX_BACKBUFFER_RATIO_EQUAL )
-		invalid.SetHandleToInvalid()
+		invalid = BGFX_INVALID_HANDLE
 		bgfxSetViewFrameBuffer( hdrHBlurTonemap, invalid )
 
 		bgfxGetCaps(bgfxCaps)
@@ -616,32 +607,28 @@ Class BumpExample Extends App
 
 		' Downscale luminance 0.
 		SetOffsets4x4Lum( u_offset, 128, 128, offsetLumScale0 )
-		bgfxGetTexture( textureLum0, m_lum[0] )
-		bgfxSetTexture( 0, s_texColor, textureLum0 )
+		bgfxSetTexture( 0, s_texColor, bgfxGetTexture( m_lum[0] ) )
 		bgfxSetState( state )
 		ScreenSpaceQuad( tvbLumScale0, 64.0, 64.0, bgfxCaps.GetOriginBottomLeft() )
 		bgfxSubmit( hdrLumScale0, m_lumAvgProgram )
 
 		' Downscale luminance 1.
 		SetOffsets4x4Lum( u_offset, 64, 64, offsetLumScale1 )
-		bgfxGetTexture( textureLum1, m_lum[1] )
-		bgfxSetTexture( 0, s_texColor, textureLum1 )
+		bgfxSetTexture( 0, s_texColor, bgfxGetTexture( m_lum[1] ) )
 		bgfxSetState( state )
 		ScreenSpaceQuad( tvbLumScale1, 16.0, 16.0, bgfxCaps.GetOriginBottomLeft() )
 		bgfxSubmit( hdrLumScale1, m_lumAvgProgram )
 
 		' Downscale luminance 2.
 		SetOffsets4x4Lum( u_offset, 16, 16, offsetLumScale2 )
-		bgfxGetTexture( textureLum2, m_lum[2] )
-		bgfxSetTexture( 0, s_texColor, textureLum2 )
+		bgfxSetTexture( 0, s_texColor, bgfxGetTexture( m_lum[2] ) )
 		bgfxSetState( state )
 		ScreenSpaceQuad( tvbLumScale2, 4.0, 4.0, bgfxCaps.GetOriginBottomLeft() )
 		bgfxSubmit( hdrLumScale2, m_lumAvgProgram )
 
 		' Downscale luminance 3.
 		SetOffsets4x4Lum( u_offset, 4, 4, offsetLumScale3 )
-		bgfxGetTexture( textureLum3, m_lum[3] )
-		bgfxSetTexture( 0, s_texColor, textureLum3 )
+		bgfxSetTexture( 0, s_texColor, bgfxGetTexture( m_lum[3] ) )
 		bgfxSetState( state )
 		ScreenSpaceQuad( tvbLumScale3, 1.0, 1.0, bgfxCaps.GetOriginBottomLeft() )
 		bgfxSubmit( hdrLumScale3, m_lumAvgProgram )
@@ -649,16 +636,14 @@ Class BumpExample Extends App
 		' m_bright pass m_threshold is tonemap[3].
 		SetOffsets4x4Lum( u_offset, m_width/2, m_height/2, offsetBrightness )
 		bgfxSetTexture( 0, s_texColor, m_fbtextures[0] )
-		bgfxGetTexture( textureLum4a, m_lum[4] )
-		bgfxSetTexture( 1, s_texLum, textureLum4a )
+		bgfxSetTexture( 1, s_texLum, bgfxGetTexture( m_lum[4] ) )
 		bgfxSetState( state )
 		bgfxSetUniform( u_tonemap, tonemap )
 		ScreenSpaceQuad( tvbBrightness, Float(m_width)/2.0, Float(m_height)/2.0, bgfxCaps.GetOriginBottomLeft() )
 		bgfxSubmit( hdrBrightness, m_brightProgram )
 
 		' m_blur m_bright pass vertically.
-		bgfxGetTexture( textureBright, m_bright )
-		bgfxSetTexture( 0, s_texColor, textureBright )
+		bgfxSetTexture( 0, s_texColor, bgfxGetTexture( m_bright ) )
 		bgfxSetState( state )
 		bgfxSetUniform( u_tonemap, tonemap )
 		ScreenSpaceQuad( tvbVBlur, Float(m_width)/8.0, Float(m_height)/8.0, bgfxCaps.GetOriginBottomLeft() )
@@ -666,17 +651,14 @@ Class BumpExample Extends App
 
 		' m_blur m_bright pass horizontally, do tonemaping and combine.
 		bgfxSetTexture( 0, s_texColor, m_fbtextures[0] )
-		bgfxGetTexture( textureLum4b, m_lum[4] )
-		bgfxSetTexture( 1, s_texLum, textureLum4b )
-		bgfxGetTexture( textureBlur, m_blur )
-		bgfxSetTexture( 2, s_texBlur, textureBlur )
+		bgfxSetTexture( 1, s_texLum, bgfxGetTexture( m_lum[4] ) )
+		bgfxSetTexture( 2, s_texBlur, bgfxGetTexture( m_blur ) )
 		bgfxSetState( state )
 		ScreenSpaceQuad( tvbHBlur, Float(m_width), Float(m_height), bgfxCaps.GetOriginBottomLeft() )
 		bgfxSubmit( hdrHBlurTonemap, m_tonemapProgram )
 
-		If m_rb.IsValid() Then
-			bgfxGetTexture( textureLum4c, m_lum[4] )
-			bgfxBlit( hdrHBlurTonemap, m_rb, 0, 0, textureLum4c )
+		If bgfxIsValid( m_rb ) Then
+			bgfxBlit( hdrHBlurTonemap, m_rb, 0, 0, bgfxGetTexture( m_lum[4] ) )
 			bgfxReadTexture( m_rb, m_lumBgra8 )
 		Endif
 

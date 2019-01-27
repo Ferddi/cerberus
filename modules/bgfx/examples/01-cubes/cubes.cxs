@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 Import mojo.app
 Import bgfx
@@ -98,10 +100,10 @@ Class CubesGame Extends App
 	Field sCubeLineListBuffer :DataBuffer
 	Field sCubePointsBuffer   :DataBuffer
 
-	Field m_vbh     :BgfxVertexBufferHandle
-	Field m_ibh     :BgfxIndexBufferHandle[4]
+	Field m_vbh     :Int
+	Field m_ibh     :Int[4]
 
-	Field m_program :BgfxProgramHandle
+	Field m_program :Int
 	Field bgfxCaps  := New BgfxCaps()
 
 	Field at    :Float[] = [ 0.0, 0.0,   0.0 ]
@@ -174,40 +176,40 @@ Class CubesGame Extends App
 
 	Method OnCreate:Int()
 
-		SetUpdateRate(60)
+		SetUpdateRate( 60 )
 
 		MakeDataBuffers()
 
 		' Enable debug text.
-		bgfxSetDebug(debug)
+		bgfxSetDebug( debug )
 
 		' Set view 0 clear state.
-		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
 
 		' Create vertex stream declaration.
 		PosColorVertex.Init()
 
 		' Create static vertex buffer.
-		m_vbh = bgfxUtilsCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosColorVertex.ms_decl )
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( sCubeVerticesBuffer ), PosColorVertex.ms_decl )
 
 		' Create static index buffer for triangle strip rendering.
 		' Static data can be passed with bgfx::makeRef
-		m_ibh[0] = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeTriStripBuffer ) )
+		m_ibh[0] = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubeTriStripBuffer ) )
 
 		' Create static index buffer for triangle list rendering. 
 		' Static data can be passed with bgfx::makeRef
-		m_ibh[1] = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeTriListBuffer ) )
+		m_ibh[1] = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubeTriListBuffer ) )
 
 		' Create static index buffer for triangle list rendering. 
 		' Static data can be passed with bgfx::makeRef
-		m_ibh[2] = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubeLineListBuffer ) )
+		m_ibh[2] = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubeLineListBuffer ) )
 
 		' Create static index buffer for triangle list rendering. 
 		' Static data can be passed with bgfx::makeRef
-		m_ibh[3] = bgfxUtilsCreateIndexBuffer( bgfxUtilsMakeRef( sCubePointsBuffer ) )
+		m_ibh[3] = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sCubePointsBuffer ) )
 
 		' Create program from shaders.
-		m_program = bgfxUtilsLoadProgram("vs_cubes", "fs_cubes");
+		m_program = bgfxUtilsLoadProgram("vs_cubes", "fs_cubes")
 
 		Return 0
 	End

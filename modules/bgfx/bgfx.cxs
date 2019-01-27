@@ -19,8 +19,14 @@ Import defines
 ' constants
 '-------------------------------------------------------------------------------
 
-Const UINT16_MAX:Int = $FFFF
-Const INT32_MAX:Int = 2147483647
+Const UINT16_MAX :Int = $FFFF
+Const INT32_MAX  :Int = 2147483647
+
+Const BGFX_INVALID_HANDLE:Int = UINT16_MAX
+
+Function bgfxIsValid:Bool( _handle:Int )
+	Return _handle <> BGFX_INVALID_HANDLE
+End
 
 '-------------------------------------------------------------------------------
 ' bgfx renderer type
@@ -371,48 +377,48 @@ Extern
 ' classes
 '-------------------------------------------------------------------------------
 
-Class BgfxDynamicIndexBufferHandle="bgfx_dynamic_index_buffer_handle_object"
-End
-
-Class BgfxDynamicVertexBufferHandle="bgfx_dynamic_vertex_buffer_handle_object"
-End
-
-Class BgfxFrameBufferHandle="bgfx_frame_buffer_handle_object"
-	Method SetHandleToInvalid:Void()
-	Method IsValid:Bool()
-End
-
-Class BgfxIndexBufferHandle="bgfx_index_buffer_handle_object"
-End
-
-Class BgfxIndirectBufferHandle="bgfx_indirect_buffer_handle_object"
-End
-
-Class BgfxOcclusionQueryHandle="bgfx_occlusion_query_handle_object"
-End
-
-Class BgfxProgramHandle="bgfx_program_handle_object"
-	Method SetHandleToInvalid:Void()
-	Method IsValid:Bool()
-End
-
-Class BgfxShaderHandle="bgfx_shader_handle_object"
-End
-
-Class BgfxTextureHandle="bgfx_texture_handle_object"
-	Method GetHandle:Int()
-	Method SetHandleToInvalid:Void()
-	Method IsValid:Bool()
-End
-
-Class BgfxUniformHandle="bgfx_uniform_handle_object"
-End
-
-Class BgfxVertexBufferHandle="bgfx_vertex_buffer_handle_object"
-End
-
-Class BgfxVertexDeclHandle="bgfx_vertex_decl_handle_object"
-End
+'  Class BgfxDynamicIndexBufferHandle="bgfx_dynamic_index_buffer_handle_object"
+'  End
+'  
+'  Class BgfxDynamicVertexBufferHandle="bgfx_dynamic_vertex_buffer_handle_object"
+'  End
+'  
+'  Class BgfxFrameBufferHandle="bgfx_frame_buffer_handle_object"
+'  	Method SetHandleToInvalid:Void()
+'  	Method IsValid:Bool()
+'  End
+'  
+'  Class BgfxIndexBufferHandle="bgfx_index_buffer_handle_object"
+'  End
+'  
+'  Class BgfxIndirectBufferHandle="bgfx_indirect_buffer_handle_object"
+'  End
+'  
+'  Class BgfxOcclusionQueryHandle="bgfx_occlusion_query_handle_object"
+'  End
+'  
+'  Class BgfxProgramHandle="bgfx_program_handle_object"
+'  	Method SetHandleToInvalid:Void()
+'  	Method IsValid:Bool()
+'  End
+'  
+'  Class BgfxShaderHandle="bgfx_shader_handle_object"
+'  End
+'  
+'  Class BgfxTextureHandle="bgfx_texture_handle_object"
+'  	Method GetHandle:Int()
+'  	Method SetHandleToInvalid:Void()
+'  	Method IsValid:Bool()
+'  End
+'  
+'  Class BgfxUniformHandle="bgfx_uniform_handle_object"
+'  End
+'  
+'  Class BgfxVertexBufferHandle="bgfx_vertex_buffer_handle_object"
+'  End
+'  
+'  Class BgfxVertexDeclHandle="bgfx_vertex_decl_handle_object"
+'  End
 
 Class BgfxMemory="bgfx_memory_object"
 
@@ -559,7 +565,7 @@ End
 ' functions
 '-------------------------------------------------------------------------------
 
-'  Function bgfxUtilsLoadProgram:BgfxProgramHandle( _vsName:String, _fsName:String )="_bgfx_utils_load_program"
+'  Function bgfxUtilsLoadProgram:Int( _vsName:String, _fsName:String )="_bgfx_utils_load_program"
 
 Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[] )="_bx_mtx_look_at"
 Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] )="_bx_mtx_look_at"
@@ -692,40 +698,40 @@ Function bgfxDbgTextPrintf:Void( _x:Int, _y:Int, _attr:Int, _format:String )="_b
 Function bgfxDbgTextImage:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:DataBuffer, _pitch:Int )="_bgfx_dbg_text_image"
 
 '  bgfx_index_buffer_handle_object bgfx_create_index_buffer(const bgfx_memory_object* _mem, int _flags);
-Function bgfxCreateIndexBuffer:Void( _handle:BgfxIndexBufferHandle, _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )="_bgfx_create_index_buffer"
+Function bgfxCreateIndexBuffer:Int( _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )="_bgfx_create_index_buffer"
 
 '  void bgfx_destroy_index_buffer(bgfx_index_buffer_handle_object _handle);
-Function bgfxDestroyIndexBuffer:Void( _handle:BgfxIndexBufferHandle )="_bgfx_destroy_index_buffer"
+Function bgfxDestroyIndexBuffer:Void( _handle:Int )="_bgfx_destroy_index_buffer"
 
 '  bgfx_vertex_buffer_handle_object bgfx_create_vertex_buffer(const bgfx_memory_object* _mem, const bgfx_vertex_decl_object* _decl, int _flags);
-Function bgfxCreateVertexBuffer:Void( _handle:BgfxVertexBufferHandle, _mem:BgfxMemory, _decl:BgfxVertexDecl, _flags=BGFX_BUFFER_NONE )="_bgfx_create_vertex_buffer"
+Function bgfxCreateVertexBuffer:Int( _mem:BgfxMemory, _decl:BgfxVertexDecl, _flags=BGFX_BUFFER_NONE )="_bgfx_create_vertex_buffer"
 
 '  void bgfx_destroy_vertex_buffer(bgfx_vertex_buffer_handle_object _handle);
-Function bgfxDestroyVertexBuffer:Void( _handle:BgfxVertexBufferHandle )="_bgfx_destroy_vertex_buffer"
+Function bgfxDestroyVertexBuffer:Void( _handle:Int )="_bgfx_destroy_vertex_buffer"
 
 '  bgfx_dynamic_index_buffer_handle_object bgfx_create_dynamic_index_buffer(int _num, int _flags);
-Function bgfxCreateDynamicIndexBuffer:Void( _handle:BgfxDynamicIndexBufferHandle, _num:Int, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_index_buffer"
+Function bgfxCreateDynamicIndexBuffer:Int( _num:Int, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_index_buffer"
 
 '  bgfx_dynamic_index_buffer_handle_object bgfx_create_dynamic_index_buffer_mem(const bgfx_memory_object* _mem, int _flags);
-Function bgfxCreateDynamicIndexBufferMem:Void( _handle:BgfxDynamicIndexBufferHandle, _mem:BgfxMemory, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_index_buffer_mem"
+Function bgfxCreateDynamicIndexBufferMem:Int( _mem:BgfxMemory, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_index_buffer_mem"
 
 '  void bgfx_update_dynamic_index_buffer(bgfx_dynamic_index_buffer_handle_object _handle, int _startIndex, const bgfx_memory_object* _mem);
-Function bgfxUpdateDynamicIndexBuffer:Void( _handle:BgfxDynamicIndexBufferHandle, _startIndex:Int, _mem:BgfxMemory )="_bgfx_update_dynamic_index_buffer"
+Function bgfxUpdateDynamicIndexBuffer:Void( _handle:Int, _startIndex:Int, _mem:BgfxMemory )="_bgfx_update_dynamic_index_buffer"
 
 '  void bgfx_destroy_dynamic_index_buffer(bgfx_dynamic_index_buffer_handle_object _handle);
-Function bgfxDestroyDynamicIndexBuffer:Void( _handle:BgfxDynamicIndexBufferHandle )="_bgfx_destroy_dynamic_index_buffer"
+Function bgfxDestroyDynamicIndexBuffer:Void( _handle:Int )="_bgfx_destroy_dynamic_index_buffer"
 
 '  bgfx_dynamic_vertex_buffer_handle_object bgfx_create_dynamic_vertex_buffer(int _num, const bgfx_vertex_decl_object* _decl, int _flags);
-Function bgfxCreateDynamicVertexBuffer:Void( _handle:BgfxDynamicVertexBufferHandle, _num:Int, _decl:BgfxVertexDecl, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_vertex_buffer"
+Function bgfxCreateDynamicVertexBuffer:Int( _num:Int, _decl:BgfxVertexDecl, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_vertex_buffer"
 
 '  bgfx_dynamic_vertex_buffer_handle_object bgfx_create_dynamic_vertex_buffer_mem(const bgfx_memory_object* _mem, const bgfx_vertex_decl_object* _decl, int _flags);
-Function bgfxCreateDynamicVertexBufferMem:Void( _handle:BgfxDynamicVertexBufferHandle, _mem:BgfxMemory, _decl:BgfxVertexDecl, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_vertex_buffer_mem"
+Function bgfxCreateDynamicVertexBufferMem:Int( _mem:BgfxMemory, _decl:BgfxVertexDecl, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_dynamic_vertex_buffer_mem"
 
 '  void bgfx_update_dynamic_vertex_buffer(bgfx_dynamic_vertex_buffer_handle_object _handle, int _startVertex, const bgfx_memory_object* _mem);
-Function bgfxUpdateDynamicVertexBuffer:Void( _handle:BgfxDynamicVertexBufferHandle, _startVertex:Int, _mem:BgfxMemory )="_bgfx_update_dynamic_vertex_buffer"
+Function bgfxUpdateDynamicVertexBuffer:Void( _handle:Int, _startVertex:Int, _mem:BgfxMemory )="_bgfx_update_dynamic_vertex_buffer"
 
 '  void bgfx_destroy_dynamic_vertex_buffer(bgfx_dynamic_vertex_buffer_handle_object _handle);
-Function bgfxDestroyDynamicVertexBuffer:Void( _handle:BgfxDynamicVertexBufferHandle )="_bgfx_destroy_dynamic_vertex_buffer"
+Function bgfxDestroyDynamicVertexBuffer:Void( _handle:Int )="_bgfx_destroy_dynamic_vertex_buffer"
 
 '  int bgfx_get_avail_transient_index_buffer(int _num);
 Function bgfxGetAvailTransientIndexBuffer:Int( _num:Int )="bgfx_get_avail_transient_index_buffer"
@@ -749,36 +755,37 @@ Function bgfxAllocTransientBuffers:Bool( _tvb:BgfxTransientVertexBuffer, _decl:B
 Function bgfxAllocInstanceDataBuffer:Void( _idb:BgfxInstanceDataBuffer, _num:Int, _stride:Int )="_bgfx_alloc_instance_data_buffer"
 
 '  bgfx_indirect_buffer_handle_object bgfx_create_indirect_buffer(int _num);
-Function bgfxCreateIndirectBuffer:Void( _handle:BgfxIndirectBufferHandle, _num:Int )="_bgfx_create_indirect_buffer"
+Function bgfxCreateIndirectBuffer:Int( _num:Int )="_bgfx_create_indirect_buffer"
 
 '  void bgfx_destroy_indirect_buffer(bgfx_indirect_buffer_handle_object _handle);
-Function bgfxDestroyIndirectBuffer:Void( _handle:BgfxIndirectBufferHandle )="_bgfx_destroy_indirect_buffer"
+Function bgfxDestroyIndirectBuffer:Void( _handle:Int )="_bgfx_destroy_indirect_buffer"
 
 '  bgfx_shader_handle_object bgfx_create_shader(const bgfx_memory_object* _mem);
-Function bgfxCreateShader:Void( _handle:BgfxShaderHandle, _mem:BgfxMemory )="_bgfx_create_shader"
+Function bgfxCreateShader:Int( _mem:BgfxMemory )="_bgfx_create_shader"
 
+' bgfx_uniform_handle_object* _uniforms => _uniforms:BgfxUniformHandle[] => _uniforms:DataBuffer because handle are UINT16
 '  int bgfx_get_shader_uniforms(bgfx_shader_handle_object _handle, bgfx_uniform_handle_object* _uniforms, int _max);
-'  Function bgfxGetShaderUniforms:Int( _handle:BgfxShaderHandle, _uniforms:BgfxUniformHandle[]=Null, _max:Int=0 )="_bgfx_get_shader_uniforms"
-Function bgfxGetShaderUniforms:Int( _handle:BgfxShaderHandle )="_bgfx_get_shader_uniforms"
-Function bgfxGetShaderUniforms:Int( _handle:BgfxShaderHandle, _uniforms:BgfxUniformHandle[], _max:Int=0 )="_bgfx_get_shader_uniforms"
+'  Function bgfxGetShaderUniforms:Int( _handle:Int, _uniforms:DataBuffer=Null, _max:Int=0 )="_bgfx_get_shader_uniforms"
+'  Function bgfxGetShaderUniforms:Int( _handle:Int )="_bgfx_get_shader_uniforms"
+Function bgfxGetShaderUniforms:Int( _handle:Int, _uniforms:DataBuffer=Null, _max:Int=0 )="_bgfx_get_shader_uniforms"
 
 '  void bgfx_get_uniform_info(bgfx_uniform_handle_object _handle, bgfx_uniform_info_object* _info);
-Function bgfxGetUniformInfo:Void( _handle:BgfxUniformHandle, _info:BgfxUniformInfo[] )="_bgfx_get_uniform_info"
+Function bgfxGetUniformInfo:Void( _handle:Int, _info:BgfxUniformInfo )="_bgfx_get_uniform_info"
 
 '  void bgfx_set_shader_name(bgfx_shader_handle_object _handle, const char* _name, int _len);
-Function bgfxSetShaderName:Void( _handle:BgfxShaderHandle, _name:String, _len:Int=INT32_MAX )="_bgfx_set_shader_name"
+Function bgfxSetShaderName:Void( _handle:Int, _name:String, _len:Int=INT32_MAX )="_bgfx_set_shader_name"
 
 '  void bgfx_destroy_shader(bgfx_shader_handle_object _handle);
-Function bgfxDestroyShader:Void( _handle:BgfxShaderHandle )="_bgfx_destroy_shader"
+Function bgfxDestroyShader:Void( _handle:Int )="_bgfx_destroy_shader"
 
 '  bgfx_program_handle_object bgfx_create_program(bgfx_shader_handle_object _vsh, bgfx_shader_handle_object _fsh, bool _destroyShaders);
-Function bgfxCreateProgram:Void( _handle:BgfxProgramHandle, _vsh:BgfxShaderHandle, _fsh:BgfxShaderHandle, _destroyShaders:Bool=False )="_bgfx_create_program"
+Function bgfxCreateProgram:Int( _vsh:Int, _fsh:Int, _destroyShaders:Bool=False )="_bgfx_create_program"
 
 '  bgfx_program_handle_object bgfx_create_compute_program(bgfx_shader_handle_object _csh, bool _destroyShaders);
-Function bgfxCreateComputeProgram:Void( _handle:BgfxProgramHandle, _csh:BgfxShaderHandle, _destroyShaders:Bool=False )="_bgfx_create_compute_program"
+Function bgfxCreateComputeProgram:Int( _csh:Int, _destroyShaders:Bool=False )="_bgfx_create_compute_program"
 
 '  void bgfx_destroy_program(bgfx_program_handle_object _handle);
-Function bgfxDestroyProgram:Void( _handle:BgfxProgramHandle )="_bgfx_destroy_program"
+Function bgfxDestroyProgram:Void( _handle:Int )="_bgfx_destroy_program"
 
 '  bool bgfx_is_texture_valid(int _depth, bool _cubeMap, int _numLayers, int _format, uint64_t _flags);
 Function bgfxIsTextureValid:Bool( _depth:Int, _cubeMap:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_is_texture_valid"
@@ -787,95 +794,97 @@ Function bgfxIsTextureValid:Bool( _depth:Int, _cubeMap:Bool, _numLayers:Int, _fo
 Function bgfxCalcTextureSize:Void( _info:BgfxTextureInfo, _width:Int, _height:Int, _depth:Int, _cubeMap:Bool, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_calc_texture_size"
 
 '  bgfx_texture_handle_object bgfx_create_texture(const bgfx_memory_object* _mem, uint64_t _flags, int _skip, bgfx_texture_info_object* _info);
-'  Function bgfxCreateTexture:Void( _handle:BgfxTextureHandle, _mem:BgfxMemory, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _skip:Int=0, _info:BgfxTextureInfo=Null )="_bgfx_create_texture"
-Function bgfxCreateTexture:Void( _handle:BgfxTextureHandle, _mem:BgfxMemory )="_bgfx_create_texture"
-Function bgfxCreateTexture:Void( _handle:BgfxTextureHandle, _mem:BgfxMemory, _flags:Int[], _skip:Int=0, _info:BgfxTextureInfo=Null )="_bgfx_create_texture"
+'  Function bgfxCreateTexture:Int( _mem:BgfxMemory, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _skip:Int=0, _info:BgfxTextureInfo=Null )="_bgfx_create_texture"
+Function bgfxCreateTexture:Int( _mem:BgfxMemory )="_bgfx_create_texture"
+Function bgfxCreateTexture:Int( _mem:BgfxMemory, _flags:Int[], _skip:Int=0, _info:BgfxTextureInfo=Null )="_bgfx_create_texture"
 
 '  bgfx_texture_handle_object bgfx_create_texture_2d(int _width, int _height, bool _hasMips, int _numLayers, int _format, uint64_t _flags, const bgfx_memory_object* _mem);
-'  Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_2d"
-Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_2d"
-Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_2d"
-Function bgfxCreateTexture2D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_2d"
+'  Function bgfxCreateTexture2D:Int( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_2d"
+Function bgfxCreateTexture2D:Int( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_2d"
+Function bgfxCreateTexture2D:Int( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_2d"
+Function bgfxCreateTexture2D:Int( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_2d"
 
 '  bgfx_texture_handle_object bgfx_create_texture_2d_scaled(int _ratio, bool _hasMips, int _numLayers, int _format, uint64_t _flags);
-'  Function bgfxCreateTexture2DScaled:Void( _handle:BgfxTextureHandle, _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE )="_bgfx_create_texture_2d_scaled"
-Function bgfxCreateTexture2DScaled:Void( _handle:BgfxTextureHandle, _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_2d_scaled"
-Function bgfxCreateTexture2DScaled:Void( _handle:BgfxTextureHandle, _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_2d_scaled"
+'  Function bgfxCreateTexture2DScaled:Int( _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE )="_bgfx_create_texture_2d_scaled"
+Function bgfxCreateTexture2DScaled:Int( _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_2d_scaled"
+Function bgfxCreateTexture2DScaled:Int( _ratio:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_2d_scaled"
 
 '  bgfx_texture_handle_object bgfx_create_texture_3d(int _width, int _height, int _depth, bool _hasMips, int _format, uint64_t _flags, const bgfx_memory_object* _mem);
-'  Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_3d"
-Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int )="_bgfx_create_texture_3d"
-Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[] )="_bgfx_create_texture_3d"
-Function bgfxCreateTexture3D:Void( _handle:BgfxTextureHandle, _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_3d"
+'  Function bgfxCreateTexture3D:Int( _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_3d"
+Function bgfxCreateTexture3D:Int( _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int )="_bgfx_create_texture_3d"
+Function bgfxCreateTexture3D:Int( _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[] )="_bgfx_create_texture_3d"
+Function bgfxCreateTexture3D:Int( _width:Int, _height:Int, _depth:Int, _hasMips:Bool, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_3d"
 
 '  bgfx_texture_handle_object bgfx_create_texture_cube(int _size, bool _hasMips, int _numLayers, int _format, uint64_t _flags, const bgfx_memory_object* _mem);
-'  Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_cube"
-Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_cube"
-Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_cube"
-Function bgfxCreateTextureCube:Void( _handle:BgfxTextureHandle, _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_cube"
+'  Function bgfxCreateTextureCube:Int( _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[]=BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE, _mem:BgfxMemory=Null )="_bgfx_create_texture_cube"
+Function bgfxCreateTextureCube:Int( _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int )="_bgfx_create_texture_cube"
+Function bgfxCreateTextureCube:Int( _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )="_bgfx_create_texture_cube"
+Function bgfxCreateTextureCube:Int( _size:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )="_bgfx_create_texture_cube"
 
 '  void bgfx_update_texture_2d(bgfx_texture_handle_object _handle, int _layer, int _mip, int _x, int _y, int _width, int _height, const bgfx_memory_object* _mem, int _pitch);
-Function bgfxUpdateTexture2D:Void( _handle:BgfxTextureHandle, _layer:Int, _mip:Int, _x:Int, _y:Int, _width:Int, _height:Int, _mem:BgfxMemory, _pitch:Int=UINT16_MAX )="_bgfx_update_texture_2d"
+Function bgfxUpdateTexture2D:Void( _handle:Int, _layer:Int, _mip:Int, _x:Int, _y:Int, _width:Int, _height:Int, _mem:BgfxMemory, _pitch:Int=UINT16_MAX )="_bgfx_update_texture_2d"
 
 '  void bgfx_update_texture_3d(bgfx_texture_handle_object _handle, int _mip, int _x, int _y, int _z, int _width, int _height, int _depth, const bgfx_memory_object* _mem);
-Function bgfxUpdateTexture3D:Void( _handle:BgfxTextureHandle, _mip:Int, _x:Int, _y:Int, _z:Int, _width:Int, _height:Int, _depth:Int, _mem:BgfxMemory )="_bgfx_update_texture_3d"
+Function bgfxUpdateTexture3D:Void( _handle:Int, _mip:Int, _x:Int, _y:Int, _z:Int, _width:Int, _height:Int, _depth:Int, _mem:BgfxMemory )="_bgfx_update_texture_3d"
 
 '  void bgfx_update_texture_cube(bgfx_texture_handle_object _handle, int _layer, int _side, int _mip, int _x, int _y, int _width, int _height, const bgfx_memory_object* _mem, int _pitch);
-Function bgfxUpdateTextureCube:Void( _handle:BgfxTextureHandle, _layer:Int, _side:Int, _mip:Int, _x:Int, _y:Int, _width:Int, _height:Int, _mem:BgfxMemory, _pitch:Int=UINT16_MAX )="_bgfx_update_texture_cube"
+Function bgfxUpdateTextureCube:Void( _handle:Int, _layer:Int, _side:Int, _mip:Int, _x:Int, _y:Int, _width:Int, _height:Int, _mem:BgfxMemory, _pitch:Int=UINT16_MAX )="_bgfx_update_texture_cube"
 
 '  int bgfx_read_texture(bgfx_texture_handle_object _handle, void* _data, int _mip);
-Function bgfxReadTexture:Int( _handle:BgfxTextureHandle, _data:DataBuffer, _mip:Int=0 )="_bgfx_read_texture"
+Function bgfxReadTexture:Int( _handle:Int, _data:DataBuffer, _mip:Int=0 )="_bgfx_read_texture"
 
 '  void bgfx_set_texture_name(bgfx_texture_handle_object _handle, const char* _name, int _len);
-Function bgfxSetTextureName:Void( _handle:BgfxTextureHandle, _name:String, _len:Int=INT32_MAX )="_bgfx_set_texture_name"
+Function bgfxSetTextureName:Void( _handle:Int, _name:String, _len:Int=INT32_MAX )="_bgfx_set_texture_name"
 
-'  void* bgfx_get_direct_access_ptr(bgfx_texture_handle_object * _handle)
+'  void* bgfx_get_direct_access_ptr(bgfx_texture_handle_object* _handle)
+
 
 '  void bgfx_destroy_texture(bgfx_texture_handle_object _handle);
-Function bgfxDestroyTexture:Void( _handle:BgfxTextureHandle )="_bgfx_destroy_texture"
+Function bgfxDestroyTexture:Void( _handle:Int )="_bgfx_destroy_texture"
 
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer(int _width, int _height, int _format, uint64_t _textureFlags);
-'  Function bgfxCreateFrameBuffer:Void( _handle:BgfxFrameBufferHandle, _width:Int, _height:Int, _format:Int, _textureFlags:Int[]=BGFX_SAMPLER_U_CLAMP|BGFX_SAMPLER_V_CLAMP )="_bgfx_create_frame_buffer"
-Function bgfxCreateFrameBuffer:Void( _handle:BgfxFrameBufferHandle, _width:Int, _height:Int, _format:Int )="_bgfx_create_frame_buffer"
-Function bgfxCreateFrameBuffer:Void( _handle:BgfxFrameBufferHandle, _width:Int, _height:Int, _format:Int, _textureFlags:Int[] )="_bgfx_create_frame_buffer"
+'  Function bgfxCreateFrameBuffer:Int( _width:Int, _height:Int, _format:Int, _textureFlags:Int[]=BGFX_SAMPLER_U_CLAMP|BGFX_SAMPLER_V_CLAMP )="_bgfx_create_frame_buffer"
+Function bgfxCreateFrameBuffer:Int( _width:Int, _height:Int, _format:Int )="_bgfx_create_frame_buffer"
+Function bgfxCreateFrameBuffer:Int( _width:Int, _height:Int, _format:Int, _textureFlags:Int[] )="_bgfx_create_frame_buffer"
 
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer_scaled(int _ratio, int _format, uint64_t _textureFlags);
-'  Function bgfxCreateFrameBufferScaled:Void( _handle:BgfxFrameBufferHandle, _ratio:Int, _format:Int, _textureFlags:Int[]=BGFX_SAMPLER_U_CLAMP|BGFX_SAMPLER_V_CLAMP )="_bgfx_create_frame_buffer_scaled"
-Function bgfxCreateFrameBufferScaled:Void( _handle:BgfxFrameBufferHandle, _ratio:Int, _format:Int )="_bgfx_create_frame_buffer_scaled"
-Function bgfxCreateFrameBufferScaled:Void( _handle:BgfxFrameBufferHandle, _ratio:Int, _format:Int, _textureFlags:Int[] )="_bgfx_create_frame_buffer_scaled"
+'  Function bgfxCreateFrameBufferScaled:Int( _ratio:Int, _format:Int, _textureFlags:Int[]=BGFX_SAMPLER_U_CLAMP|BGFX_SAMPLER_V_CLAMP )="_bgfx_create_frame_buffer_scaled"
+Function bgfxCreateFrameBufferScaled:Int( _ratio:Int, _format:Int )="_bgfx_create_frame_buffer_scaled"
+Function bgfxCreateFrameBufferScaled:Int( _ratio:Int, _format:Int, _textureFlags:Int[] )="_bgfx_create_frame_buffer_scaled"
 
+' bgfx_texture_handle_object* _handles => _handles:BgfxTextureHandle[] => _handles:DataBuffer because handles are UINT16
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer_from_handles(int _num, const bgfx_texture_handle_object* _handles, bool _destroyTextures);
-Function bgfxCreateFrameBufferFromHandles:Void( _handle:BgfxFrameBufferHandle, _num:Int, _handles:DataBuffer, _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
-'  Function bgfxCreateFrameBufferFromHandles:Void( _handle:BgfxFrameBufferHandle, _num:Int, _handles:BgfxTextureHandle[], _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
+Function bgfxCreateFrameBufferFromHandles:Int( _num:Int, _handles:DataBuffer, _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
+'  Function bgfxCreateFrameBufferFromHandles:Int( _num:Int, _handles:DataBuffer, _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_handles"
 
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer_from_attachment(int _num, const bgfx_attachment_object* _attachment, bool _destroyTextures);
-Function bgfxCreateFrameBufferFromAttachment:Void( _handle:BgfxFrameBufferHandle, _num:Int, _attachment:BgfxAttachment, _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_attachment"
+Function bgfxCreateFrameBufferFromAttachment:Int( _num:Int, _attachment:BgfxAttachment, _destroyTextures:Bool=False )="_bgfx_create_frame_buffer_from_attachment"
 
 '  bgfx_frame_buffer_handle_object bgfx_create_frame_buffer_from_nwh(void* _nwh, int _width, int _height, int _format, int _depthFormat);
-Function bgfxCreateFrameBufferFromNwh:Void( _handle:BgfxFrameBufferHandle, _nwh:BgfxNativeWindowHandle, _width:Int, _height:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT, _depthFormat:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_create_frame_buffer_from_nwh"
+Function bgfxCreateFrameBufferFromNwh:Int( _nwh:BgfxNativeWindowHandle, _width:Int, _height:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT, _depthFormat:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_create_frame_buffer_from_nwh"
 
 '  bgfx_texture_handle_object bgfx_get_texture(bgfx_frame_buffer_handle_object _handle, int _attachment);
-Function bgfxGetTexture:Void( _result:BgfxTextureHandle, _handle:BgfxFrameBufferHandle, _attachment:Int=0 )="_bgfx_get_texture"
+Function bgfxGetTexture:Int( _handle:Int, _attachment:Int=0 )="_bgfx_get_texture"
 
 '  void bgfx_destroy_frame_buffer(bgfx_frame_buffer_handle_object _handle);
-Function bgfxDestroyFrameBuffer:Void( _handle:BgfxFrameBufferHandle )="_bgfx_destroy_frame_buffer"
+Function bgfxDestroyFrameBuffer:Void( _handle:Int )="_bgfx_destroy_frame_buffer"
 
 '  bgfx_uniform_handle_object bgfx_create_uniform(const char* _name, int _type, int _num);
-Function bgfxCreateUniform:Void( _handle:BgfxUniformHandle, _name:String, _type:Int, _num:Int=1 )="_bgfx_create_uniform"
+Function bgfxCreateUniform:Int( _name:String, _type:Int, _num:Int=1 )="_bgfx_create_uniform"
 
 '  void bgfx_destroy_uniform(bgfx_uniform_handle_object _handle);
-Function bgfxDestroyUniform:Void( _handle:BgfxUniformHandle )="_bgfx_destroy_uniform"
+Function bgfxDestroyUniform:Void( _handle:Int )="_bgfx_destroy_uniform"
 
 '  bgfx_occlusion_query_handle_object bgfx_create_occlusion_query(void);
-Function bgfxCreateOcclusionQuery:Void( _handle:BgfxOcclusionQueryHandle )="_bgfx_create_occlusion_query"
+Function bgfxCreateOcclusionQuery:Int()="_bgfx_create_occlusion_query"
 
 '  int bgfx_get_result(bgfx_occlusion_query_handle_object _handle, int* _result);
-'  Function bgfxGetResult:Int( _handle:BgfxOcclusionQueryHandle, _result:Int[]=Null )="_bgfx_get_result"
-Function bgfxGetResult:Int( _handle:BgfxOcclusionQueryHandle )="_bgfx_get_result"
-Function bgfxGetResult:Int( _handle:BgfxOcclusionQueryHandle, _result:Int[] )="_bgfx_get_result"
+'  Function bgfxGetResult:Int( _handle:Int, _result:Int[]=Null )="_bgfx_get_result"
+Function bgfxGetResult:Int( _handle:Int )="_bgfx_get_result"
+Function bgfxGetResult:Int( _handle:Int, _result:Int[] )="_bgfx_get_result"
 
 '  void bgfx_destroy_occlusion_query(bgfx_occlusion_query_handle_object _handle);
-Function bgfxDestroyOcclusionQuery:Void( _handle:BgfxOcclusionQueryHandle )="_bgfx_destroy_occlusion_query"
+Function bgfxDestroyOcclusionQuery:Void( _handle:Int )="_bgfx_destroy_occlusion_query"
 
 '  void bgfx_set_palette_color(int _index, const float _rgba[4]);
 Function bgfxSetPaletteColor:Void( _index:Int, _rgba:Int )="bgfx::setPaletteColor"
@@ -904,7 +913,7 @@ Function bgfxSetViewClearMrt:Void( _id:Int, _flags:Int, _depth:Float, _stencil:I
 Function bgfxSetViewMode:Void( _id:Int, _mode:Int=BGFX_VIEW_MODE_DEFAULT )="_bgfx_set_view_mode"
 
 '  void bgfx_set_view_frame_buffer(int _id, bgfx_frame_buffer_handle_object _handle);
-Function bgfxSetViewFrameBuffer:Void( _id:Int, _handle:BgfxFrameBufferHandle )="_bgfx_set_view_frame_buffer"
+Function bgfxSetViewFrameBuffer:Void( _id:Int, _handle:Int )="_bgfx_set_view_frame_buffer"
 
 '  void bgfx_set_view_transform(int _id, const void* _view, const void* _proj);
 Function bgfxSetViewTransform:Void( _id:Int, _view:Float[], _proj:Float[] )="_bgfx_set_view_transform"
@@ -932,7 +941,7 @@ Function bgfxSetMarker:Void( _marker:String )="_bgfx_set_marker"
 Function bgfxSetState:Void( _state:Int[], _rgba:Int=0 )="_bgfx_set_state"
 
 '  void bgfx_set_condition(bgfx_occlusion_query_handle_object _handle, bool _visible);
-Function bgfxSetCondition:Void( _handle:BgfxOcclusionQueryHandle, _visible:Bool )="_bgfx_set_condition"
+Function bgfxSetCondition:Void( _handle:Int, _visible:Bool )="_bgfx_set_condition"
 
 '  void bgfx_set_stencil(int _fstencil, int _bstencil);
 Function bgfxSetStencil:Void( _fstencil:Int, _bstencil:Int=BGFX_STENCIL_NONE )="bgfx_set_stencil"
@@ -954,18 +963,18 @@ Function bgfxAllocTransform:Int( _transform:BgfxTransform, _num:Int )="_bgfx_all
 Function bgfxSetTransformCached:Void( _cache:Int, _num:Int=1 )="bgfx_set_transform_cached"
 
 '  void bgfx_set_uniform(bgfx_uniform_handle_object _handle, const void* _value, int _num);
-Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Int, _num:Int=1 )="_bgfx_set_uniform"
-Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Int[], _num:Int=1 )="_bgfx_set_uniform"
-Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Float, _num:Int=1 )="_bgfx_set_uniform"
-Function bgfxSetUniform:Void( _handle:BgfxUniformHandle, _value:Float[], _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _value:Int, _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _value:Int[], _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _value:Float, _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _value:Float[], _num:Int=1 )="_bgfx_set_uniform"
 
 '  void bgfx_set_index_buffer(bgfx_index_buffer_handle_object _handle, int _firstIndex, int _numIndices);
-Function bgfxSetIndexBuffer:Void( _handle:BgfxIndexBufferHandle )="_bgfx_set_index_buffer"
-Function bgfxSetIndexBuffer:Void( _handle:BgfxIndexBufferHandle, _firstIndex:Int, _numIndices:Int )="_bgfx_set_index_buffer"
+Function bgfxSetIndexBuffer:Void( _handle:Int )="_bgfx_set_index_buffer"
+Function bgfxSetIndexBuffer:Void( _handle:Int, _firstIndex:Int, _numIndices:Int )="_bgfx_set_index_buffer"
 
 '  void bgfx_set_dynamic_index_buffer(bgfx_dynamic_index_buffer_handle_object _handle, int _firstIndex, int _numIndices);
-Function bgfxSetDynamicIndexBuffer:Void( _handle:BgfxDynamicIndexBufferHandle )="_bgfx_set_dynamic_index_buffer"
-Function bgfxSetDynamicIndexBuffer:Void( _handle:BgfxDynamicIndexBufferHandle, _firstIndex:Int, _numIndices:Int )="_bgfx_set_dynamic_index_buffer"
+Function bgfxSetDynamicIndexBuffer:Void( _handle:Int )="_bgfx_set_dynamic_index_buffer"
+Function bgfxSetDynamicIndexBuffer:Void( _handle:Int, _firstIndex:Int, _numIndices:Int )="_bgfx_set_dynamic_index_buffer"
 Function bgfxResetDynamicIndexBuffer:Void( )="_bgfx_reset_dynamic_index_buffer"
 
 '  void bgfx_set_transient_index_buffer(const bgfx_transient_index_buffer_object* _tib, int _firstIndex, int _numIndices);
@@ -973,12 +982,12 @@ Function bgfxSetTransientIndexBuffer:Void( _tib:BgfxTransientIndexBuffer )="_bgf
 Function bgfxSetTransientIndexBuffer:Void( _tib:BgfxTransientIndexBuffer, _firstIndex:Int, _numIndices:Int )="_bgfx_set_transient_index_buffer"
 
 '  void bgfx_set_vertex_buffer(int _stream, bgfx_vertex_buffer_handle_object _handle, int _startVertex, int _numVertices);
-Function bgfxSetVertexBuffer:Void( _stream:Int, _handle:BgfxVertexBufferHandle )="_bgfx_set_vertex_buffer"
-Function bgfxSetVertexBuffer:Void( _stream:Int, _handle:BgfxVertexBufferHandle, _startVertex:Int, _numVertices:Int )="_bgfx_set_vertex_buffer"
+Function bgfxSetVertexBuffer:Void( _stream:Int, _handle:Int )="_bgfx_set_vertex_buffer"
+Function bgfxSetVertexBuffer:Void( _stream:Int, _handle:Int, _startVertex:Int, _numVertices:Int )="_bgfx_set_vertex_buffer"
 
 '  void bgfx_set_dynamic_vertex_buffer(int _stream, bgfx_dynamic_vertex_buffer_handle_object _handle, int _startVertex, int _numVertices);
-Function bgfxSetDynamicVertexBuffer:Void( _stream:Int, _handle:BgfxDynamicVertexBufferHandle )="_bgfx_set_dynamic_vertex_buffer"
-Function bgfxSetDynamicVertexBuffer:Void( _stream:Int, _handle:BgfxDynamicVertexBufferHandle, _startVertex:Int, _numVertices:Int )="_bgfx_set_dynamic_vertex_buffer"
+Function bgfxSetDynamicVertexBuffer:Void( _stream:Int, _handle:Int )="_bgfx_set_dynamic_vertex_buffer"
+Function bgfxSetDynamicVertexBuffer:Void( _stream:Int, _handle:Int, _startVertex:Int, _numVertices:Int )="_bgfx_set_dynamic_vertex_buffer"
 
 '  void bgfx_set_transient_vertex_buffer(int _stream, const bgfx_transient_vertex_buffer_object* _tvb, int _startVertex, int _numVertices);
 Function bgfxSetTransientVertexBuffer:Void( _stream:Int, _tvb:BgfxTransientVertexBuffer )="_bgfx_set_transient_vertex_buffer"
@@ -992,60 +1001,60 @@ Function bgfxSetInstanceDataBuffer:Void( _idb:BgfxInstanceDataBuffer )="_bgfx_se
 Function bgfxSetInstanceDataBuffer:Void( _idb:BgfxInstanceDataBuffer, _start:Int, _num:Int )="_bgfx_set_instance_data_buffer"
 
 '  void bgfx_set_instance_data_from_vertex_buffer(bgfx_vertex_buffer_handle_object _handle, int _start, int _num);
-Function bgfxSetInstanceDataFromVertexBuffer:Void( _handle:BgfxVertexBufferHandle, _start:Int, _num:Int )="_bgfx_set_instance_data_from_vertex_buffer"
+Function bgfxSetInstanceDataFromVertexBuffer:Void( _handle:Int, _start:Int, _num:Int )="_bgfx_set_instance_data_from_vertex_buffer"
 
 '  void bgfx_set_instance_data_from_dynamic_vertex_buffer(bgfx_dynamic_vertex_buffer_handle_object _handle, int _start, int _num);
-Function bgfxSetInstanceDataFromDynamicVertexBuffer:Void( _handle:BgfxDynamicVertexBufferHandle, _start:Int, _num:Int )="_bgfx_set_instance_data_from_dynamic_vertex_buffer"
+Function bgfxSetInstanceDataFromDynamicVertexBuffer:Void( _handle:Int, _start:Int, _num:Int )="_bgfx_set_instance_data_from_dynamic_vertex_buffer"
 
 '  void bgfx_set_instance_count(int _numInstances);
 Function bgfxSetInstanceCount:Void( _numInstances:Int )="bgfx_set_instance_count"
 
 '  void bgfx_set_texture(int _stage, bgfx_uniform_handle_object _sampler, bgfx_texture_handle_object _handle, int _flags=UINT32_MAX);
-Function bgfxSetTexture:Void( _stage:Int, _sampler:BgfxUniformHandle, _handle:BgfxTextureHandle )="_bgfx_set_texture"
-Function bgfxSetTexture:Void( _stage:Int, _sampler:BgfxUniformHandle, _handle:BgfxTextureHandle, _flags:Int )="_bgfx_set_texture"
+Function bgfxSetTexture:Void( _stage:Int, _sampler:Int, _handle:Int )="_bgfx_set_texture"
+Function bgfxSetTexture:Void( _stage:Int, _sampler:Int, _handle:Int, _flags:Int )="_bgfx_set_texture"
 
 '  void bgfx_touch(int _id);
 Function bgfxTouch:Void( _id:Int )="bgfx_touch"
 
 '  void bgfx_submit(int _id, bgfx_program_handle_object _handle, int _depth, bool _preserveState);
-Function bgfxSubmit:Void( _id:Int, _program:BgfxProgramHandle, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit"
+Function bgfxSubmit:Void( _id:Int, _program:Int, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit"
 
 '  void bgfx_submit_occlusion_query(int _id, bgfx_program_handle_object _program, bgfx_occlusion_query_handle_object _occlusionQuery, int _depth, bool _preserveState);
-Function bgfxSubmitOcclusionQuery:Void( _id:Int, _program:BgfxProgramHandle, _occlusionQuery:BgfxOcclusionQueryHandle, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit_occlusion_query"
+Function bgfxSubmitOcclusionQuery:Void( _id:Int, _program:Int, _occlusionQuery:Int, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit_occlusion_query"
 
 '  void bgfx_submit_indirect(int _id, bgfx_program_handle_object _handle, bgfx_indirect_buffer_handle_object _indirectHandle, int _start, int _num, int _depth, bool _preserveState);
-Function bgfxSubmitIndirect:Void( _id:Int, _handle:BgfxProgramHandle, _indirectHandle:BgfxIndirectBufferHandle, _start:Int=0, _num:Int=1, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit_indirect"
+Function bgfxSubmitIndirect:Void( _id:Int, _handle:Int, _indirectHandle:Int, _start:Int=0, _num:Int=1, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit_indirect"
 
 '  void bgfx_set_image(int _stage, bgfx_texture_handle_object _handle, int _mip, int _access, int _format);
-Function bgfxSetImage:Void( _stage:Int, _handle:BgfxTextureHandle, _mip:Int, _access:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_set_image"
+Function bgfxSetImage:Void( _stage:Int, _handle:Int, _mip:Int, _access:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_set_image"
 
 '  void bgfx_set_compute_index_buffer(int _stage, bgfx_index_buffer_handle_object _handle, int _access);
-Function bgfxSetComputeIndexBuffer:Void( _stage:Int, _handle:BgfxIndexBufferHandle, _access:Int )="_bgfx_set_compute_index_buffer"
+Function bgfxSetComputeIndexBuffer:Void( _stage:Int, _handle:Int, _access:Int )="_bgfx_set_compute_index_buffer"
 
 '  void bgfx_set_compute_vertex_buffer(int _stage, bgfx_vertex_buffer_handle_object _handle, int _access);
-Function bgfxSetComputeVertexBuffer:Void( _stage:Int, _handle:BgfxVertexBufferHandle, _access:Int )="_bgfx_set_compute_vertex_buffer"
+Function bgfxSetComputeVertexBuffer:Void( _stage:Int, _handle:Int, _access:Int )="_bgfx_set_compute_vertex_buffer"
 
 '  void bgfx_set_compute_dynamic_index_buffer(int _stage, bgfx_dynamic_index_buffer_handle_object _handle, int _access);
-Function bgfxSetComputeDynamicIndexBuffer:Void( _stage:Int, _handle:BgfxDynamicIndexBufferHandle, _access:Int )="_bgfx_set_compute_dynamic_index_buffer"
+Function bgfxSetComputeDynamicIndexBuffer:Void( _stage:Int, _handle:Int, _access:Int )="_bgfx_set_compute_dynamic_index_buffer"
 
 '  void bgfx_set_compute_dynamic_vertex_buffer(int _stage, bgfx_dynamic_vertex_buffer_handle_object _handle, int _access);
-Function bgfxSetComputeDynamicVertexBuffer:Void( _stage:Int, _handle:BgfxDynamicVertexBufferHandle, _access:Int )="_bgfx_set_compute_dynamic_vertex_buffer"
+Function bgfxSetComputeDynamicVertexBuffer:Void( _stage:Int, _handle:Int, _access:Int )="_bgfx_set_compute_dynamic_vertex_buffer"
 
 '  void bgfx_set_compute_indirect_buffer(int _stage, bgfx_indirect_buffer_handle_object _handle, int _access);
-Function bgfxSetComputeIndirectBuffer:Void( _stage:Int, _handle:BgfxIndirectBufferHandle, _access:Int )="_bgfx_set_compute_indirect_buffer"
+Function bgfxSetComputeIndirectBuffer:Void( _stage:Int, _handle:Int, _access:Int )="_bgfx_set_compute_indirect_buffer"
 
 '  void bgfx_dispatch(int _id, bgfx_program_handle_object _handle, int _numX, int _numY, int _numZ, int _flags);
-Function bgfxDispatch:Void( _id:Int, _handle:BgfxProgramHandle, _numX:Int=1, _numY:Int=1, _numZ:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_dispatch"
+Function bgfxDispatch:Void( _id:Int, _handle:Int, _numX:Int=1, _numY:Int=1, _numZ:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_dispatch"
 
 '  void bgfx_dispatch_indirect(int _id, bgfx_program_handle_object _handle, bgfx_indirect_buffer_handle_object _indirectHandle, int _start, int _num, int _flags);
-Function bgfxDispatchIndirect:Void( _id:Int, _handle:BgfxProgramHandle, _indirectHandle:BgfxIndirectBufferHandle, _start:Int=0, _num:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_dispatch_indirect"
+Function bgfxDispatchIndirect:Void( _id:Int, _handle:Int, _indirectHandle:Int, _start:Int=0, _num:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_dispatch_indirect"
 
 '  void bgfx_discard(void);
 Function bgfxDiscard:Void(  )="bgfx_discard"
 
 '  void bgfx_blit(int _id, bgfx_texture_handle_object _dst, int _dstMip, int _dstX, int _dstY, int _dstZ, bgfx_texture_handle_object _src, int _srcMip, int _srcX, int _srcY, int _srcZ, int _width, int _height, int _depth);
-Function bgfxBlit:Void( _id:Int, _dst:BgfxTextureHandle, _dstX:Int, _dstY:Int, _src:BgfxTextureHandle, _srcX:Int=0, _srcY:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX )="_bgfx_blit"
-Function bgfxBlit:Void( _id:Int, _dst:BgfxTextureHandle, _dstMip:Int, _dstX:Int, _dstY:Int, _dstZ:Int, _src:BgfxTextureHandle, _srcMip:Int=0, _srcX:Int=0, _srcY:Int=0, _srcZ:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX, _depth:Int=UINT16_MAX )="_bgfx_blit"
+Function bgfxBlit:Void( _id:Int, _dst:Int, _dstX:Int, _dstY:Int, _src:Int, _srcX:Int=0, _srcY:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX )="_bgfx_blit"
+Function bgfxBlit:Void( _id:Int, _dst:Int, _dstMip:Int, _dstX:Int, _dstY:Int, _dstZ:Int, _src:Int, _srcMip:Int=0, _srcX:Int=0, _srcY:Int=0, _srcZ:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX, _depth:Int=UINT16_MAX )="_bgfx_blit"
 
 '  void bgfx_encoder_set_marker(struct bgfx_encoder_s* _encoder, const char* _marker);
 Function bgfxEncoderSetMarker:Void( _encoder:BgfxEncoder, _marker:String )="_bgfx_encoder_set_marker"
@@ -1054,7 +1063,7 @@ Function bgfxEncoderSetMarker:Void( _encoder:BgfxEncoder, _marker:String )="_bgf
 Function bgfxEncoderSetState:Void( _encoder:BgfxEncoder, _state:Int[], _rgba:Int=0 )="_bgfx_encoder_set_state"
 
 '  void bgfx_encoder_set_condition(struct bgfx_encoder_s* _encoder, bgfx_occlusion_query_handle_object _handle, bool _visible);
-Function bgfxEncoderSetCondition:Void( _encoder:BgfxEncoder, _handle:BgfxOcclusionQueryHandle, _visible:Bool )="_bgfx_encoder_set_condition"
+Function bgfxEncoderSetCondition:Void( _encoder:BgfxEncoder, _handle:Int, _visible:Bool )="_bgfx_encoder_set_condition"
 
 '  void bgfx_encoder_set_stencil(struct bgfx_encoder_s* _encoder, int _fstencil, int _bstencil);
 Function bgfxEncoderSetStencil:Void( _encoder:BgfxEncoder, _fstencil:Int, _bstencil:Int=BGFX_STENCIL_NONE )="_bgfx_encoder_set_stencil"
@@ -1075,27 +1084,27 @@ Function bgfxEncoderAllocTransform:Int( _encoder:BgfxEncoder, _transform:BgfxTra
 Function bgfxEncoderSetTransformCached:Void( _encoder:BgfxEncoder, _cache:Int, _num:Int=1 )="_bgfx_encoder_set_transform_cached"
 
 '  void bgfx_encoder_set_uniform(struct bgfx_encoder_s* _encoder, bgfx_uniform_handle_object _handle, const void* _value, int _num);
-Function bgfxEncoderSetUniform:Void( _encoder:BgfxEncoder, _handle:BgfxUniformHandle, _value:Float[], _num:Int=1 )="_bgfx_encoder_set_uniform"
+Function bgfxEncoderSetUniform:Void( _encoder:BgfxEncoder, _handle:Int, _value:Float[], _num:Int=1 )="_bgfx_encoder_set_uniform"
 
 '  void bgfx_encoder_set_index_buffer(struct bgfx_encoder_s* _encoder, bgfx_index_buffer_handle_object _handle, int _firstIndex, int _numIndices);
-Function bgfxEncoderSetIndexBuffer:Void( _encoder:BgfxEncoder, _handle:BgfxIndexBufferHandle )="_bgfx_encoder_set_index_buffer"
-Function bgfxEncoderSetIndexBuffer:Void( _encoder:BgfxEncoder, _handle:BgfxIndexBufferHandle, _firstIndex:Int, _numIndices:Int )="_bgfx_encoder_set_index_buffer"
+Function bgfxEncoderSetIndexBuffer:Void( _encoder:BgfxEncoder, _handle:Int )="_bgfx_encoder_set_index_buffer"
+Function bgfxEncoderSetIndexBuffer:Void( _encoder:BgfxEncoder, _handle:Int, _firstIndex:Int, _numIndices:Int )="_bgfx_encoder_set_index_buffer"
 
 '  void bgfx_encoder_set_dynamic_index_buffer(struct bgfx_encoder_s* _encoder, bgfx_dynamic_index_buffer_handle_object _handle, int _firstIndex, int _numIndices);
-Function bgfxEncoderSetDynamicIndexBuffer:Void( _encoder:BgfxEncoder, _handle:BgfxDynamicIndexBufferHandle )="_bgfx_encoder_set_dynamic_index_buffer"
-Function bgfxEncoderSetDynamicIndexBuffer:Void( _encoder:BgfxEncoder, _handle:BgfxDynamicIndexBufferHandle, _firstIndex:Int, _numIndices:Int )="_bgfx_encoder_set_dynamic_index_buffer"
+Function bgfxEncoderSetDynamicIndexBuffer:Void( _encoder:BgfxEncoder, _handle:Int )="_bgfx_encoder_set_dynamic_index_buffer"
+Function bgfxEncoderSetDynamicIndexBuffer:Void( _encoder:BgfxEncoder, _handle:Int, _firstIndex:Int, _numIndices:Int )="_bgfx_encoder_set_dynamic_index_buffer"
 
 '  void bgfx_encoder_set_transient_index_buffer(struct bgfx_encoder_s* _encoder, const bgfx_transient_index_buffer_object* _tib, int _firstIndex, int _numIndices);
 Function bgfxEncoderSetTransientIndexBuffer:Void( _encoder:BgfxEncoder, _tib:BgfxTransientIndexBuffer )="_bgfx_encoder_set_transient_index_buffer"
 Function bgfxEncoderSetTransientIndexBuffer:Void( _encoder:BgfxEncoder, _tib:BgfxTransientIndexBuffer, _firstIndex:Int, _numIndices:Int )="_bgfx_encoder_set_transient_index_buffer"
 
 '  void bgfx_encoder_set_vertex_buffer(struct bgfx_encoder_s* _encoder, int _stream, bgfx_vertex_buffer_handle_object _handle, int _startVertex, int _numVertices);
-Function bgfxEncoderSetVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:BgfxVertexBufferHandle )="_bgfx_encoder_set_vertex_buffer"
-Function bgfxEncoderSetVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:BgfxVertexBufferHandle, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_vertex_buffer"
+Function bgfxEncoderSetVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:Int )="_bgfx_encoder_set_vertex_buffer"
+Function bgfxEncoderSetVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:Int, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_vertex_buffer"
 
 '  void bgfx_encoder_set_dynamic_vertex_buffer(struct bgfx_encoder_s* _encoder, int _stream, bgfx_dynamic_vertex_buffer_handle_object _handle, int _startVertex, int _numVertices);
-Function bgfxEncoderSetDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:BgfxDynamicVertexBufferHandle )="_bgfx_encoder_set_dynamic_vertex_buffer"
-Function bgfxEncoderSetDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:BgfxDynamicVertexBufferHandle, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_dynamic_vertex_buffer"
+Function bgfxEncoderSetDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:Int )="_bgfx_encoder_set_dynamic_vertex_buffer"
+Function bgfxEncoderSetDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:Int, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_dynamic_vertex_buffer"
 
 '  void bgfx_encoder_set_transient_vertex_buffer(struct bgfx_encoder_s* _encoder, int _stream, const bgfx_transient_vertex_buffer_object* _tvb, int _startVertex, int _numVertices);
 Function bgfxEncoderSetTransientVertexBuffer:Void( _encoder:BgfxEncoder, _encoder:Int, _tvb:BgfxTransientVertexBuffer )="_bgfx_encoder_set_transient_vertex_buffer"
@@ -1109,62 +1118,62 @@ Function bgfxEncoderSetInstanceDataBuffer:Void( _encoder:BgfxEncoder, _idb:BgfxI
 Function bgfxEncoderSetInstanceDataBuffer:Void( _encoder:BgfxEncoder, _idb:BgfxInstanceDataBuffer, _start:Int, _num:Int )="_bgfx_encoder_set_instance_data_buffer"
 
 '  void bgfx_encoder_set_instance_data_from_vertex_buffer(struct bgfx_encoder_s* _encoder, bgfx_vertex_buffer_handle_object _handle, int _start, int _num);
-Function bgfxEncoderSetInstanceDataFromVertexBuffer:Void( _encoder:BgfxEncoder, _handle:BgfxVertexBufferHandle, _start:Int, _num:Int )="_bgfx_encoder_set_instance_data_from_vertex_buffer"
+Function bgfxEncoderSetInstanceDataFromVertexBuffer:Void( _encoder:BgfxEncoder, _handle:Int, _start:Int, _num:Int )="_bgfx_encoder_set_instance_data_from_vertex_buffer"
 
 '  void bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer(struct bgfx_encoder_s* _encoder, bgfx_dynamic_vertex_buffer_handle_object _handle, int _start, int _num);
-Function bgfxEncoderSetInstanceDataFromDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _handle:BgfxDynamicVertexBufferHandle, _start:Int, _num:Int )="_bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer"
+Function bgfxEncoderSetInstanceDataFromDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _handle:Int, _start:Int, _num:Int )="_bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer"
 
 '  void setInstanceCount(uint32_t _numInstances);
 Function bgfxEncoderSetInstanceCount:Void( _encoder:BgfxEncoder, _numInstances:Int )="_bgfx_encoder_set_instance_count"
 
 '  void bgfx_encoder_set_texture(struct bgfx_encoder_s* _encoder, int _stage, bgfx_uniform_handle_object _sampler, bgfx_texture_handle_object _handle, int _flags);
-Function bgfxEncoderSetTexture:Void( _encoder:BgfxEncoder, _stage:Int, _sampler:BgfxUniformHandle, _handle:BgfxTextureHandle, _flags:Int=UINT32_MAX )="_bgfx_encoder_set_texture"
+Function bgfxEncoderSetTexture:Void( _encoder:BgfxEncoder, _stage:Int, _sampler:Int, _handle:Int, _flags:Int=UINT32_MAX )="_bgfx_encoder_set_texture"
 
 '  void bgfx_encoder_touch(struct bgfx_encoder_s* _encoder, int _id);
 Function bgfxEncoderTouch:Void( _encoder:BgfxEncoder, _id:Int )="_bgfx_encoder_touch"
 
 '  void bgfx_encoder_submit(struct bgfx_encoder_s* _encoder, int _id, bgfx_program_handle_object _handle, int _depth, bool _preserveState);
-Function bgfxEncoderSubmit:Void( _encoder:BgfxEncoder, _id:Int, _handle:BgfxProgramHandle, _depth:Int=0, _preserveState:Bool=False )="_bgfx_encoder_submit"
+Function bgfxEncoderSubmit:Void( _encoder:BgfxEncoder, _id:Int, _handle:Int, _depth:Int=0, _preserveState:Bool=False )="_bgfx_encoder_submit"
 
 '  void bgfx_encoder_submit_occlusion_query(struct bgfx_encoder_s* _encoder, int _id, bgfx_program_handle_object _program, bgfx_occlusion_query_handle_object _occlusionQuery, int _depth, bool _preserveState);
-Function bgfxEncoderSubmitOcclusionQuery:Void( _encoder:BgfxEncoder, _id:Int, _program:BgfxProgramHandle, _occlusionQuery:BgfxOcclusionQueryHandle, _depth:Int=0, _preserveState:Bool=False )="_bgfx_encoder_submit_occlusion_query"
+Function bgfxEncoderSubmitOcclusionQuery:Void( _encoder:BgfxEncoder, _id:Int, _program:Int, _occlusionQuery:Int, _depth:Int=0, _preserveState:Bool=False )="_bgfx_encoder_submit_occlusion_query"
 
 '  void bgfx_encoder_submit_indirect(struct bgfx_encoder_s* _encoder, int _id, bgfx_program_handle_object _handle, bgfx_indirect_buffer_handle_object _indirectHandle, int _start, int _num, int _depth, bool _preserveState);
-Function bgfxEncoderSubmitIndirect:Void( _encoder:BgfxEncoder, _id:Int, _handle:BgfxProgramHandle, _indirectHandle:BgfxIndirectBufferHandle, _start:Int=0, _num:Int=1, _depth:Int=0, _preserveState:Bool=False )="_bgfx_encoder_submit_indirect"
+Function bgfxEncoderSubmitIndirect:Void( _encoder:BgfxEncoder, _id:Int, _handle:Int, _indirectHandle:Int, _start:Int=0, _num:Int=1, _depth:Int=0, _preserveState:Bool=False )="_bgfx_encoder_submit_indirect"
 
 '  void bgfx_encoder_set_image(struct bgfx_encoder_s* _encoder, int _stage, bgfx_texture_handle_object _handle, int _mip, int _access, int _format);
-Function bgfxEncoderSetImage:Void( _encoder:BgfxEncoder, _stage:Int, _handle:BgfxTextureHandle, _mip:Int, _access:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_encoder_set_image"
+Function bgfxEncoderSetImage:Void( _encoder:BgfxEncoder, _stage:Int, _handle:Int, _mip:Int, _access:Int, _format:Int=BGFX_TEXTURE_FORMAT_COUNT )="_bgfx_encoder_set_image"
 
 '  void bgfx_encoder_set_compute_index_buffer(struct bgfx_encoder_s* _encoder, int _stage, bgfx_index_buffer_handle_object _handle, int _access);
-Function bgfxEncoderSetComputeIndexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:BgfxIndexBufferHandle, _access:Int )="_bgfx_encoder_set_compute_index_buffer"
+Function bgfxEncoderSetComputeIndexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:Int, _access:Int )="_bgfx_encoder_set_compute_index_buffer"
 
 '  void bgfx_encoder_set_compute_vertex_buffer(struct bgfx_encoder_s* _encoder, int _stage, bgfx_vertex_buffer_handle_object _handle, int _access);
-Function bgfxEncoderSetComputeVertexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:BgfxVertexBufferHandle, _access:Int )="_bgfx_encoder_set_compute_vertex_buffer"
+Function bgfxEncoderSetComputeVertexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:Int, _access:Int )="_bgfx_encoder_set_compute_vertex_buffer"
 
 '  void bgfx_encoder_set_compute_dynamic_index_buffer(struct bgfx_encoder_s* _encoder, int _stage, bgfx_dynamic_index_buffer_handle_object _handle, int _access);
-Function bgfxEncoderSetComputeDynamicIndexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:BgfxDynamicIndexBufferHandle, _access:Int )="_bgfx_encoder_set_compute_dynamic_index_buffer"
+Function bgfxEncoderSetComputeDynamicIndexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:Int, _access:Int )="_bgfx_encoder_set_compute_dynamic_index_buffer"
 
 '  void bgfx_encoder_set_compute_dynamic_vertex_buffer(struct bgfx_encoder_s* _encoder, int _stage, bgfx_dynamic_vertex_buffer_handle_object _handle, int _access);
-Function bgfxEncoderSetComputeDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:BgfxDynamicVertexBufferHandle, _access:Int )="_bgfx_encoder_set_compute_dynamic_vertex_buffer"
+Function bgfxEncoderSetComputeDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:Int, _access:Int )="_bgfx_encoder_set_compute_dynamic_vertex_buffer"
 
 '  void bgfx_encoder_set_compute_indirect_buffer(struct bgfx_encoder_s* _encoder, int _stage, bgfx_indirect_buffer_handle_object _handle, int _access);
-Function bgfxEncoderSetComputeIndirectBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:BgfxIndirectBufferHandle, _access:Int )="_bgfx_encoder_set_compute_indirect_buffer"
+Function bgfxEncoderSetComputeIndirectBuffer:Void( _encoder:BgfxEncoder, _stage:Int, _handle:Int, _access:Int )="_bgfx_encoder_set_compute_indirect_buffer"
 
 '  void bgfx_encoder_dispatch(struct bgfx_encoder_s* _encoder, int _id, bgfx_program_handle_object _handle, int _numX, int _numY, int _numZ, int _flags);
-Function bgfxEncoderDispatch:Void( _encoder:BgfxEncoder, _id:Int, _handle:BgfxProgramHandle, _numX:Int=1, _numY:Int=1, _numZ:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_encoder_dispatch"
+Function bgfxEncoderDispatch:Void( _encoder:BgfxEncoder, _id:Int, _handle:Int, _numX:Int=1, _numY:Int=1, _numZ:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_encoder_dispatch"
 
 '  void bgfx_encoder_dispatch_indirect(struct bgfx_encoder_s* _encoder, int _id, bgfx_program_handle_object _handle, bgfx_indirect_buffer_handle_object _indirectHandle, int _start, int _num, int _flags);
-Function bgfxEncoderDispatchIndirect:Void( _encoder:BgfxEncoder, _id:Int, _handle:BgfxProgramHandle, _indirectHandle:BgfxIndirectBufferHandle, _start:Int=0, _num:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_encoder_dispatch_indirect"
+Function bgfxEncoderDispatchIndirect:Void( _encoder:BgfxEncoder, _id:Int, _handle:Int, _indirectHandle:Int, _start:Int=0, _num:Int=1, _flags:Int=BGFX_SUBMIT_EYE_FIRST )="_bgfx_encoder_dispatch_indirect"
 
 '  void bgfx_encoder_discard(struct bgfx_encoder_s* _encoder);
 Function bgfxEncoderDiscard:Void( _encoder:BgfxEncoder )="_bgfx_encoder_discard"
 
 '  void bgfx_encoder_blit(struct bgfx_encoder_s* _encoder, int _id, bgfx_texture_handle_object _dst, int _dstMip, int _dstX, int _dstY, int _dstZ, bgfx_texture_handle_object _src, int _srcMip, int _srcX, int _srcY, int _srcZ, int _width, int _height, int _depth);
-Function bgfxEncoderBlit:Void( _encoder:BgfxEncoder, _id:Int, _dst:BgfxTextureHandle, _dstX:Int, _dstY:Int, _src:BgfxTextureHandle, _srcX:Int=0, _srcY:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX )="_bgfx_encoder_blit"
-Function bgfxEncoderBlit:Void( _encoder:BgfxEncoder, _id:Int, _dst:BgfxTextureHandle, _dstMip:Int, _dstX:Int, _dstY:Int, _dstZ:Int, _src:BgfxTextureHandle, _srcMip:Int=0, _srcX:Int=0, _srcY:Int=0, _srcZ:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX, _depth:Int=UINT16_MAX )="_bgfx_encoder_blit"
+Function bgfxEncoderBlit:Void( _encoder:BgfxEncoder, _id:Int, _dst:Int, _dstX:Int, _dstY:Int, _src:Int, _srcX:Int=0, _srcY:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX )="_bgfx_encoder_blit"
+Function bgfxEncoderBlit:Void( _encoder:BgfxEncoder, _id:Int, _dst:Int, _dstMip:Int, _dstX:Int, _dstY:Int, _dstZ:Int, _src:Int, _srcMip:Int=0, _srcX:Int=0, _srcY:Int=0, _srcZ:Int=0, _width:Int=UINT16_MAX, _height:Int=UINT16_MAX, _depth:Int=UINT16_MAX )="_bgfx_encoder_blit"
 
 '  void bgfx_request_screen_shot(bgfx_frame_buffer_handle_object _handle, const char* _filePath);
-Function bgfxRequestScreenShot:Void( _handle:BgfxFrameBufferHandle, _filePath:String )="_bgfx_request_screen_shot"
+Function bgfxRequestScreenShot:Void( _handle:Int, _filePath:String )="_bgfx_request_screen_shot"
 
 ' direct copy from opengl.gles20.cxs
 Function BBLoadImageData:BBDataBuffer( buf:BBDataBuffer,path$,info[]=[] )="BBLoadImageData"
@@ -1173,8 +1182,8 @@ Function BBLoadImageData:BBDataBuffer( buf:BBDataBuffer,path$,info[]=[] )="BBLoa
 ' bgfx utils
 '-------------------------------------------------------------------------------
 
-Function bgfxUtilsCalcTangents:Void(_vertices:DataBuffer, _numVertices:Int, _decl:BgfxVertexDecl, _indices:DataBuffer, _numIndices)="_bgfx_utils_calc_tangents"
-Function bgfxUtilsLoadTexture:Void( _handle:BgfxTextureHandle, _dataBuffer:DataBuffer, _flags:Int )="_bgfx_utils_load_texture"
+Function bgfxUtilsCalcTangents:Void( _vertices:DataBuffer, _numVertices:Int, _decl:BgfxVertexDecl, _indices:DataBuffer, _numIndices:Int )="_bgfx_utils_calc_tangents"
+Function bgfxUtilsLoadTexture:Int( _dataBuffer:DataBuffer, _flags:Int )="_bgfx_utils_load_texture"
 
 Public
 
@@ -1186,48 +1195,6 @@ End
 Function bgfxUtilsSet64Bit:Void( numbers:Int[], value:Int[] )
 	numbers[0] |= value[0]
 	numbers[1] |= value[1]
-End
-
-Function bgfxUtilsCreateVertexBuffer:BgfxVertexBufferHandle( _mem:BgfxMemory, _decl:BgfxVertexDecl, _flags=BGFX_BUFFER_NONE )
-	Local _handle := New BgfxVertexBufferHandle()
-	bgfxCreateVertexBuffer( _handle, _mem, _decl, _flags )
-	Return _handle
-End
-
-Function bgfxUtilsCreateIndexBuffer:BgfxIndexBufferHandle( _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )
-	Local _handle := New BgfxIndexBufferHandle()
-	bgfxCreateIndexBuffer( _handle, _mem, _flags )
-	Return _handle
-End
-
-Function bgfxUtilsCreateFrameBuffer:BgfxFrameBufferHandle( _width:Int, _height:Int, _format:Int ) ' _textureFlags:Int[] )
-	Local _handle := New BgfxFrameBufferHandle()
-	bgfxCreateFrameBuffer( _handle, _width, _height, _format )
-	Return _handle
-End
-
-Function bgfxUtilsCreateFrameBufferScaled:BgfxFrameBufferHandle( _ratio:Int, _format:Int ) ' _textureFlags:Int[] )
-	Local _handle := New BgfxFrameBufferHandle()
-	bgfxCreateFrameBufferScaled( _handle, _ratio, _format )
-	Return _handle
-End
-
-Function bgfxUtilsCreateTexture2D:BgfxTextureHandle( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int )
-	Local _handle := New BgfxTextureHandle()
-	bgfxCreateTexture2D( _handle, _width, _height, _hasMips, _numLayers, _format )
-	Return _handle
-End
-
-Function bgfxUtilsCreateTexture2D:BgfxTextureHandle( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[] )
-	Local _handle := New BgfxTextureHandle()
-	bgfxCreateTexture2D( _handle, _width, _height, _hasMips, _numLayers, _format, _flags )
-	Return _handle
-End
-
-Function bgfxUtilsCreateTexture2D:BgfxTextureHandle( _width:Int, _height:Int, _hasMips:Bool, _numLayers:Int, _format:Int, _flags:Int[], _mem:BgfxMemory )
-	Local _handle := New BgfxTextureHandle()
-	bgfxCreateTexture2D( _handle, _width, _height, _hasMips, _numLayers, _format, _flags, _mem )
-	Return _handle
 End
 
 Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer )
@@ -1242,13 +1209,7 @@ Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer, _size:Int )
 	Return _mem
 End
 
-Function bgfxUtilsCreateUniform:BgfxUniformHandle( _name:String, _type:Int, _num:Int=1 )
-	Local _handle := New BgfxUniformHandle()
-	bgfxCreateUniform( _handle, _name, _type, _num )
-	Return _handle
-End
-
-Function bgfxUtilsLoadShader:BgfxShaderHandle( _name:String )
+Function bgfxUtilsLoadShader:Int( _name:String )
 
 	Local filePath:String = "cerberus://data/"
 
@@ -1278,22 +1239,23 @@ Function bgfxUtilsLoadShader:BgfxShaderHandle( _name:String )
 
 	Print "filePath=" + filePath
 
-	Local handle:= New BgfxShaderHandle()
-	Local data:DataBuffer = DataBuffer.Load( filePath )
-	If data = Null Then
-		DebugLog("Error - Unable to load shader: " + filePath)
-	Else
-		bgfxCreateShader( handle, bgfxUtilsMakeRef( data ) )
+	Local handle :Int = BGFX_INVALID_HANDLE
+	Local data   := DataBuffer.Load( filePath )
+
+	If data Then
+		handle = bgfxCreateShader( bgfxUtilsMakeRef( data ) )
 		bgfxSetShaderName( handle, filePath )
+	Else
+		DebugLog("Error - Unable to load shader: " + filePath)
 	Endif
 
 	Return handle
 End
 
-Function bgfxUtilsLoadProgram:BgfxProgramHandle( _vsName:String, _fsName:String="" )
+Function bgfxUtilsLoadProgram:Int( _vsName:String, _fsName:String="" )
 
-	Local vsh:BgfxShaderHandle = bgfxUtilsLoadShader( _vsName )
-	Local fsh:BgfxShaderHandle = Null
+	Local vsh:Int = bgfxUtilsLoadShader( _vsName )
+	Local fsh:Int = BGFX_INVALID_HANDLE
 
 	If _fsName <> "" Then
 		fsh = bgfxUtilsLoadShader( _fsName )
@@ -1301,35 +1263,24 @@ Function bgfxUtilsLoadProgram:BgfxProgramHandle( _vsName:String, _fsName:String=
 
 	Local destroyShaders:Bool = True ' destroy shaders when program is destroyed 
 
-	Local handle:= New BgfxProgramHandle()
-	bgfxCreateProgram( handle, vsh, fsh, destroyShaders )
-	Return handle
+	Return bgfxCreateProgram( vsh, fsh, destroyShaders )
 End
 
-'bgfx::TextureHandle loadTexture(const char* _name, uint32_t _flags, uint8_t _skip, bgfx::TextureInfo* _info, bimg::Orientation::Enum* _orientation)
-'{
-'	return loadTexture(entry::getFileReader(), _name, _flags, _skip, _info, _orientation);
-'}
-'bgfx::TextureHandle loadTexture(const char* _name, uint32_t _flags = BGFX_SAMPLER_NONE, uint8_t _skip = 0, bgfx::TextureInfo* _info = NULL, bimg::Orientation::Enum* _orientation = NULL);
+Function bgfxUtilsLoadTexture:Int( _name:String, _flags:Int=BGFX_SAMPLER_NONE ) ', _flags:Int=BGFX_SAMPLER_NONE, _skip:Int=0 )
 
-Function bgfxUtilsLoadTexture:BgfxTextureHandle( _name:String, _flags:Int=BGFX_SAMPLER_NONE ) ', _flags:Int=BGFX_SAMPLER_NONE, _skip:Int=0 )
+	Local filePath :String = "cerberus://data/" + _name
+	Local handle   :Int = BGFX_INVALID_HANDLE
+	Local data     := DataBuffer.Load( filePath )
 
-	Local filePath:String = "cerberus://data/" + _name
-
-	Local handle := New BgfxTextureHandle()
-	Local data:DataBuffer = DataBuffer.Load( filePath )
-
-	If data = Null Then
-		DebugLog("Error - Unable to load texture: " + filePath)
-	Else
+	If data Then
 		Print "data.Length()=" + data.Length()
-		bgfxUtilsLoadTexture( handle, data, _flags )
+		handle = bgfxUtilsLoadTexture( data, _flags )
+	Else
+		DebugLog("Error - Unable to load texture: " + filePath)
 	Endif
 
 	Return handle
 End
-
-' Function bgfxUtilsCreateTextureCube:BgfxTextureHandle
 
 '-------------------------------------------------------------------------------
 ' load image
@@ -1374,18 +1325,18 @@ Class BgfxUtilsPrimitive
 	Field m_startVertex :Int
 	Field m_numVertices :Int
 
-	Field m_sphere := New BgfxUtilsSphere()
-	Field m_aabb   := New BgfxUtilsAabb()
-	Field m_obb    := New BgfxUtilsObb()
+	Field m_sphere      := New BgfxUtilsSphere()
+	Field m_aabb        := New BgfxUtilsAabb()
+	Field m_obb         := New BgfxUtilsObb()
 End
 
 Class BgfxUtilsGroup
 
-	Field m_vbMem := New BgfxMemory()
-	Field m_ibMem := New BgfxMemory()
+	Field m_vbMem  := New BgfxMemory()
+	Field m_ibMem  := New BgfxMemory()
 
-	Field m_vbh := New BgfxVertexBufferHandle()
-	Field m_ibh := New BgfxIndexBufferHandle()
+	Field m_vbh    :Int
+	Field m_ibh    :Int
 
 	Field m_sphere := New BgfxUtilsSphere()
 	Field m_aabb   := New BgfxUtilsAabb()
@@ -1578,7 +1529,7 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 			bgfxCopy(group.m_vbMem, buffer, address, size)
 			address += size
 
-			bgfxCreateVertexBuffer(group.m_vbh, group.m_vbMem, mesh.m_decl)
+			group.m_vbh = bgfxCreateVertexBuffer(group.m_vbMem, mesh.m_decl)
 
 		Case BGFX_CHUNK_MAGIC_IB
 			Local numIndices :Int = buffer.PeekInt(address); address += 4
@@ -1587,7 +1538,7 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 			bgfxAlloc(group.m_ibMem, size)
 			bgfxCopy(group.m_ibMem, buffer, address, size); address += size
 
-			bgfxCreateIndexBuffer(group.m_ibh, group.m_ibMem)
+			group.m_ibh = bgfxCreateIndexBuffer(group.m_ibMem)
 
 		Case BGFX_CHUNK_MAGIC_IBC
 			Print "TODO BGFX_CHUNK_MAGIC_IBC"
@@ -1661,7 +1612,7 @@ Function IntToHex:String(number:Int)
 	Return str
 End
 
-Function bgfxUtilsMeshSubmit:Void(_mesh:BgfxUtilsMesh, _id:Int, _program:BgfxProgramHandle, _mtx:Float[], _state:Int[]=BGFX_STATE_MASK)
+Function bgfxUtilsMeshSubmit:Void(_mesh:BgfxUtilsMesh, _id:Int, _program:Int, _mtx:Float[], _state:Int[]=BGFX_STATE_MASK)
 
 	If _state[0] = BGFX_STATE_MASK[0] And _state[1] = BGFX_STATE_MASK[1] Then
 		bgfxUtilsClear64Bit(_state)
@@ -1708,11 +1659,11 @@ End
 '  End
 '  
 '  '  void bgfx_submit(int _id, bgfx_program_handle_object _handle, int _depth, bool _preserveState);
-'  '  Function bgfxSubmit:Void( _id:Int, _program:BgfxProgramHandle, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit"
+'  '  Function bgfxSubmit:Void( _id:Int, _program:Int, _depth:Int=0, _preserveState:Bool=False )="_bgfx_submit"
 '  
 '  Function bgfxUtilsMeshLoad:Void(mesh:BgfxUtilsMesh, filePath:String)="_bgfx_utils_mesh_load"
 '  Function bgfxUtilsMeshUnload:Void(mesh:BgfxUtilsMesh)="_bgfx_utils_mesh_unload"
-'  Function bgfxUtilsMeshSubmit:Void(mesh:BgfxUtilsMesh, _id:Int, _program:BgfxProgramHandle, _mtx:Float[], _state:Int[]=BGFX_STATE_MASK)="_bgfx_utils_mesh_submit"
+'  Function bgfxUtilsMeshSubmit:Void(mesh:BgfxUtilsMesh, _id:Int, _program:Int, _mtx:Float[], _state:Int[]=BGFX_STATE_MASK)="_bgfx_utils_mesh_submit"
 '  
 '  Public
 '  

@@ -1,6 +1,8 @@
 
-#GLFW_WINDOW_WIDTH  = 1280
-#GLFW_WINDOW_HEIGHT = 720
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
 
 ' using DrawText to draw some bgfx debug text
 '  Import mojo1bgfx
@@ -53,8 +55,19 @@ Class MeshExample Extends App
 '  	Field m_debug   :Int = BGFX_DEBUG_TEXT
 
 	Field m_mesh    :BgfxUtilsMesh
-	Field m_program :BgfxProgramHandle
-	Field u_time    := New BgfxUniformHandle()
+	Field m_program :Int
+	Field u_time    :Int
+
+	Field bgfxCaps  := New BgfxCaps()
+
+	Field at        :Float[] = [ 0.0, 1.0,  0.0 ]
+	Field eye       :Float[] = [ 0.0, 1.0, -2.5 ]
+
+	Field time      :Float[4]
+
+	Field view      :Float[16]
+	Field proj      :Float[16]
+	Field mtx       :Float[16]
 
 	Method OnCreate:Int()
 
@@ -66,7 +79,7 @@ Class MeshExample Extends App
 		' Set view 0 clear state.
 		bgfxSetViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0)
 
-		bgfxCreateUniform(u_time, "u_time", BGFX_UNIFORM_TYPE_VEC4)
+		u_time = bgfxCreateUniform("u_time", BGFX_UNIFORM_TYPE_VEC4)
 
 		' Create program from shaders.
 		m_program = bgfxUtilsLoadProgram("vs_mesh", "fs_mesh")
@@ -79,17 +92,6 @@ Class MeshExample Extends App
 	Method OnUpdate:Int()
 		Return 0
 	End
-
-	Field bgfxCaps := New BgfxCaps()
-
-	Field at   :Float[] = [ 0.0, 1.0,  0.0 ]
-	Field eye  :Float[] = [ 0.0, 1.0, -2.5 ]
-
-	Field time :Float[4]
-
-	Field view :Float[16]
-	Field proj :Float[16]
-	Field mtx  :Float[16]
 
 	Method OnRender:Int()
 
@@ -121,6 +123,9 @@ Class MeshExample Extends App
 		bxMtxRotateXY(mtx, 0.0, time[0] * 0.37)
 		Print "time[0]=" + time[0]
 
+		'
+		' @Bug: the bunny should be rotating
+		'
 		bgfxUtilsMeshSubmit(m_mesh, 0, m_program, mtx)
 
 		' Advance to next frame. Rendering thread will be kicked to
