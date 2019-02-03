@@ -581,6 +581,7 @@ Function bxMtxSRT:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float, _ax:Fl
 Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_translate"
 Function bxVec3MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx"
 Function bxSquare:Float( _a:Float )="_bx_square"
+Function bxMtxScale:Float( _result:Float[], _sx:Float, _sy:Float, _sz:Float )="_bx_mtx_scale"
 
 
 
@@ -1627,11 +1628,11 @@ Function bgfxUtilsMeshSubmit:Void(_mesh:BgfxUtilsMesh, _id:Int, _program:Int, _m
 	' 0x 01000060 0000001f
 '  	Print "_state=$" + IntToHex(_state[0]) + " $" + IntToHex(_state[1])
 
-'  	If _mtx = [] Then
+	If _mtx Then
+		bgfxSetTransform(_mtx)
+	Else
 		bgfxSetTransformNull()
-'  	Else
-'  		bgfxSetTransform(_mtx)
-'  	Endif
+	Endif
 
 	bgfxSetState(_state)
 
@@ -1651,6 +1652,30 @@ Function bgfxUtilsMeshSubmit:Void(_mesh:BgfxUtilsMesh, _id:Int, _program:Int, _m
 	Next
 End
 
+'  '/ Blend function separate.
+'  Function BGFX_STATE_BLEND_FUNC_SEPARATE:Void( state:Int[], _srcRGB:Int[], _dstRGB:Int[], _srcA:Int[], _dstA:Int[] )
+'  	' (UINT64_C(0) \
+'  	'		| ( ( (uint64_t)(_srcRGB)|( (uint64_t)(_dstRGB)<<4) )   )               \
+'  	'		| ( ( (uint64_t)(_srcA  )|( (uint64_t)(_dstA  )<<4) )<<8)               \
+'  	state[1] |= _srcRGB[1] | (_dstRGB[1] Shl 4) | (_srcA[1] Shl 8) | (_dstA[1] Shl 12)
+'  End
+'  
+'  '/ Blend equation separate.
+'  Function BGFX_STATE_BLEND_EQUATION_SEPARATE:Void( state:Int[], _equationRGB:Int[], _equationA:Int[] )
+'  	' ( (uint64_t)(_equationRGB)|( (uint64_t)(_equationA)<<3) )
+'  	state[0] |= ((_equationA[1] Shr (BGFX_STATE_BLEND_EQUATION_SHIFT+1)) & 3)
+'  	state[1] |= _equationRGB[1] | (_equationA[1] Shl 3)
+'  End
+'  
+'  '/ Blend function.
+'  Function BGFX_STATE_BLEND_FUNC:Void( state:Int[], _src:Int[], _dst:Int[] )
+'  	BGFX_STATE_BLEND_FUNC_SEPARATE( state, _src, _dst, _src, _dst )
+'  End
+'  
+'  '/ Blend equation.
+'  Function BGFX_STATE_BLEND_EQUATION:Void( state:Int[], _equation:Int[] )
+'  	BGFX_STATE_BLEND_EQUATION_SEPARATE( state, _equation, _equation )
+'  End
 
 '  Extern
 '  

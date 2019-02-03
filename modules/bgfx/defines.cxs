@@ -152,6 +152,7 @@ Global BGFX_STATE_DEFAULT                 :Int[] = [ $01000050, $0000001F ]  '!<
 '  Const BGFX_STATE_BLEND_ALPHA (0                                                       \
 '  	| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) \
 '  	)
+Global BGFX_STATE_BLEND_ALPHA:Int[] = [ $00000000, $06565000 ]
 
 '/ Selects darker color of blend.
 '  Const BGFX_STATE_BLEND_DARKEN (0                                      \

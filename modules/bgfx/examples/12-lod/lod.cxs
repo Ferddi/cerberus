@@ -1,0 +1,312 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'  Import mojo.app
+'  Import bgfx
+
+Import mojo.input
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+Class KnightPos
+
+	Field m_x:Int
+	Field m_y:Int
+
+	Method New( x:Int, y:Int )
+		Self.m_x = x
+		Self.m_y = y
+	End
+End
+
+Global knightTour:KnightPos[] = [
+
+	New KnightPos(0,0), New KnightPos(1,2), New KnightPos(3,3), New KnightPos(4,1),
+	New KnightPos(5,3), New KnightPos(7,2), New KnightPos(6,0), New KnightPos(5,2),
+
+	New KnightPos(7,3), New KnightPos(6,1), New KnightPos(4,0), New KnightPos(3,2),
+	New KnightPos(2,0), New KnightPos(0,1), New KnightPos(1,3), New KnightPos(2,1),
+
+	New KnightPos(0,2), New KnightPos(1,0), New KnightPos(2,2), New KnightPos(0,3),
+	New KnightPos(1,1), New KnightPos(3,0), New KnightPos(4,2), New KnightPos(5,0),
+
+	New KnightPos(7,1), New KnightPos(6,3), New KnightPos(5,1), New KnightPos(7,0),
+	New KnightPos(6,2), New KnightPos(4,3), New KnightPos(3,1), New KnightPos(2,3) ]
+
+Class LodExample Extends App
+
+'  	Field m_debug           :Int = BGFX_DEBUG_NONE
+	Field m_debug           :Int = BGFX_DEBUG_TEXT
+	Field m_reset           :Int = BGFX_RESET_VSYNC
+
+	Field m_meshTop         :BgfxUtilsMesh[3]
+	Field m_meshTrunk       :BgfxUtilsMesh[3]
+
+	Field m_program         :Int
+	Field s_texColor        :Int
+	Field s_texStipple      :Int
+	Field u_stipple         :Int
+
+	Field m_textureStipple  :Int
+	Field m_textureLeafs    :Int
+	Field m_textureBark     :Int
+
+	Field m_scrollArea      :Int
+	Field m_transitionFrame :Int
+	Field m_currLod         :Int
+	Field m_targetLod       :Int
+	Field m_transitions     :bool
+
+	Field m_distance        :Float
+
+	Field stippleTex := New BgfxMemory()
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		s_texColor   = bgfxCreateUniform( "s_texColor",   BGFX_UNIFORM_TYPE_INT1 )
+		s_texStipple = bgfxCreateUniform( "s_texStipple", BGFX_UNIFORM_TYPE_INT1 )
+		u_stipple    = bgfxCreateUniform( "u_stipple",    BGFX_UNIFORM_TYPE_VEC4 )
+
+		m_program = bgfxUtilsLoadProgram( "vs_tree", "fs_tree" )
+
+		m_textureLeafs = bgfxUtilsLoadTexture( "textures/leafs1.dds" )
+		m_textureBark  = bgfxUtilsLoadTexture( "textures/bark1.dds" )
+
+		Local stippleTexDataBuffer := New DataBuffer( 8 * 4 )
+
+		For Local ii:Int = 0 Until stippleTexDataBuffer.Length()
+			stippleTexDataBuffer.PokeByte( ii, 0 )
+		Next
+
+		For Local ii:Int = 0 Until knightTour.Length()
+			stippleTexDataBuffer.PokeByte( knightTour[ii].m_y * 8 + knightTour[ii].m_x, ii * 4 )
+		Next
+
+		bgfxMakeRef( stippleTex, stippleTexDataBuffer )
+
+		Local flags:Int[2]
+
+		flags[0] = 0
+		flags[1] = BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIN_POINT
+		m_textureStipple = bgfxCreateTexture2D( 8, 4, False, 1, BGFX_TEXTURE_FORMAT_R8, flags, stippleTex )
+
+		m_meshTop[0] = bgfxUtilsMeshLoad( "meshes/tree1b_lod0_1.bin" )
+		m_meshTop[1] = bgfxUtilsMeshLoad( "meshes/tree1b_lod1_1.bin" )
+		m_meshTop[2] = bgfxUtilsMeshLoad( "meshes/tree1b_lod2_1.bin" )
+
+		m_meshTrunk[0] = bgfxUtilsMeshLoad( "meshes/tree1b_lod0_2.bin" )
+		m_meshTrunk[1] = bgfxUtilsMeshLoad( "meshes/tree1b_lod1_2.bin" )
+		m_meshTrunk[2] = bgfxUtilsMeshLoad( "meshes/tree1b_lod2_2.bin" )
+
+		m_scrollArea  = 0
+		m_transitions = True
+
+		m_transitionFrame = 0
+		m_currLod         = 0
+		m_targetLod       = 0
+
+		m_distance = 2.0
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+
+		If KeyDown( KEY_UP   ) Then
+			m_distance -= 0.1
+			m_distance = Clamp( m_distance, 2.0, 6.0 )
+		Endif
+
+		If KeyDown( KEY_DOWN ) Then
+			m_distance += 0.1
+			m_distance = Clamp( m_distance, 2.0, 6.0 )
+		Endif
+
+		If KeyHit( KEY_SPACE ) Then
+			If m_transitions Then
+				m_transitions = False
+			Else
+				m_transitions = True
+			Endif
+		Endif
+
+		Return 0
+	End
+
+'  	Method OnClose:Int()
+'  
+'  		For Local ii:Int = 0 Until m_meshTop.Length()
+'  			bgfxUtilsMeshUnload( m_meshTop[ ii ] )
+'  			bgfxUtilsMeshUnload( m_meshTrunk[ ii ] )
+'  		Next
+'  
+'  		bgfxDestroyProgram( m_program )
+'  
+'  		bgfxDestroyUniform( s_texColor )
+'  		bgfxDestroyUniform( s_texStipple )
+'  		bgfxDestroyUniform( u_stipple )
+'  
+'  		bgfxDestroyTexture( m_textureStipple )
+'  		bgfxDestroyTexture( m_textureLeafs )
+'  		bgfxDestroyTexture( m_textureBark )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field bgfxCaps   := New BgfxCaps()
+
+	Field at         :Float[] = [ 0.0, 1.0,  0.0 ]
+	Field eye        :Float[] = [ 0.0, 2.0, -2.0 ]
+	Field view       :Float[ 16 ]
+	Field proj       :Float[ 16 ]
+	Field mtx        :Float[ 16 ]
+	Field stipple    :Float[  3 ]
+	Field stippleInv :Float[  3 ]
+
+	Field stateTransparent :Int[2]
+	Field stateOpaque      :Int[2]
+
+	Method OnRender:Int()
+
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect( 0, 0, 0, m_width, m_height )
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch(0);
+
+		eye[2] = -m_distance
+
+		' Set view and projection matrix for view 0.
+		bxMtxLookAt(view, eye, at)
+
+		bgfxGetCaps( bgfxCaps )
+		bxMtxProj(proj, 60.0, Float(m_width)/Float(m_height), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth())
+		bgfxSetViewTransform(0, view, proj)
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect(0, 0, 0, m_width, m_height )
+
+		bxMtxScale(mtx, 0.1, 0.1, 0.1)
+		mtx[ 0] = 0.1 ; mtx[ 1] = 0.0 ; mtx[ 2] = 0.0 ; mtx[ 3] = 0.0
+		mtx[ 4] = 0.0 ; mtx[ 5] = 0.1 ; mtx[ 6] = 0.0 ; mtx[ 7] = 0.0
+		mtx[ 8] = 0.0 ; mtx[ 9] = 0.0 ; mtx[10] = 0.1 ; mtx[11] = 0.0
+		mtx[12] = 0.0 ; mtx[13] = 0.0 ; mtx[14] = 0.0 ; mtx[15] = 1.0
+
+		Local currentLODframe :Int = 32
+		Local mainLOD         :Int = m_targetLod
+
+		If m_transitions Then
+			currentLODframe = 32-m_transitionFrame
+			mainLOD         = m_currLod
+		Endif
+
+		stipple[0] = 0.0
+		stipple[1] = -1.0
+		stipple[2] = (Float(currentLODframe)*4.0/255.0) - (1.0/255.0)
+
+		stippleInv[0] = (Float(31)*4.0/255.0)
+		stippleInv[1] = 1.0
+		stippleInv[2] = (Float(m_transitionFrame)*4.0/255.0) - (1.0/255.0)
+
+		bgfxUtilsClear64Bit(stateTransparent)
+		bgfxUtilsSet64Bit(stateTransparent, BGFX_STATE_WRITE_RGB)
+		bgfxUtilsSet64Bit(stateTransparent, BGFX_STATE_WRITE_A)
+		bgfxUtilsSet64Bit(stateTransparent, BGFX_STATE_DEPTH_TEST_LESS)
+		bgfxUtilsSet64Bit(stateTransparent, BGFX_STATE_CULL_CCW)
+		bgfxUtilsSet64Bit(stateTransparent, BGFX_STATE_MSAA)
+		bgfxUtilsSet64Bit(stateTransparent, BGFX_STATE_BLEND_ALPHA)
+
+		bgfxUtilsClear64Bit(stateOpaque)
+		bgfxUtilsSet64Bit(stateOpaque, BGFX_STATE_DEFAULT)
+
+		bgfxSetTexture(0, s_texColor, m_textureBark)
+		bgfxSetTexture(1, s_texStipple, m_textureStipple)
+		bgfxSetUniform(u_stipple, stipple)
+		bgfxUtilsMeshSubmit(m_meshTrunk[mainLOD], 0, m_program, mtx, stateOpaque)
+
+		bgfxSetTexture(0, s_texColor, m_textureLeafs)
+		bgfxSetTexture(1, s_texStipple, m_textureStipple)
+		bgfxSetUniform(u_stipple, stipple)
+		bgfxUtilsMeshSubmit(m_meshTop[mainLOD], 0, m_program, mtx, stateTransparent)
+
+		If m_transitions And m_transitionFrame <> 0 Then
+
+			bgfxSetTexture(0, s_texColor, m_textureBark)
+			bgfxSetTexture(1, s_texStipple, m_textureStipple)
+			bgfxSetUniform(u_stipple, stippleInv)
+			bgfxUtilsMeshSubmit(m_meshTrunk[m_targetLod], 0, m_program, mtx, stateOpaque)
+
+			bgfxSetTexture(0, s_texColor, m_textureLeafs)
+			bgfxSetTexture(1, s_texStipple, m_textureStipple)
+			bgfxSetUniform(u_stipple, stippleInv)
+			bgfxUtilsMeshSubmit(m_meshTop[m_targetLod], 0, m_program, mtx, stateTransparent)
+		Endif
+
+		Local lod:Int = 0
+
+		If eye[2] < -2.5 Then
+			lod = 1
+		Endif
+
+		If eye[2] < -5.0 Then
+			lod = 2
+		Endif
+
+		If m_targetLod <> lod Then
+			If m_targetLod = m_currLod Then
+				m_targetLod = lod
+			Endif
+		Endif
+
+		If m_currLod <> m_targetLod Then
+			m_transitionFrame += 1
+		Endif
+
+		If m_transitionFrame > 32 Then
+			m_currLod = m_targetLod
+			m_transitionFrame = 0
+		Endif
+
+		DrawText("Transition : " + BoolToString( m_transitions ), 8, 14 * 1)
+		DrawText("Distance   : " + Float(m_distance), 8, 14 * 2)
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		' bgfxFrame()
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 12-lod"
+	Print "Description: Mesh LOD transitions."
+	New LodExample()
+	Return 0
+End

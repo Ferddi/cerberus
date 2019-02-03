@@ -1050,7 +1050,10 @@ float _bx_square( float _a )
 	return bx::square( _a );
 }
 
-
+void _bx_mtx_scale( Array<float> _result, float _sx, float _sy, float _sz )
+{
+	bx::mtxScale( &_result[0], _sx, _sy, _sz );
+}
 
 
 
