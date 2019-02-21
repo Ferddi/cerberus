@@ -1073,6 +1073,10 @@ Class StencilExample Extends App
 
 	Method OnRender:Int()
 
+		' reset clear values on used views
+		ClearViewMask( s_clearMask, BGFX_CLEAR_NONE, m_clearValues )
+		s_clearMask = 0
+
 		s_uniforms.SubmitConstUniforms()
 
 		' Update settings.
@@ -1464,11 +1468,7 @@ Class StencilExample Extends App
 		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
 		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
 		' it is done after method RenderGame(), where glfwSwapBuffers used to be
-		bgfxFrame() 
-
-		' reset clear values on used views
-		ClearViewMask( s_clearMask, BGFX_CLEAR_NONE, m_clearValues )
-		s_clearMask = 0
+		' bgfxFrame() 
 
 		Return 0
 	End
