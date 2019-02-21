@@ -1,0 +1,1497 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Import camera
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+Const RENDER_VIEWID_RANGE1_PASS_0:Int =  1
+Const RENDER_VIEWID_RANGE1_PASS_1:Int =  2
+Const RENDER_VIEWID_RANGE1_PASS_2:Int =  3
+Const RENDER_VIEWID_RANGE1_PASS_3:Int =  4
+Const RENDER_VIEWID_RANGE1_PASS_4:Int =  5
+Const RENDER_VIEWID_RANGE1_PASS_5:Int =  6
+Const RENDER_VIEWID_RANGE5_PASS_6:Int =  7
+Const RENDER_VIEWID_RANGE1_PASS_7:Int = 13
+
+Const MAX_NUM_LIGHTS:Int = 5
+
+Function EncodeNormalRgba8:Int(_x:Float, _y:Float=0.0, _z:Float=0.0, _w:Float=0.0)
+
+	Local srcx:Float = _x * 0.5 + 0.5
+	Local srcy:Float = _y * 0.5 + 0.5
+	Local srcz:Float = _z * 0.5 + 0.5
+	Local srcw:Float = _w * 0.5 + 0.5
+
+	Return (Int(srcw * 255) Shl 24) | (Int(srcz * 255) Shl 16) | (Int(srcy * 255) Shl 8) | Int(srcx * 255)
+End
+
+Class PosNormalTexcoordVertex
+
+	Field m_x      :Float
+	Field m_y      :Float
+	Field m_z      :Float
+
+	Field m_normal :Int
+
+	Field m_u      :Float
+	Field m_v      :Float
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_nx:Float, m_ny:Float, m_nz:Float, m_u:Float, m_v:Float )
+
+		Self.m_x      = m_x
+		Self.m_y      = m_y
+		Self.m_z      = m_z
+
+		Self.m_normal = EncodeNormalRgba8( m_nx, m_ny, m_nz )
+'  		Print "m_nx=" + m_nx + " m_ny=" + m_ny + " m_nz=" + m_nz + " m_normal=" + IntToHex(m_normal)
+
+		Self.m_u      = m_u
+		Self.m_v      = m_v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_NORMAL,    4, BGFX_ATTRIB_TYPE_UINT8, True, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Function PosNormalTexcoordVertexToDataBuffer:DataBuffer( _vertices:PosNormalTexcoordVertex[] )
+
+	Local bufferAddress  :Int = 0
+	Local verticesCount  :Int = _vertices.Length()
+
+	' there are 6 fields in PosNormalTexcoordVertex (m_x, m_y, m_z, m_normal, m_u & m_v)
+	' each field is 4 bytes in size:
+	Local verticesBuffer := New DataBuffer( verticesCount * 6 * 4 )
+
+	For Local ii:Int = 0 Until verticesCount
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+
+		verticesBuffer.PokeInt( bufferAddress, _vertices[ ii ].m_normal ) ; bufferAddress += 4
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_u ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_v ) ; bufferAddress += 4
+	Next
+
+	Return verticesBuffer
+End
+
+Function Index16ToDataBuffer:DataBuffer( _indices:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	' the size of each index is 16 bit, which is 2 bytes:
+	Local indicesBuffer := New DataBuffer( indicesCount * 2 )
+
+	For Local ii:Int = 0 Until indicesCount
+		indicesBuffer.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+
+	Return indicesBuffer
+End
+
+
+Const s_texcoord:Float = 5.0
+
+Global s_hplaneVertices:PosNormalTexcoordVertex[] = [
+	New PosNormalTexcoordVertex( -1.0, 0.0,  1.0, 0.0, 1.0, 0.0, s_texcoord, s_texcoord ),
+	New PosNormalTexcoordVertex(  1.0, 0.0,  1.0, 0.0, 1.0, 0.0, s_texcoord, 0.0        ),
+	New PosNormalTexcoordVertex( -1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0,        s_texcoord ),
+	New PosNormalTexcoordVertex(  1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0,        0.0        ) ]
+
+Global s_vplaneVertices:PosNormalTexcoordVertex[] = [
+	New PosNormalTexcoordVertex( -1.0,  1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0 ) ]
+
+Global s_cubeVertices:PosNormalTexcoordVertex[] = [
+	New PosNormalTexcoordVertex( -1.0,  1.0,  1.0,  0.0,  1.0,  0.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0,  1.0,  0.0,  1.0,  0.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex( -1.0,  1.0, -1.0,  0.0,  1.0,  0.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0, -1.0,  0.0,  1.0,  0.0, 0.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0,  1.0,  0.0, -1.0,  0.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0,  1.0,  0.0, -1.0,  0.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0, -1.0,  0.0, -1.0,  0.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0, -1.0,  0.0, -1.0,  0.0, 0.0, 0.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0,  1.0,  0.0,  0.0,  1.0, 0.0, 0.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0,  1.0,  0.0,  0.0,  1.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0,  1.0,  0.0,  0.0,  1.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0,  1.0,  1.0,  0.0,  0.0,  1.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0, -1.0,  0.0,  0.0, -1.0, 0.0, 0.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0, -1.0,  0.0,  0.0, -1.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0, -1.0,  0.0,  0.0, -1.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0,  1.0, -1.0,  0.0,  0.0, -1.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0, -1.0,  1.0,  0.0,  0.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0,  1.0,  1.0,  0.0,  0.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0, -1.0,  1.0,  0.0,  0.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0,  1.0,  1.0,  0.0,  0.0, 0.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0,  1.0, -1.0, -1.0,  0.0,  0.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex( -1.0,  1.0,  1.0, -1.0,  0.0,  0.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0, -1.0, -1.0,  0.0,  0.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0,  1.0, -1.0,  0.0,  0.0, 0.0, 0.0 ) ]
+
+Global s_cubeIndices:Int[] = [
+	0,  1,  2,
+	1,  3,  2,
+	4,  6,  5,
+	5,  6,  7,
+	8,  9,  10,
+	9,  11, 10,
+	12, 14, 13,
+	13, 14, 15,
+	16, 17, 18,
+	17, 19, 18,
+	20, 22, 21,
+	21, 22, 23 ]
+
+Global s_planeIndices:Int[] = [
+	0, 1, 2,
+	1, 3, 2 ]
+
+Global s_viewMask  :Int = 0
+Global s_clearMask :Int = 0
+Global s_texColor  :Int
+
+Function SetViewClearMask:Void( _viewMask:Int, _flags:Int, _rgba:Int, _depth:Float, _stencil:Int )
+
+	Local view     :Int = 0
+	Local viewMask :Int = _viewMask
+	Local ntz      :Int = bxCntTZ( _viewMask )
+
+	Repeat
+
+		viewMask Shr= ntz
+		view += ntz
+
+		bgfxSetViewClear( view, _flags, _rgba, _depth, _stencil )
+
+		viewMask Shr= 1
+		view += 1
+		ntz = bxCntTZ( viewMask )
+
+		If viewMask = 0 Then
+			Exit
+		Endif
+	Forever
+End
+
+Function SetViewTransformMask:Void( _viewMask:Int, _view:Float[], _proj:Float[] )
+
+	Local view     :Int = 0
+	Local viewMask :Int = _viewMask
+	Local ntz      :Int = bxCntTZ( _viewMask )
+
+	Repeat
+
+		viewMask Shr= ntz
+		view += ntz
+
+		bgfxSetViewTransform( view, _view, _proj )
+
+		viewMask Shr= 1
+		view += 1
+		ntz = bxCntTZ( viewMask )
+
+		If viewMask = 0 Then
+			Exit
+		Endif
+	Forever
+End
+
+Function SetViewRectMask:Void( _viewMask:Int, _x:Int, _y:Int, _width:Int, _height:Int )
+
+	Local view     :Int = 0
+	Local viewMask :Int = _viewMask
+	Local ntz      :Int = bxCntTZ( _viewMask )
+
+	Repeat
+
+		viewMask Shr= ntz
+		view += ntz
+
+		bgfxSetViewRect( view, _x, _y, _width, _height )
+
+		viewMask Shr= 1
+		view += 1
+		ntz = bxCntTZ( viewMask )
+
+		If viewMask = 0 Then
+			Exit
+		Endif
+	Forever
+End
+
+' _p - plane, _n - normal
+Function MtxReflected:Void( _result:Float[], _p:Float[], _n:Float[] )
+
+	Local dot:Float = bxVec3Dot( _p, _n )
+
+	_result[ 0] =  1.0 -   2.0 * _n[0] * _n[0]  ' 1-2Nx^2
+	_result[ 1] = -2.0 * _n[0] * _n[1]          ' -2*Nx*Ny
+	_result[ 2] = -2.0 * _n[0] * _n[2]          ' -2*NxNz
+	_result[ 3] =  0.0                          ' 0
+
+	_result[ 4] = -2.0 * _n[0] * _n[1]          ' -2*NxNy
+	_result[ 5] =  1.0 -   2.0 * _n[1] * _n[1]  ' 1-2*Ny^2
+	_result[ 6] = -2.0 * _n[1] * _n[2]          ' -2*NyNz
+	_result[ 7] =  0.0                          ' 0
+
+	_result[ 8] = -2.0 * _n[0] * _n[2]          ' -2*NxNz
+	_result[ 9] = -2.0 * _n[1] * _n[2]          ' -2NyNz
+	_result[10] =  1.0 -   2.0 * _n[2] * _n[2]  ' 1-2*Nz^2
+	_result[11] =  0.0                          ' 0
+
+	_result[12] =  2.0 * dot * _n[0]            ' 2*dot*Nx
+	_result[13] =  2.0 * dot * _n[1]            ' 2*dot*Ny
+	_result[14] =  2.0 * dot * _n[2]            ' 2*dot*Nz
+	_result[15] =  1.0                          ' 1
+End
+
+Function MtxShadow:Void( _result:Float[], _ground:Float[], _light:Float[] )
+
+	Local dot:Float = _ground[0] * _light[0] + _ground[1] * _light[1] + _ground[2] * _light[2] + _ground[3] * _light[3]
+
+	_result[ 0] = dot - _light[0] * _ground[0]
+	_result[ 1] = 0.0 - _light[1] * _ground[0]
+	_result[ 2] = 0.0 - _light[2] * _ground[0]
+	_result[ 3] = 0.0 - _light[3] * _ground[0]
+
+	_result[ 4] = 0.0 - _light[0] * _ground[1]
+	_result[ 5] = dot - _light[1] * _ground[1]
+	_result[ 6] = 0.0 - _light[2] * _ground[1]
+	_result[ 7] = 0.0 - _light[3] * _ground[1]
+
+	_result[ 8] = 0.0 - _light[0] * _ground[2]
+	_result[ 9] = 0.0 - _light[1] * _ground[2]
+	_result[10] = dot - _light[2] * _ground[2]
+	_result[11] = 0.0 - _light[3] * _ground[2]
+
+	_result[12] = 0.0 - _light[0] * _ground[3]
+	_result[13] = 0.0 - _light[1] * _ground[3]
+	_result[14] = 0.0 - _light[2] * _ground[3]
+	_result[15] = dot - _light[3] * _ground[3]
+End
+
+Function MtxBillboard:Void( _result:Float[], _view:Float[], _pos:Float[], _scale:Float[] )
+
+	_result[ 0] = _view[0]  * _scale[0]
+	_result[ 1] = _view[4]  * _scale[0]
+	_result[ 2] = _view[8]  * _scale[0]
+	_result[ 3] = 0.0
+
+	_result[ 4] = _view[1]  * _scale[1]
+	_result[ 5] = _view[5]  * _scale[1]
+	_result[ 6] = _view[9]  * _scale[1]
+	_result[ 7] = 0.0
+
+	_result[ 8] = _view[2]  * _scale[2]
+	_result[ 9] = _view[6]  * _scale[2]
+	_result[10] = _view[10] * _scale[2]
+	_result[11] = 0.0
+
+	_result[12] = _pos[0]
+	_result[13] = _pos[1]
+	_result[14] = _pos[2]
+	_result[15] = 1.0
+End
+
+Const UNIFORMS_PARAMS_AMBIENT_PASS  :Int = 0
+Const UNIFORMS_PARAMS_LIGHTING_PASS :Int = 1
+Const UNIFORMS_PARAMS_LIGHT_COUNT   :Int = 2
+Const UNIFORMS_PARAMS_LIGHT_INDEX   :Int = 3
+
+Class UniformsParams
+
+	Field toArray        :Float[4]
+
+	Field m_ambientPass  :Float
+	Field m_lightingPass :Float
+	Field m_lightCount   :Float
+	Field m_lightIndex   :Float
+
+	Method ToArray:Float[]()
+		toArray[0] = m_ambientPass
+		toArray[1] = m_lightingPass
+		toArray[2] = m_lightCount
+		toArray[3] = m_lightIndex
+	End
+End
+
+Class UniformsSvParams
+
+	Field toArray         :Float[4]
+
+	Field m_useStencilTex :Float
+	Field m_dfail         :Float
+	Field m_unused0       :Float
+	Field m_unused1       :Float
+
+	Method ToArray:Float[]()
+		toArray[0] = m_useStencilTex
+		toArray[1] = m_dfail
+		toArray[2] = m_unused0
+		toArray[3] = m_unused1
+	End
+End
+
+Class Uniforms
+
+	Method Init:Void()
+
+'		m_params.m_ambientPass   = 1.0
+'		m_params.m_lightingPass  = 1.0
+'		m_params.m_lightCount    = 4.0
+'		m_params.m_lightIndex    = 4.0
+
+		m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
+		m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
+		m_params[ UNIFORMS_PARAMS_LIGHT_COUNT   ] = 4.0
+		m_params[ UNIFORMS_PARAMS_LIGHT_INDEX   ] = 4.0
+
+		m_ambient[0] = 0.02
+		m_ambient[1] = 0.02
+		m_ambient[2] = 0.02
+		m_ambient[3] = 0.0  ' unused
+
+		m_diffuse[0] = 0.2
+		m_diffuse[1] = 0.2
+		m_diffuse[2] = 0.2
+		m_diffuse[3] = 0.0 ' unused
+
+		m_specular_shininess[0] = 1.0
+		m_specular_shininess[1] = 1.0
+		m_specular_shininess[2] = 1.0
+		m_specular_shininess[3] = 10.0 ' shininess
+
+		m_color[0] = 1.0
+		m_color[1] = 1.0
+		m_color[2] = 1.0
+		m_color[3] = 1.0
+
+		m_time = 0.0
+
+		For Local ii:Int = 0 Until MAX_NUM_LIGHTS
+
+			Local jj:Int = ii * 4
+
+			m_lightPosRadius[ jj + 0 ] = 0.0
+			m_lightPosRadius[ jj + 1 ] = 0.0
+			m_lightPosRadius[ jj + 2 ] = 0.0
+			m_lightPosRadius[ jj + 3 ] = 1.0
+
+			m_lightRgbInnerR[ jj + 0 ] = 1.0
+			m_lightRgbInnerR[ jj + 1 ] = 1.0
+			m_lightRgbInnerR[ jj + 2 ] = 1.0
+			m_lightRgbInnerR[ jj + 3 ] = 1.0
+		Next
+
+		u_params             = bgfxCreateUniform("u_params",              BGFX_UNIFORM_TYPE_VEC4)
+		u_ambient            = bgfxCreateUniform("u_ambient",             BGFX_UNIFORM_TYPE_VEC4)
+		u_diffuse            = bgfxCreateUniform("u_diffuse",             BGFX_UNIFORM_TYPE_VEC4)
+		u_specular_shininess = bgfxCreateUniform("u_specular_shininess",  BGFX_UNIFORM_TYPE_VEC4)
+		u_color              = bgfxCreateUniform("u_color",               BGFX_UNIFORM_TYPE_VEC4)
+		u_lightPosRadius     = bgfxCreateUniform("u_lightPosRadius",      BGFX_UNIFORM_TYPE_VEC4, MAX_NUM_LIGHTS)
+		u_lightRgbInnerR     = bgfxCreateUniform("u_lightRgbInnerR",      BGFX_UNIFORM_TYPE_VEC4, MAX_NUM_LIGHTS)
+	End
+
+	' call this once at initialization
+	Method SubmitConstUniforms:Void()
+		bgfxSetUniform(u_ambient,            m_ambient)
+		bgfxSetUniform(u_diffuse,            m_diffuse)
+		bgfxSetUniform(u_specular_shininess, m_specular_shininess)
+	End
+
+	' call this before each draw call
+	Method SubmitPerDrawUniforms:Void()
+'		bgfxSetUniform(u_params,         m_params.ToArray())
+		bgfxSetUniform(u_params,         m_params)
+		bgfxSetUniform(u_color,          m_color)
+		bgfxSetUniform(u_lightPosRadius, m_lightPosRadius, MAX_NUM_LIGHTS)
+		bgfxSetUniform(u_lightRgbInnerR, m_lightRgbInnerR, MAX_NUM_LIGHTS)
+	End
+
+	Method Destroy:Void()
+		bgfxDestroyUniform(u_params)
+		bgfxDestroyUniform(u_ambient)
+		bgfxDestroyUniform(u_diffuse)
+		bgfxDestroyUniform(u_specular_shininess)
+		bgfxDestroyUniform(u_color)
+		bgfxDestroyUniform(u_lightPosRadius)
+		bgfxDestroyUniform(u_lightRgbInnerR)
+	End
+
+	' Field m_params             := New UniformsParams()
+	Field m_params             :Float[4]
+	Field m_svparams           := New UniformsSvParams()
+
+	Field m_ambient            :Float[4]
+	Field m_diffuse            :Float[4]
+	Field m_specular_shininess :Float[4]
+	Field m_color              :Float[4]
+	Field m_time               :Float
+	Field m_lightPosRadius     :Float[ MAX_NUM_LIGHTS * 4 ]
+	Field m_lightRgbInnerR     :Float[ MAX_NUM_LIGHTS * 4 ]
+
+	'/**
+	' * u_params.x - u_ambientPass
+	' * u_params.y - u_lightingPass
+	' * u_params.z - u_lightCount
+	' * u_params.w - u_lightIndex
+	' */
+	Field u_params             :Int
+	Field u_ambient            :Int
+	Field u_diffuse            :Int
+	Field u_specular_shininess :Int
+	Field u_color              :Int
+	Field u_lightPosRadius     :Int
+	Field u_lightRgbInnerR     :Int
+End
+
+Global s_uniforms := New Uniforms()
+
+'-------------------------------------------------
+' Render state
+'-------------------------------------------------
+
+Const RENDER_STATE_STENCIL_REFLECTION_CRAFT_STENCIL  :Int = 0
+Const RENDER_STATE_STENCIL_REFLECTION_DRAW_REFLECTED :Int = 1
+Const RENDER_STATE_STENCIL_REFLECTION_BLEND_PLANE    :Int = 2
+Const RENDER_STATE_STENCIL_REFLECTION_DRAW_SCENE     :Int = 3
+
+Const RENDER_STATE_PROJECTION_SHADOWS_DRAW_AMBIENT   :Int = 4
+Const RENDER_STATE_PROJECTION_SHADOWS_CRAFT_STENCIL  :Int = 5
+Const RENDER_STATE_PROJECTION_SHADOWS_DRAW_DIFFUSE   :Int = 6
+
+Const RENDER_STATE_CUSTOM_BLEND_LIGHT_TEXTURE        :Int = 7
+Const RENDER_STATE_CUSTOM_DRAW_PLANE_BOTTOM          :Int = 8
+
+Const RENDER_STATE_COUNT                             :Int = 9
+
+Class RenderState
+	Field m_state           :Int[2]
+	Field m_blendFactorRgba :Int
+	Field m_fstencil        :Int
+	Field m_bstencil        :Int
+End
+
+Global s_renderStates:RenderState[ RENDER_STATE_COUNT ]
+
+Function InitRenderType:Void()
+
+	For Local ii:Int = 0 Until RENDER_STATE_COUNT
+		s_renderStates[ ii ] = New RenderState()
+	Next
+
+	Local rs:RenderState
+
+	rs = s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_CRAFT_STENCIL ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_Z )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_state[0] = $01000060
+'  	rs.m_state[1] = $0000001f
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = 0
+'  	rs.m_fstencil = BGFX_STENCIL_TEST_ALWAYS       | ' pass always
+'  	                BGFX_STENCIL_FUNC_REF(1)       | ' value = 1
+'  	                BGFX_STENCIL_FUNC_RMASK($ff)   |
+'  	                BGFX_STENCIL_OP_FAIL_S_REPLACE |
+'  	                BGFX_STENCIL_OP_FAIL_Z_REPLACE |
+'  	                BGFX_STENCIL_OP_PASS_Z_REPLACE   ' store the value
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState0	{m_state=0x0100004000000017 m_blendFactorRgba=0xffffffff m_fstencil=0x2228ff01 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100004000000017	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x2228ff01	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000040
+	rs.m_state[1]        = $00000017
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $2228ff01
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_DRAW_REFLECTED ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_A )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_Z )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS ) ' reflection matrix has inverted normals. using CCW instead of CW.
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = 0
+'  	rs.m_fstencil = BGFX_STENCIL_TEST_EQUAL      | ' pass always
+'  	                BGFX_STENCIL_FUNC_REF(1)     | ' value = 1
+'  	                BGFX_STENCIL_FUNC_RMASK($ff) |
+'  	                BGFX_STENCIL_OP_FAIL_S_KEEP  |
+'  	                BGFX_STENCIL_OP_FAIL_Z_KEEP  |
+'  	                BGFX_STENCIL_OP_PASS_Z_KEEP    ' store the value
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState1	{m_state=0x010000500656501f m_blendFactorRgba=0xffffffff m_fstencil=0x11130101 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x010000500656501f	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x11130101	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000050
+	rs.m_state[1]        = $0656501f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $11130101
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_BLEND_PLANE ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_Z )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_SRC_COLOR) )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CCW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_NONE
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState2	{m_state=0x0100006003232017 m_blendFactorRgba=0xffffffff m_fstencil=0x00000000 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100006003232017	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x00000000	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $03232017
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_DRAW_SCENE ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_Z )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CCW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_NONE
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState3	{m_state=0x0100006000000017 m_blendFactorRgba=0xffffffff m_fstencil=0x00000000 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100006000000017	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x00000000	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $00000017
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_AMBIENT ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_Z ) ' write depth !
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CCW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_NONE
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState4	{m_state=0x0100006000000017 m_blendFactorRgba=0xffffffff m_fstencil=0x00000000 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100006000000017	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x00000000	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $00000017
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_CRAFT_STENCIL ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_TEST_ALWAYS       |
+'  	                BGFX_STENCIL_FUNC_REF(1)       |
+'  	                BGFX_STENCIL_FUNC_RMASK($ff)   |
+'  	                BGFX_STENCIL_OP_FAIL_S_KEEP    |
+'  	                BGFX_STENCIL_OP_FAIL_Z_KEEP    |
+'  	                BGFX_STENCIL_OP_PASS_Z_REPLACE
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState5	{m_state=0x0100000000000010 m_blendFactorRgba=0xffffffff m_fstencil=0x2118ff01 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100000000000010	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x2118ff01	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000000
+	rs.m_state[1]        = $00000010
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $2118ff01
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_DIFFUSE ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE) )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_EQUAL )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CCW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_TEST_NOTEQUAL  |
+'  	                BGFX_STENCIL_FUNC_REF(1)    |
+'  	                BGFX_STENCIL_FUNC_RMASK(1)  |
+'  	                BGFX_STENCIL_OP_FAIL_S_KEEP |
+'  	                BGFX_STENCIL_OP_FAIL_Z_KEEP |
+'  	                BGFX_STENCIL_OP_PASS_Z_KEEP
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState6	{m_state=0x0100002002222037 m_blendFactorRgba=0xffffffff m_fstencil=0x11160101 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100002002222037	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x11160101	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000020
+	rs.m_state[1]        = $02222037
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $11160101
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_CUSTOM_BLEND_LIGHT_TEXTURE ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_A )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_Z )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_COLOR, BGFX_STATE_BLEND_INV_SRC_COLOR) )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CCW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_NONE
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState7	{m_state=0x010000600434301f m_blendFactorRgba=0xffffffff m_fstencil=0x00000000 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x010000600434301f	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x00000000	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $0434301f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RENDER_STATE_CUSTOM_DRAW_PLANE_BOTTOM ]
+'  	bgfxUtilsClear64Bit( rs.m_state )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_WRITE_RGB )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_CULL_CW )
+'  	bgfxUtilsSet64Bit( rs.m_state, BGFX_STATE_MSAA )
+'  	rs.m_blendFactorRgba = $ffffffff
+'  	rs.m_fstencil = BGFX_STENCIL_NONE
+'  	rs.m_bstencil = BGFX_STENCIL_NONE
+
+'  -		renderState8	{m_state=0x0100001000000007 m_blendFactorRgba=0xffffffff m_fstencil=0x00000000 ...}	`anonymous-namespace'::RenderState
+'  		m_state	0x0100001000000007	unsigned __int64
+'  		m_blendFactorRgba	0xffffffff	unsigned int
+'  		m_fstencil	0x00000000	unsigned int
+'  		m_bstencil	0x00000000	unsigned int
+
+	rs.m_state[0]        = $01000010
+	rs.m_state[1]        = $00000007
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+End
+
+Class ViewState
+
+	Field m_width  :Int
+	Field m_height :Int
+
+	Field m_view   :Float[16]
+	Field m_proj   :Float[16]
+
+	Method New( _width:Int=0, _height:Int=0 )
+		Self.m_width  = _width
+		Self.m_height = _height
+	End
+End
+
+Class ClearValues
+
+	Field m_clearRgba    :Int
+	Field m_clearDepth   :Float
+	Field m_clearStencil :Int
+
+	Method New( _clearRgba:Int=$30303000, _clearDepth:Float=1.0, _clearStencil:Int=0 )
+		Self.m_clearRgba    = _clearRgba
+		Self.m_clearDepth   = _clearDepth
+		Self.m_clearStencil = _clearStencil
+	End
+End
+
+Function ClearView:Void( _id:Int, _flags:Int, _clearValues:ClearValues )
+
+	bgfxSetViewClear( _id, _flags, _clearValues.m_clearRgba, _clearValues.m_clearDepth, _clearValues.m_clearStencil )
+
+	' Keep track of cleared views
+	s_clearMask |= 1 Shl _id
+End
+
+Function ClearViewMask:Void( _viewMask:Int, _flags:Int, _clearValues:ClearValues )
+
+	SetViewClearMask( _viewMask, _flags, _clearValues.m_clearRgba, _clearValues.m_clearDepth, _clearValues.m_clearStencil )
+
+	' Keep track of cleared views
+	s_clearMask |= _viewMask
+End
+
+Global invalidTexture:Int = $ffffffff
+
+Function MeshSubmitStencil:Void( _mesh:BgfxUtilsMesh, _id:Int, _mtx:Float[], _program:Int, _renderState:RenderState )
+	Local texture:Int = BGFX_INVALID_HANDLE
+	MeshSubmitStencil( _mesh, _id, _mtx, _program, _renderState, invalidTexture )
+End
+	
+Function MeshSubmitStencil:Void( _mesh:BgfxUtilsMesh, _id:Int, _mtx:Float[], _program:Int, _renderState:RenderState, _texture:Int )
+
+	Local groups := _mesh.m_groups
+	Local length :Int = groups.Length()
+
+	For Local ii:Int = 0 Until length
+
+		Local group := groups.Get( ii )
+
+		' Set uniforms
+		s_uniforms.SubmitPerDrawUniforms()
+
+		' Set model matrix for rendering.
+		bgfxSetTransform( _mtx )
+		bgfxSetIndexBuffer( group.m_ibh )
+		bgfxSetVertexBuffer( 0, group.m_vbh )
+
+		' Set texture
+		bgfxSetTexture( 0, s_texColor, _texture )
+
+		' Apply render state
+		bgfxSetStencil( _renderState.m_fstencil, _renderState.m_bstencil )
+		bgfxSetState( _renderState.m_state, _renderState.m_blendFactorRgba )
+
+		' Submit
+		bgfxSubmit( _id, _program )
+
+		' Keep track of submited view ids
+		s_viewMask |= 1 Shl _id
+	Next
+
+'  	Print "_renderState.m_state[0]=" + IntToHex(_renderState.m_state[0]) +
+'  		" _renderState.m_state[1]=" + IntToHex(_renderState.m_state[1]) + 
+'  		" _renderState.m_blendFactorRgba=" + IntToHex(_renderState.m_blendFactorRgba) +
+'  		" _renderState.m_fstencil=" + IntToHex(_renderState.m_fstencil) +
+'  		" _renderState.m_bstencil=" + IntToHex(_renderState.m_bstencil)
+End
+
+Class StencilExample Extends App
+
+'  	Field m_width          :Int ' use DeviceWidth directly
+'  	Field m_height         :Int ' use DeviceHeight directly
+'  	Field m_debug          :Int = BGFX_DEBUG_NONE
+
+	Field bgfxCaps := New BgfxCaps()
+
+	Field m_viewState   :ViewState
+	' Field entry::MouseState m_mouseState;
+	Field m_clearValues :ClearValues
+
+	Field m_debug          :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset          :Int ' = BGFX_RESET_VSYNC
+
+	Field m_programTextureLighting :Int
+	Field m_programColorLighting   :Int
+	Field m_programColorTexture    :Int
+	Field m_programColorBlack      :Int
+	Field m_programTexture         :Int
+
+	Field m_bunnyMesh  :BgfxUtilsMesh
+	Field m_columnMesh :BgfxUtilsMesh
+	Field m_cubeMesh   :BgfxUtilsMesh
+	Field m_hplaneMesh :BgfxUtilsMesh
+	Field m_vplaneMesh :BgfxUtilsMesh
+
+	Field m_figureTex       :Int
+	Field m_flareTex        :Int
+	Field m_fieldstoneTex   :Int
+
+	Field m_lightRgbInnerR  :Float[ MAX_NUM_LIGHTS ][]
+
+	Field m_timeOffset      :Int
+
+	Const STENCIL_REFLECTION_SCENE:Int = 0
+	Const PROJECTION_SHADOWS_SCENE:Int = 1
+
+	Field m_scene           :Int
+	Field m_numLights       :Int
+	Field m_reflectionValue :Float
+	Field m_updateLights    :Bool
+	Field m_updateScene     :Bool
+
+	Method OnCreate:Int()
+
+		For Local ii:Int = 0 Until MAX_NUM_LIGHTS
+			m_lightRgbInnerR [ ii ] = New Float[4]
+			lightPosRadius   [ ii ] = New Float[4]
+			reflectedLights  [ ii ] = New Float[4]
+		Next
+
+		For Local ii:Int = 0 Until columnMtx.Length()
+			columnMtx[ ii ] = New Float[ 16 ]
+		Next
+
+		For Local ii:Int = 0 Until cubeMtx.Length()
+			cubeMtx[ ii ] = New Float[ 16 ]
+		Next
+
+		SetUpdateRate( 60 )
+
+		InitRenderType()
+
+		m_viewState   = New ViewState( DeviceWidth(), DeviceHeight() )
+		m_clearValues = New ClearValues( $30303000, 1.0, 0 )
+
+		m_debug = BGFX_DEBUG_NONE
+		m_reset = BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Create vertex stream declaration.
+		PosNormalTexcoordVertex.Init()
+
+		s_uniforms.Init()
+
+		s_texColor  = bgfxCreateUniform( "s_texColor", BGFX_UNIFORM_TYPE_INT1 )
+
+		m_programTextureLighting = bgfxUtilsLoadProgram( "vs_stencil_texture_lighting", "fs_stencil_texture_lighting" )
+		Print "m_programTextureLighting=" + m_programTextureLighting
+		m_programColorLighting   = bgfxUtilsLoadProgram( "vs_stencil_color_lighting",   "fs_stencil_color_lighting"   )
+		Print "m_programColorLighting=" + m_programColorLighting
+		m_programColorTexture    = bgfxUtilsLoadProgram( "vs_stencil_color_texture",    "fs_stencil_color_texture"    )
+		Print "m_programColorTexture=" + m_programColorTexture
+		m_programColorBlack      = bgfxUtilsLoadProgram( "vs_stencil_color",            "fs_stencil_color_black"      )
+		Print "m_programColorBlack=" + m_programColorBlack
+		m_programTexture         = bgfxUtilsLoadProgram( "vs_stencil_texture",          "fs_stencil_texture"          )
+		Print "m_programTexture=" + m_programTexture
+
+		m_bunnyMesh  = bgfxUtilsMeshLoad( "meshes/bunny.bin" )
+		m_columnMesh = bgfxUtilsMeshLoad( "meshes/column.bin" )
+		m_cubeMesh   = bgfxUtilsMeshLoad( PosNormalTexcoordVertexToDataBuffer( s_cubeVertices   ), PosNormalTexcoordVertex.ms_decl, Index16ToDataBuffer( s_cubeIndices  ) )
+		m_hplaneMesh = bgfxUtilsMeshLoad( PosNormalTexcoordVertexToDataBuffer( s_hplaneVertices ), PosNormalTexcoordVertex.ms_decl, Index16ToDataBuffer( s_planeIndices ) )
+		m_vplaneMesh = bgfxUtilsMeshLoad( PosNormalTexcoordVertexToDataBuffer( s_vplaneVertices ), PosNormalTexcoordVertex.ms_decl, Index16ToDataBuffer( s_planeIndices ) )
+
+		m_figureTex     = bgfxUtilsLoadTexture( "textures/figure-rgba.dds" )
+		m_flareTex      = bgfxUtilsLoadTexture( "textures/flare.dds" )
+		m_fieldstoneTex = bgfxUtilsLoadTexture( "textures/fieldstone-rgba.dds" )
+
+		' Setup lights.
+		Local rgbInnerR:Float[][] = [
+			[ 1.0, 0.7, 0.2, 0.0 ],  ' yellow
+			[ 0.7, 0.2, 1.0, 0.0 ],  ' purple
+			[ 0.2, 1.0, 0.7, 0.0 ],  ' cyan
+			[ 1.0, 0.4, 0.2, 0.0 ],  ' orange
+			[ 0.7, 0.7, 0.7, 0.0 ] ] ' white
+
+		Local jj:Int = 0
+
+		For Local ii:Int = 0 Until MAX_NUM_LIGHTS
+
+			Local index:Int = jj Mod rgbInnerR.Length() ; jj += 1
+
+			m_lightRgbInnerR[ ii ][ 0 ] = rgbInnerR[ index ][ 0 ]
+			m_lightRgbInnerR[ ii ][ 1 ] = rgbInnerR[ index ][ 1 ]
+			m_lightRgbInnerR[ ii ][ 2 ] = rgbInnerR[ index ][ 2 ]
+			m_lightRgbInnerR[ ii ][ 3 ] = rgbInnerR[ index ][ 3 ]
+
+			s_uniforms.m_lightRgbInnerR[ ii * 4 + 0 ] = m_lightRgbInnerR[ ii ][ 0 ]
+			s_uniforms.m_lightRgbInnerR[ ii * 4 + 1 ] = m_lightRgbInnerR[ ii ][ 1 ]
+			s_uniforms.m_lightRgbInnerR[ ii * 4 + 2 ] = m_lightRgbInnerR[ ii ][ 2 ]
+			s_uniforms.m_lightRgbInnerR[ ii * 4 + 3 ] = m_lightRgbInnerR[ ii ][ 3 ]
+		Next
+
+		' Set view and projection matrices.
+		Local aspect:Float = Float( m_viewState.m_width ) / Float ( m_viewState.m_height )
+		bgfxGetCaps( bgfxCaps )
+		bxMtxProj( m_viewState.m_proj, 60.0, aspect, 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+
+		Local initialPos:Float[] = [ 0.0, 18.0, -40.0 ]
+		CameraCreate()
+		CameraSetPosition( initialPos )
+		CameraSetVerticalAngle( -0.35 )
+		CameraGetViewMtx( m_viewState.m_view )
+
+		m_timeOffset = Millisecs()
+
+		m_scene = STENCIL_REFLECTION_SCENE
+		' m_scene = PROJECTION_SHADOWS_SCENE
+		m_numLights       = 4
+		m_reflectionValue = 0.8
+		m_updateLights    = True
+		m_updateScene     = True
+	End
+
+	Method OnUpdate:Int()
+
+		If KeyHit(KEY_SPACE) Then
+			If m_scene = STENCIL_REFLECTION_SCENE Then
+				m_scene = PROJECTION_SHADOWS_SCENE
+				m_numLights = 1
+			Else
+				m_scene = STENCIL_REFLECTION_SCENE
+				m_numLights = 4
+			Endif
+		Endif
+
+		If KeyHit(KEY_LEFT) Then
+			m_numLights -= 1
+			If m_numLights < 1 Then m_numLights = 1
+		Endif
+
+		If KeyHit(KEY_RIGHT) Then
+			m_numLights += 1
+			If m_numLights >= 5 Then m_numLights = 5
+		Endif
+
+		If KeyDown(KEY_DOWN) Then
+			m_reflectionValue -= 0.01
+			If m_reflectionValue <= 0.0 Then m_reflectionValue = 0.0
+		Endif
+
+		If KeyDown(KEY_UP) Then
+			m_reflectionValue += 0.01
+			If m_reflectionValue >= 1.0 Then m_reflectionValue = 1.0
+		Endif
+
+		If KeyHit(KEY_L) Then
+			If m_updateLights Then m_updateLights = False Else m_updateLights = True
+		Endif
+
+		If KeyHit(KEY_S) Then
+			If m_updateScene Then m_updateScene = False Else m_updateScene = True
+		Endif
+
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		bgfxUtilsMeshUnload( m_bunny )
+'  		bgfxUtilsMeshUnload( m_columnMesh )
+'  		bgfxUtilsMeshUnload( m_cubeMesh )
+'  		bgfxUtilsMeshUnload( m_hplaneMesh )
+'  		bgfxUtilsMeshUnload( m_vplaneMesh )
+'  
+'  		bgfxDestroyTexture( m_figureTex )
+'  		bgfxDestroyTexture( m_fieldstoneTex )
+'  		bgfxDestroyTexture( m_flareTex )
+'  
+'  		bgfxDestroyProgram( m_programTextureLighting )
+'  		bgfxDestroyProgram( m_programColorLighting )
+'  		bgfxDestroyProgram( m_programColorTexture )
+'  		bgfxDestroyProgram( m_programColorBlack )
+'  		bgfxDestroyProgram( m_programTexture )
+'  
+'  		bgfxDestroyProgram( s_texColor )
+'  
+'  		s_uniforms.Destroy()
+'  		CameraDestroy()
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
+
+	Field last                 :Int
+	Field lightTimeAccumulator :Float = 0.0
+	Field sceneTimeAccumulator :Float = 0.0
+
+	Field lightPosRadius       :Float[ MAX_NUM_LIGHTS ][]
+	Field reflectedLights      :Float[ MAX_NUM_LIGHTS ][]
+	Field columnMtx            :Float[ 4 ][]
+
+	Const numCubes:Int = 9
+	Field cubeMtx              :Float[ numCubes ][]
+
+	Const dist:Float = 14.0
+	Field columnPositions:Float[][] = [
+		[  dist, 0.0,  dist ],
+		[ -dist, 0.0,  dist ],
+		[  dist, 0.0, -dist ],
+		[ -dist, 0.0, -dist ] ]
+
+	Field lightScale:Float[] = [ 1.5, 1.5, 1.5 ]
+	Field lightMtx:Float[ 16 ]
+
+	Method OnRender:Int()
+
+		s_uniforms.SubmitConstUniforms()
+
+		' Update settings.
+		Local numLights:Int = m_numLights
+'		s_uniforms.m_params.m_ambientPass  = 1.0
+'		s_uniforms.m_params.m_lightingPass = 1.0
+'		s_uniforms.m_params.m_lightCount   = Float(m_numLights)
+'		s_uniforms.m_params.m_lightIndex   = 0.0
+		s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
+		s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
+		s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_COUNT   ] = Float(m_numLights)
+		s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_INDEX   ] = 0.0
+		s_uniforms.m_color[3]              = m_reflectionValue
+
+		' Time.
+		Local now       :Int = Millisecs()
+		Local frameTime :Int = now - last
+		last = now
+		Local time      :Float = (now - m_timeOffset) * 0.001
+		Local deltaTime :Float = frameTime * 0.001
+		s_uniforms.m_time = time
+	
+		' Update camera.
+		CameraUpdate( deltaTime )
+		CameraGetViewMtx( m_viewState.m_view )
+
+		If m_updateLights Then
+			lightTimeAccumulator += deltaTime
+		Endif
+
+		If m_updateScene Then
+			sceneTimeAccumulator += deltaTime
+		Endif
+
+		Local radius:Float = 25.0
+		If m_scene = STENCIL_REFLECTION_SCENE Then
+			radius = 15.0
+		Endif
+		For Local ii:Int = 0 Until numLights
+			lightPosRadius[ ii ][ 0 ] = Sinr( (lightTimeAccumulator * 1.1 + ii * 0.03 + ii * HALFPI * 1.07 ) ) * 20.0
+			lightPosRadius[ ii ][ 1 ] = 8.0 + (1.0 - Cosr( (lightTimeAccumulator * 1.5 + ii * 0.29 + HALFPI * 1.49 ) ) ) * 4.0
+			lightPosRadius[ ii ][ 2 ] = Cosr( (lightTimeAccumulator * 1.3 + ii * 0.13 + ii * HALFPI * 1.79 ) ) * 20.0
+			lightPosRadius[ ii ][ 3 ] = radius
+
+			s_uniforms.m_lightPosRadius[ ii * 4 + 0 ] = lightPosRadius[ ii ][ 0 ]
+			s_uniforms.m_lightPosRadius[ ii * 4 + 1 ] = lightPosRadius[ ii ][ 1 ]
+			s_uniforms.m_lightPosRadius[ ii * 4 + 2 ] = lightPosRadius[ ii ][ 2 ]
+			s_uniforms.m_lightPosRadius[ ii * 4 + 3 ] = lightPosRadius[ ii ][ 3 ]
+		Next
+
+		' Floor position.
+		Local floorMtx:Float[16]
+		bxMtxSRT( floorMtx,
+			20.0,  ' scaleX
+			20.0,  ' scaleY
+			20.0,  ' scaleZ
+			0.0,   ' rotX
+			0.0,   ' rotY
+			0.0,   ' rotZ
+			0.0,   ' translateX
+			0.0,   ' translateY
+			0.0 )  ' translateZ
+
+		' Bunny position.
+		Local bunnyMtx:Float[16]
+		bxMtxSRT( bunnyMtx,
+			5.0,
+			5.0,
+			5.0,
+			0.0,
+			1.56 - sceneTimeAccumulator,
+			0.0,
+			0.0,
+			2.0,
+			0.0 )
+
+		' Columns position.
+		For Local ii:Int = 0 Until 4
+			bxMtxSRT( columnMtx[ii],
+				1.0,
+				1.0,
+				1.0,
+				0.0,
+				0.0,
+				0.0,
+				columnPositions[ii][0],
+				columnPositions[ii][1],
+				columnPositions[ii][2] )
+		Next
+
+		For Local ii:Int = 0 Until numCubes
+			bxMtxSRT( cubeMtx[ii],
+				1.0,
+				1.0,
+				1.0,
+				0.0,
+				0.0,
+				0.0,
+				Sinr(ii * 2.0 + 13.0 - sceneTimeAccumulator) * 13.0,
+				4.0,
+				Cosr(ii * 2.0 + 13.0 - sceneTimeAccumulator) * 13.0 )
+		Next
+
+		' Make sure at the beginning everything gets cleared.
+		ClearView( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH | BGFX_CLEAR_STENCIL, m_clearValues )
+		bgfxTouch( 0 )
+		s_viewMask |= 1
+
+		' Bunny and columns color.
+		s_uniforms.m_color[ 0 ] = 0.70
+		s_uniforms.m_color[ 1 ] = 0.65
+		s_uniforms.m_color[ 2 ] = 0.60
+
+		Select m_scene
+
+		Case STENCIL_REFLECTION_SCENE
+			' First pass - Draw plane.
+
+			' Setup params for this scene.
+'			s_uniforms.m_params.m_ambientPass = 1.0
+'			s_uniforms.m_params.m_lightingPass = 1.0
+			s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
+			s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
+
+
+			' Floor.
+			MeshSubmitStencil( m_hplaneMesh,
+				RENDER_VIEWID_RANGE1_PASS_0,
+				floorMtx,
+				m_programColorBlack,
+				s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_CRAFT_STENCIL ] )
+
+			' Second pass - Draw reflected objects.
+
+			' Clear depth from previous pass.
+			ClearView( RENDER_VIEWID_RANGE1_PASS_1, BGFX_CLEAR_DEPTH, m_clearValues )
+
+			' Compute reflected matrix.
+			Local reflectMtx :Float[ 16 ]
+			Local plane_pos  :Float[] = [ 0.0, 0.01, 0.0 ]
+			Local normal     :Float[] = [ 0.0, 1.0,  0.0 ]
+			MtxReflected( reflectMtx, plane_pos, normal )
+
+			' Reflect lights.
+			For Local ii:Int = 0 Until numLights
+				bxVec3MulMtx( reflectedLights[ ii ], lightPosRadius[ ii ], reflectMtx )
+				reflectedLights[ ii ][ 3 ] = lightPosRadius[ ii ][ 3 ]
+				s_uniforms.m_lightPosRadius[ ii * 4 + 0 ] = reflectedLights[ ii ][ 0 ]
+				s_uniforms.m_lightPosRadius[ ii * 4 + 1 ] = reflectedLights[ ii ][ 1 ]
+				s_uniforms.m_lightPosRadius[ ii * 4 + 2 ] = reflectedLights[ ii ][ 2 ]
+				s_uniforms.m_lightPosRadius[ ii * 4 + 3 ] = reflectedLights[ ii ][ 3 ]
+			Next
+
+			' Reflect and submit bunny.
+			Local mtxReflectedBunny:Float[ 16 ]
+			bxMtxMul( mtxReflectedBunny, bunnyMtx, reflectMtx )
+			MeshSubmitStencil( m_bunnyMesh,
+				RENDER_VIEWID_RANGE1_PASS_1,
+				mtxReflectedBunny,
+				m_programColorLighting,
+				s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_DRAW_REFLECTED ] )
+
+  			' Reflect and submit columns.
+  			Local mtxReflectedColumn:Float[ 16 ]
+  			For Local ii:Int = 0 Until 4
+  				bxMtxMul( mtxReflectedColumn, columnMtx[ ii ], reflectMtx )
+  				MeshSubmitStencil( m_columnMesh,
+  					RENDER_VIEWID_RANGE1_PASS_1,
+  					mtxReflectedColumn,
+  					m_programColorLighting,
+  					s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_DRAW_REFLECTED ] )
+  			Next
+  
+  			' Set lights back.
+  			For Local ii:Int = 0 Until numLights
+  				s_uniforms.m_lightPosRadius[ ii * 4 + 0 ] = lightPosRadius[ ii ][ 0 ]
+  				s_uniforms.m_lightPosRadius[ ii * 4 + 1 ] = lightPosRadius[ ii ][ 1 ]
+  				s_uniforms.m_lightPosRadius[ ii * 4 + 2 ] = lightPosRadius[ ii ][ 2 ]
+  				s_uniforms.m_lightPosRadius[ ii * 4 + 3 ] = lightPosRadius[ ii ][ 3 ]
+  			Next
+  
+  			' Third pass - Blend plane.
+  
+  			' Floor.
+  			MeshSubmitStencil( m_hplaneMesh,
+  				RENDER_VIEWID_RANGE1_PASS_2,
+  				floorMtx,
+  				m_programTextureLighting,
+  				s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_BLEND_PLANE ],
+  				m_fieldstoneTex )
+  
+  			' Fourth pass - Draw everything else but the plane.
+  
+  			' Bunny.
+  			MeshSubmitStencil( m_bunnyMesh,
+  				RENDER_VIEWID_RANGE1_PASS_3,
+  				bunnyMtx,
+  				m_programColorLighting,
+  				s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_DRAW_SCENE ] )
+  
+  			' Columns.
+  			For Local ii:Int = 0 Until 4
+  				MeshSubmitStencil( m_columnMesh,
+  					RENDER_VIEWID_RANGE1_PASS_3,
+  					columnMtx[ ii ],
+  					m_programColorLighting,
+  					s_renderStates[ RENDER_STATE_STENCIL_REFLECTION_DRAW_SCENE ] )
+  			Next
+
+		Case PROJECTION_SHADOWS_SCENE
+
+			' First pass - Draw entire scene. (ambient only).
+'			s_uniforms.m_params.m_ambientPass  = 1.0
+'			s_uniforms.m_params.m_lightingPass = 0.0
+			s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
+			s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 0.0
+
+
+			' Bunny.
+			MeshSubmitStencil( m_bunnyMesh,
+				RENDER_VIEWID_RANGE1_PASS_0,
+				bunnyMtx,
+				m_programColorLighting,
+				s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_AMBIENT ] )
+
+			' Floor.
+			MeshSubmitStencil( m_hplaneMesh,
+				RENDER_VIEWID_RANGE1_PASS_0,
+				floorMtx,
+				m_programTextureLighting,
+				s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_AMBIENT ],
+				m_fieldstoneTex )
+
+			' Cubes.
+			For Local ii:Int = 0 Until numCubes
+				MeshSubmitStencil( m_cubeMesh,
+					RENDER_VIEWID_RANGE1_PASS_0,
+					cubeMtx[ ii ],
+					m_programTextureLighting,
+					s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_AMBIENT ],
+					' m_programColorTexture,
+					' s_renderStates[ RENDER_STATE_CUSTOM_BLEND_LIGHT_TEXTURE ],
+					m_figureTex )
+			Next
+
+			' Ground plane.
+			Local ground    :Float[ 4 ]
+			Local plane_pos :Float[] = [ 0.0, 0.0, 0.0 ]
+			Local normal    :Float[] = [ 0.0, 1.0, 0.0 ]
+			ground[ 0 ] = normal[ 0 ]
+			ground[ 1 ] = normal[ 1 ]
+			ground[ 2 ] = normal[ 2 ]
+			ground[ 3 ] = -bxVec3Dot( plane_pos, normal ) - 0.01 ' - 0.01 against z-fighting
+
+			Local viewId:Int = RENDER_VIEWID_RANGE5_PASS_6
+
+			For Local ii:Int = 0 Until numLights
+
+				' Clear stencil for this light source.
+				ClearView( viewId, BGFX_CLEAR_STENCIL, m_clearValues )
+
+				' Draw shadow projection of scene objects.
+
+				' Get homogeneous light pos.
+				Local lightPos :Float[] = lightPosRadius[ ii ]
+				Local pos      :Float[ 4 ]
+				pos[ 0 ] = lightPos[ 0 ]
+				pos[ 1 ] = lightPos[ 1 ]
+				pos[ 2 ] = lightPos[ 2 ]
+				pos[ 3 ] = 1.0
+
+				' Calculate shadow mtx for current light.
+				Local shadowMtx:Float[ 16 ]
+				MtxShadow( shadowMtx, ground, pos )
+
+				' Submit bunny's shadow.
+				Local mtxShadowedBunny:Float[ 16 ]
+				bxMtxMul( mtxShadowedBunny, bunnyMtx, shadowMtx )
+				MeshSubmitStencil( m_bunnyMesh,
+					viewId,
+					mtxShadowedBunny,
+					m_programColorBlack,
+					s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_CRAFT_STENCIL ] )
+
+				' Submit cube shadows.
+				Local mtxShadowedCube:Float[ 16 ]
+				For Local jj:Int = 0 Until numCubes
+					bxMtxMul( mtxShadowedCube, cubeMtx[ jj ], shadowMtx )
+					MeshSubmitStencil( m_cubeMesh,
+						viewId,
+						mtxShadowedCube,
+						m_programColorBlack,
+						s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_CRAFT_STENCIL ] )
+				Next
+
+				' Draw entire scene. (lighting pass only. blending is on)
+'				s_uniforms.m_params.m_ambientPass  = 0.0
+'				s_uniforms.m_params.m_lightingPass = 1.0
+'				s_uniforms.m_params.m_lightCount   = 1.0
+'				s_uniforms.m_params.m_lightIndex   = Float( ii )
+				s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 0.0
+				s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
+				s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_COUNT   ] = 1.0
+				s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_INDEX   ] = Float( ii )
+
+				' Bunny.
+				MeshSubmitStencil( m_bunnyMesh,
+					viewId,
+					bunnyMtx,
+					m_programColorLighting,
+					s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_DIFFUSE ] )
+
+				' Floor.
+				MeshSubmitStencil( m_hplaneMesh,
+					viewId,
+					floorMtx,
+					m_programTextureLighting,
+					s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_DIFFUSE ],
+					m_fieldstoneTex )
+
+				' Cubes.
+				For Local jj:Int = 0 Until numCubes
+					MeshSubmitStencil( m_cubeMesh,
+						viewId,
+						cubeMtx[ jj ],
+						m_programTextureLighting,
+						s_renderStates[ RENDER_STATE_PROJECTION_SHADOWS_DRAW_DIFFUSE ],
+						m_figureTex )
+				Next
+
+				viewId += 1
+			Next
+
+			' Reset these to default..
+'			s_uniforms.m_params.m_ambientPass  = 1.0
+'			s_uniforms.m_params.m_lightingPass = 1.0
+			s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
+			s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
+		End
+
+		' lights
+		For Local ii:Int = 0 Until numLights
+			s_uniforms.m_color[ 0 ] = m_lightRgbInnerR[ ii ][ 0 ]
+			s_uniforms.m_color[ 1 ] = m_lightRgbInnerR[ ii ][ 1 ]
+			s_uniforms.m_color[ 2 ] = m_lightRgbInnerR[ ii ][ 2 ]
+			MtxBillboard( lightMtx, m_viewState.m_view, lightPosRadius[ ii ], lightScale )
+			MeshSubmitStencil( m_vplaneMesh,
+				RENDER_VIEWID_RANGE1_PASS_7,
+				lightMtx,
+				m_programColorTexture,
+				s_renderStates[ RENDER_STATE_CUSTOM_BLEND_LIGHT_TEXTURE ],
+				m_flareTex )
+		Next
+
+		' Draw floor bottom.
+		Local floorBottomMtx:Float[16]
+		bxMtxSRT( floorBottomMtx,
+			 20.0,  ' scaleX
+			 20.0,  ' scaleY
+			 20.0,  ' scaleZ
+			  0.0,  ' rotX
+			  0.0,  ' rotY
+			  0.0,  ' rotZ
+			  0.0,  ' translateX
+			 -0.1,  ' translateY
+			  0.0 ) ' translateZ
+
+		MeshSubmitStencil( m_hplaneMesh,
+			RENDER_VIEWID_RANGE1_PASS_7,
+			floorBottomMtx,
+			m_programTexture,
+			s_renderStates[ RENDER_STATE_CUSTOM_DRAW_PLANE_BOTTOM ],
+			m_figureTex )
+
+		' Setup view rect and transform for all used views.
+		SetViewRectMask( s_viewMask, 0, 0, m_viewState.m_width, m_viewState.m_height )
+		SetViewTransformMask( s_viewMask, m_viewState.m_view, m_viewState.m_proj )
+		s_viewMask = 0
+
+		DrawText( "      [SPACE] Scene: " + SceneToString(), 8, 14 * 1 )
+		DrawText( "[LEFT][RIGHT] Lights: " + m_numLights, 8, 14 * 2 )
+		DrawText( "   [UP][DOWN] Reflection value: " + m_reflectionValue, 8, 14 * 3 )
+		DrawText( "          [L] Update lights: " + BoolToString( m_updateLights ), 8, 14 * 4 )
+		DrawText( "          [S] Update scene: " + BoolToString( m_updateScene ), 8, 14 * 5 )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		bgfxFrame() 
+
+		' reset clear values on used views
+		ClearViewMask( s_clearMask, BGFX_CLEAR_NONE, m_clearValues )
+		s_clearMask = 0
+
+		Return 0
+	End
+
+	Method SceneToString:String()
+
+		Select m_scene
+
+		Case STENCIL_REFLECTION_SCENE
+			Return "Stencil Reflection"
+
+		Case PROJECTION_SHADOWS_SCENE
+			Return "Projection Shadow"
+		End
+
+		Return ""
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 13-stencil"
+	Print "Description: Stencil reflections and shadows."
+	New StencilExample()
+	Return 0
+End

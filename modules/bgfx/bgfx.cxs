@@ -582,6 +582,15 @@ Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )
 Function bxVec3MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx"
 Function bxSquare:Float( _a:Float )="_bx_square"
 Function bxMtxScale:Float( _result:Float[], _sx:Float, _sy:Float, _sz:Float )="_bx_mtx_scale"
+Function bxVec3Cross:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_cross"
+Function bxVec3Move:Void( _result:Float[], _a:Float[] )="_bx_vec3_move"
+Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_mul"
+Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_mul"
+Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_add"
+Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_add"
+Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_sub"
+Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_sub"
+Function bxVec3Dot:Float( _a:Float[], _b:Float[] )="_bx_vec3_dot"
 
 
 
@@ -1343,6 +1352,16 @@ Class BgfxUtilsGroup
 	Field m_aabb   := New BgfxUtilsAabb()
 	Field m_obb    := New BgfxUtilsObb()
 	Field m_prims  := New Stack<BgfxUtilsPrimitive>()
+
+	Method New()
+		Reset()
+	End
+
+	Method Reset:Void()
+		m_vbh = BGFX_INVALID_HANDLE
+		m_ibh = BGFX_INVALID_HANDLE
+		m_prims.Clear()
+	End
 End
 
 Class BgfxUtilsMesh
@@ -1491,6 +1510,19 @@ Function bgfxUtilsReadVertexDecl:Int(buffer:DataBuffer, address:Int, decl:BgfxVe
 	Return address
 End
 
+Function bgfxUtilsMeshLoad:BgfxUtilsMesh( _vertices:DataBuffer, _decl:BgfxVertexDecl, _indices:DataBuffer )
+
+	Local mesh  := New BgfxUtilsMesh()
+	Local group := New BgfxUtilsGroup()
+
+	group.m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( _vertices ), _decl )
+	group.m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( _indices ) )
+
+	mesh.m_groups.Push( group )
+
+	Return mesh
+End
+
 Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 
 	Local buffer  := DataBuffer.Load("cerberus://data/" + _filePath)
@@ -1584,7 +1616,22 @@ Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 End
 
 Function bgfxUtilsMeshUnload:Void(_mesh:BgfxUtilsMesh)
-	' TODO
+
+	Local groups := _mesh.m_groups
+	Local length :Int = groups.Length()
+
+	For Local ii:Int = 0 Until length
+
+		Local group := groups.Get( ii )
+
+		bgfxDestroyVertexBuffer( group.m_vbh )
+
+		If group.m_ibh <> BGFX_INVALID_HANDLE Then
+			bgfxDestroyIndexBuffer( group.m_ibh )
+		Endif
+	Next
+
+	groups.Clear()
 End
 
 Function IntToHex:String(number:Int)

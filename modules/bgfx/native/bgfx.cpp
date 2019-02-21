@@ -1055,6 +1055,50 @@ void _bx_mtx_scale( Array<float> _result, float _sx, float _sy, float _sz )
 	bx::mtxScale( &_result[0], _sx, _sy, _sz );
 }
 
+void _bx_vec3_cross( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Cross( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_move( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Move( &_result[0], &_a[0] );
+}
+
+void _bx_vec3_mul( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Mul( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_mul( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Mul( &_result[0], &_a[0], _b );
+}
+
+void _bx_vec3_add( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Add( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_add( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Add( &_result[0], &_a[0], _b );
+}
+
+void _bx_vec3_sub( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Sub( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_sub( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Sub( &_result[0], &_a[0], _b );
+}
+
+float _bx_vec3_dot( Array<float> _a, Array<float> _b )
+{
+	return bx::vec3Dot( &_a[0], &_b[0] );
+}
 
 
 void _calc_tangents(void* _vertices, uint16_t _numVertices, bgfx_vertex_decl_t * _decl, const uint16_t* _indices, uint32_t _numIndices)

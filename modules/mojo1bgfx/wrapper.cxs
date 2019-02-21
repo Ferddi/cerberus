@@ -11,8 +11,9 @@
 Import mojo1bgfx
 
 ' inverse color channel
-Const COLOR_CHANNEL:Float = 255.0
-Const INV_COLOR_CHANNEL:Float = 1.0 / COLOR_CHANNEL
+Const COLOR_CHANNEL     :Float = 255.0
+Const INV_COLOR_CHANNEL :Float = 0.0039215686274509803921568627451
+' Const INV_COLOR_CHANNEL :Float = 1.0 / COLOR_CHANNEL
 
 Const AlphaBlend:Int = 0
 Const AdditiveBlend:Int = 1
