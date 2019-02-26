@@ -1,0 +1,458 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+Import mojo.app
+Import bgfx
+
+Const RENDER_SHADOW_PASS_ID :Int = 0
+Const RENDER_SCENE_PASS_ID  :Int = 1
+
+Class PosNormalVertex
+
+	Field m_x      :Float
+	Field m_y      :Float
+	Field m_z      :Float
+	Field m_normal :Int
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_normal:Int )
+
+		Self.m_x = m_x
+		Self.m_y = m_y
+		Self.m_z = m_z
+
+		Self.m_normal = m_normal
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_NORMAL,   4, BGFX_ATTRIB_TYPE_UINT8, True, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global s_hplaneVertices:PosNormalVertex[] = [
+	New PosNormalVertex( -1.0, 0.0,  1.0, bgfxUtilsEncodeNormalRgba8( 0.0, 1.0, 0.0 ) ),
+	New PosNormalVertex(  1.0, 0.0,  1.0, bgfxUtilsEncodeNormalRgba8( 0.0, 1.0, 0.0 ) ),
+	New PosNormalVertex( -1.0, 0.0, -1.0, bgfxUtilsEncodeNormalRgba8( 0.0, 1.0, 0.0 ) ),
+	New PosNormalVertex(  1.0, 0.0, -1.0, bgfxUtilsEncodeNormalRgba8( 0.0, 1.0, 0.0 ) ) ]
+
+Global s_planeIndices:Int[] = [
+	0, 1, 2,
+	1, 3, 2]
+
+Class ShadowmapsSimpleExample Extends App
+
+	Field debug:Int = BGFX_DEBUG_NONE
+'  	Field debug:Int = BGFX_DEBUG_TEXT
+
+	Field sHPlaneVerticesBuffer :DataBuffer
+	Field sPlaneIndicesBuffer   :DataBuffer
+
+
+'  	Field m_program :Int
+	Field bgfxCaps  := New BgfxCaps()
+
+'  	Field at    :Float[] = [ 0.0, 0.0,   0.0 ]
+'  	Field eye   :Float[] = [ 0.0, 0.0, -35.0 ]
+
+'  	Field mtx   :Float[16]
+'  
+'  	Field state :Int[2]
+
+	Field depthScaleOffset:Float[] = [ 1.0, 0.0, 0.0, 0.0 ]
+
+
+	Field s_shadowMap:Int
+	Field u_lightPos:Int
+	Field u_lightMtx:Int
+
+	Field u_depthScaleOffset:Int
+
+	Field m_bunny:BgfxUtilsMesh
+	Field m_cube:BgfxUtilsMesh
+	Field m_hollowcube:BgfxUtilsMesh
+
+	Field m_vbh     :Int
+	Field m_ibh     :Int
+
+	Field m_shadowMapSize     :Int
+
+	Field m_progShadow     :Int
+	Field m_progMesh     :Int
+	Field m_drawDepth     :Int
+
+	Field m_shadowMapFB     :Int
+
+	Field m_state:BgfxUtilsMeshState[2]
+
+	Field m_view  :Float[16]
+	Field m_proj  :Float[16]
+
+	Field m_timeOffset:Int
+
+	Field m_shadowSamplerSupported:Bool
+
+	Field fbtextureBuffer:DataBuffer
+
+	Method MakeDataBuffers:Void()
+
+		Local address:Int
+		Local length:Int
+
+		' s_hplaneVertices to sHPlaneVerticesBuffer
+
+		address = 0
+		length = s_hplaneVertices.Length()
+
+		sHPlaneVerticesBuffer = New DataBuffer( length * 16 )
+		For Local i:Int = 0 Until length
+			sHPlaneVerticesBuffer.PokeFloat( address, s_hplaneVertices[i].m_x ); address += 4
+			sHPlaneVerticesBuffer.PokeFloat( address, s_hplaneVertices[i].m_y ); address += 4
+			sHPlaneVerticesBuffer.PokeFloat( address, s_hplaneVertices[i].m_z ); address += 4
+			sHPlaneVerticesBuffer.PokeInt( address, s_hplaneVertices[i].m_normal ); address += 4
+		Next
+
+		' s_planeIndices to sPlaneIndicesBuffer
+
+		address = 0
+		length = s_planeIndices.Length()
+
+		sPlaneIndicesBuffer = New DataBuffer( length * 2 )
+		For Local i:Int = 0 Until length
+			sPlaneIndicesBuffer.PokeShort( address, s_planeIndices[i] ); address += 2
+		Next
+
+	End
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		MakeDataBuffers()
+
+		' Enable debug text.
+		bgfxSetDebug( debug )
+
+		' Uniforms.
+		s_shadowMap = bgfxCreateUniform( "s_shadowMap", BGFX_UNIFORM_TYPE_INT1 )
+		u_lightPos  = bgfxCreateUniform( "u_lightPos",  BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightMtx  = bgfxCreateUniform( "u_lightMtx",  BGFX_UNIFORM_TYPE_MAT4 )
+
+		' When using GL clip space depth range [-1, 1] and packing depth into color buffer, we need to
+		' adjust the depth range to be [0, 1] for writing to the color buffer
+		u_depthScaleOffset = bgfxCreateUniform( "u_depthScaleOffset",  BGFX_UNIFORM_TYPE_VEC4 )
+
+		' Get renderer capabilities info.
+		bgfxGetCaps( bgfxCaps )
+
+		If bgfxCaps.GetHomogeneousDepth() Then
+			depthScaleOffset[0] = 0.5
+			depthScaleOffset[1] = 0.5
+		Endif
+
+		' do this every OnRender
+		' bgfxSetUniform( u_depthScaleOffset, depthScaleOffset )
+
+		' Create vertex stream declaration.
+		PosNormalVertex.Init()
+
+		' Meshes.
+		m_bunny      = bgfxUtilsMeshLoad( "meshes/bunny.bin" )
+		m_cube       = bgfxUtilsMeshLoad( "meshes/cube.bin" )
+		m_hollowcube = bgfxUtilsMeshLoad( "meshes/hollowcube.bin" )
+
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( sHPlaneVerticesBuffer ), PosNormalVertex.ms_decl )
+		m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( sPlaneIndicesBuffer ) )
+
+		' Render targets.
+		m_shadowMapSize = 512
+
+		' Shadow samplers are supported at least partially supported if texture
+		' compare less equal feature is supported.
+		Local supported:Int[2]
+		bgfxCaps.GetSupported( supported )
+		m_shadowSamplerSupported = 0 <> (supported[1] & BGFX_CAPS_TEXTURE_COMPARE_LEQUAL[1])
+
+		Local shadowMapTexture:Int
+
+		If m_shadowSamplerSupported Then
+
+			' Depth textures and shadow samplers are supported.
+			m_progShadow = bgfxUtilsLoadProgram( "vs_sms_shadow", "fs_sms_shadow" )
+			m_progMesh   = bgfxUtilsLoadProgram( "vs_sms_mesh",   "fs_sms_mesh"   )
+
+			Local fbtextures   :Int[ 1 ]
+			Local textureState :Int[ 2 ]
+
+			bgfxUtilsClear64Bit( textureState )
+			bgfxUtilsSet64Bit( textureState, BGFX_TEXTURE_RT )
+			textureState[1] |= BGFX_SAMPLER_COMPARE_LEQUAL
+
+			fbtextures[0] = bgfxCreateTexture2D( 
+				m_shadowMapSize, 
+				m_shadowMapSize, 
+				False, 
+				1, 
+				BGFX_TEXTURE_FORMAT_D16, 
+				textureState )
+
+			shadowMapTexture = fbtextures[0]
+
+			fbtextureBuffer = New DataBuffer(2)
+			fbtextureBuffer.PokeShort( 0, fbtextures[0] )
+
+			m_shadowMapFB = bgfxCreateFrameBufferFromHandles( fbtextures.Length(), fbtextureBuffer, True )
+
+		Else
+
+			' Depth textures and shadow samplers are not supported. Use float
+			' depth packing into color buffer instead.
+			m_progShadow = bgfxUtilsLoadProgram( "vs_sms_shadow_pd", "fs_sms_shadow_pd" )
+			m_progMesh   = bgfxUtilsLoadProgram( "vs_sms_mesh",      "fs_sms_mesh_pd"   )
+
+			Local fbtextures:Int[ 2 ]
+
+			fbtextures[0] = bgfxCreateTexture2D( 
+				m_shadowMapSize, 
+				m_shadowMapSize, 
+				False, 
+				1, 
+				BGFX_TEXTURE_FORMAT_BGRA8, 
+				BGFX_TEXTURE_RT )
+
+			fbtextures[1] = bgfxCreateTexture2D( 
+				m_shadowMapSize, 
+				m_shadowMapSize, 
+				False, 
+				1, 
+				BGFX_TEXTURE_FORMAT_D16, 
+				BGFX_TEXTURE_RT_WRITE_ONLY )
+
+			shadowMapTexture = fbtextures[0]
+
+			fbtextureBuffer = New DataBuffer(4)
+			fbtextureBuffer.PokeShort( 0, fbtextures[0] )
+			fbtextureBuffer.PokeShort( 2, fbtextures[1] )
+
+			m_shadowMapFB = bgfxCreateFrameBufferFromHandles( fbtextures.Length(), fbtextureBuffer, True )
+		Endif
+
+		m_state[0] = New BgfxUtilsMeshState()
+		bgfxUtilsClear64Bit( m_state[0].m_state )
+		If Not m_shadowSamplerSupported Then
+			bgfxUtilsSet64Bit( m_state[0].m_state, BGFX_STATE_WRITE_RGB )
+			bgfxUtilsSet64Bit( m_state[0].m_state, BGFX_STATE_WRITE_A )
+		Endif
+		bgfxUtilsSet64Bit( m_state[0].m_state, BGFX_STATE_WRITE_Z )
+		bgfxUtilsSet64Bit( m_state[0].m_state, BGFX_STATE_DEPTH_TEST_LESS )
+		bgfxUtilsSet64Bit( m_state[0].m_state, BGFX_STATE_CULL_CCW )
+		bgfxUtilsSet64Bit( m_state[0].m_state, BGFX_STATE_MSAA )
+		m_state[0].m_program = m_progShadow
+		m_state[0].m_viewId  = RENDER_SHADOW_PASS_ID
+		m_state[0].m_numTextures = 0
+
+		m_state[1] = New BgfxUtilsMeshState()
+		bgfxUtilsClear64Bit( m_state[1].m_state )
+		bgfxUtilsSet64Bit( m_state[1].m_state, BGFX_STATE_WRITE_RGB )
+		bgfxUtilsSet64Bit( m_state[1].m_state, BGFX_STATE_WRITE_A )
+		bgfxUtilsSet64Bit( m_state[1].m_state, BGFX_STATE_WRITE_Z )
+		bgfxUtilsSet64Bit( m_state[1].m_state, BGFX_STATE_DEPTH_TEST_LESS )
+		bgfxUtilsSet64Bit( m_state[1].m_state, BGFX_STATE_CULL_CCW )
+		bgfxUtilsSet64Bit( m_state[1].m_state, BGFX_STATE_MSAA )
+		m_state[1].m_program = m_progMesh
+		m_state[1].m_viewId  = RENDER_SCENE_PASS_ID
+		m_state[1].m_numTextures = 1
+		m_state[1].m_textures[0].m_flags = $ffffffff ' UINT32_MAX
+		m_state[1].m_textures[0].m_stage = 0
+		m_state[1].m_textures[0].m_sampler = s_shadowMap
+		m_state[1].m_textures[0].m_texture = shadowMapTexture
+
+		' Set view and projection matrices.
+
+		Local at  :Float[] = [ 0.0,  5.0,   0.0 ]
+		Local eye :Float[] = [ 0.0, 30.0, -60.0 ]
+		bxMtxLookAt( m_view, eye, at )
+
+		Local aspect:Float = Float( DeviceWidth() ) / Float( DeviceHeight() )
+		bxMtxProj( m_proj, 60.0, aspect, 0.1, 1000.0, bgfxCaps.GetHomogeneousDepth() )
+
+		m_timeOffset = Millisecs()
+
+		Return 0
+	End
+
+'  	Method OnClose:Int()
+'  
+'  		bgfxUtilsMeshUnload( m_bunny )
+'  		bgfxUtilsMeshUnload( m_cube )
+'  		bgfxUtilsMeshUnload( m_hollowcube )
+'  
+'  		' meshStateDestroy( m_state[0] )
+'  		' meshStateDestroy( m_state[1] )
+'  
+'  		bgfxDestroyVertexBuffer( m_vbh )
+'  		bgfxDestroyIndexBuffer( m_ibh )
+'  
+'  		bgfxDestroyProgram( m_progShadow )
+'  		bgfxDestroyProgram( m_progMesh )
+'  
+'  		bgfxDestroyFrameBuffer( m_shadowMapFB )
+'  
+'  		bgfxDestroyUniform( s_shadowMap )
+'  		bgfxDestroyUniform( u_lightPos )
+'  		bgfxDestroyUniform( u_lightMtx )
+'  		bgfxDestroyUniform( u_depthScaleOffset )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	Method OnRender:Int()
+
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
+
+		Local time:Float = (Millisecs() - m_timeOffset) * 0.001
+
+		' Setup lights.
+		Local lightPos:Float[4]
+		lightPos[ 0 ] = -Cosr( time )
+		lightPos[ 1 ] = -1.0
+		lightPos[ 2 ] = -Sinr( time )
+		lightPos[ 3 ] = 0.0
+
+		bgfxSetUniform( u_lightPos, lightPos )
+		bgfxSetUniform( u_depthScaleOffset, depthScaleOffset )
+
+		' Setup instance matrices.
+		Local mtxFloor:Float[16]
+		bxMtxSRT( mtxFloor, 30.0, 30.0, 30.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 )
+
+		Local mtxBunny:Float[16]
+		bxMtxSRT( mtxBunny, 5.0, 5.0, 5.0, 0.0, PI - time, 0.0, 15.0, 5.0, 0.0 )
+
+		Local mtxHollowcube:Float[16]
+		bxMtxSRT( mtxHollowcube, 2.5, 2.5, 2.5, 0.0, 1.56 - time, 0.0, 0.0, 10.0, 0.0 )
+
+		Local mtxCube:Float[16]
+		bxMtxSRT( mtxCube, 2.5, 2.5, 2.5, 0.0, 1.56 - time, 0.0, -15.0, 5.0, 0.0 )
+
+		' Define matrices.
+		Local lightView:Float[16]
+		Local lightProj:Float[16]
+
+		Local at  :Float[] = [ 0.0, 0.0, 0.0 ]
+		Local eye :Float[] = [ -lightPos[0], -lightPos[1], -lightPos[2] ]
+		bxMtxLookAt( lightView, eye, at )
+
+		Local area:Float = 30.0
+		bxMtxOrtho( lightProj, -area, area, -area, area, -100.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+
+		bgfxSetViewRect( RENDER_SHADOW_PASS_ID, 0, 0, m_shadowMapSize, m_shadowMapSize )
+		bgfxSetViewFrameBuffer( RENDER_SHADOW_PASS_ID, m_shadowMapFB )
+		bgfxSetViewTransform( RENDER_SHADOW_PASS_ID, lightView, lightProj )
+
+		bgfxSetViewRect( RENDER_SCENE_PASS_ID, 0, 0, m_width, m_height )
+		bgfxSetViewTransform( RENDER_SCENE_PASS_ID, m_view, m_proj )
+
+		' Clear backbuffer and shadowmap framebuffer at beginning.
+		bgfxSetViewClear( RENDER_SHADOW_PASS_ID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		bgfxSetViewClear( RENDER_SCENE_PASS_ID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		' Render.
+		Local mtxShadow:Float[16]
+		Local lightMtx:Float[16]
+
+		Local sy:Float = -0.5
+		Local sz:Float =  1.0
+		Local tz:Float =  0.0
+
+		If bgfxCaps.GetOriginBottomLeft() Then sy = 0.5
+		If bgfxCaps.GetHomogeneousDepth() Then sz = 0.5
+		If bgfxCaps.GetHomogeneousDepth() Then tz = 0.5
+
+		Local mtxCrop:Float[] = [
+			0.5, 0.0, 0.0, 0.0,
+			0.0,  sy, 0.0, 0.0,
+			0.0, 0.0,  sz, 0.0,
+			0.5, 0.5,  tz, 1.0 ]
+
+		Local mtxTmp:Float[16]
+		bxMtxMul( mtxTmp,    lightProj, mtxCrop )
+		bxMtxMul( mtxShadow, lightView, mtxTmp  )
+
+		' Floor.
+		bxMtxMul( lightMtx, mtxFloor, mtxShadow )
+
+		Local cached:Int = bgfxSetTransform( mtxFloor )
+
+		For Local pass:Int = 0 Until 2
+
+			Local st := m_state[ pass ]
+
+			bgfxSetTransformCached( cached )
+
+			For Local tex:Int = 0 Until st.m_numTextures
+				Local texture := st.m_textures[ tex ]
+				bgfxSetTexture(texture.m_stage, texture.m_sampler, texture.m_texture, texture.m_flags )
+			Next
+
+			bgfxSetUniform( u_lightMtx, lightMtx )
+			bgfxSetIndexBuffer( m_ibh )
+			bgfxSetVertexBuffer( 0, m_vbh )
+			bgfxSetState( st.m_state )
+			bgfxSubmit( st.m_viewId, st.m_program )
+		Next
+
+		' Bunny.
+		bxMtxMul( lightMtx, mtxBunny, mtxShadow )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		bgfxUtilsMeshSubmit( m_bunny, m_state[0], 1, mtxBunny )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		bgfxUtilsMeshSubmit( m_bunny, m_state[1], 1, mtxBunny )
+
+		' Hollow cube.
+		bxMtxMul( lightMtx, mtxHollowcube, mtxShadow )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		bgfxUtilsMeshSubmit( m_hollowcube, m_state[0], 1, mtxHollowcube )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		bgfxUtilsMeshSubmit( m_hollowcube, m_state[1], 1, mtxHollowcube )
+
+		' Cube.
+		bxMtxMul( lightMtx, mtxCube, mtxShadow )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		bgfxUtilsMeshSubmit( m_cube, m_state[0], 1, mtxCube )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		bgfxUtilsMeshSubmit( m_cube, m_state[1], 1, mtxCube )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame(False)
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	New ShadowmapsSimpleExample()
+	Return 0
+End

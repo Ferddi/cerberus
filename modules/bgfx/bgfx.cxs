@@ -1699,6 +1699,38 @@ Function bgfxUtilsMeshSubmit:Void(_mesh:BgfxUtilsMesh, _id:Int, _program:Int, _m
 	Next
 End
 
+Function bgfxUtilsMeshSubmit:Void( _mesh:BgfxUtilsMesh, _state:BgfxUtilsMeshState, _numPasses:Int, _mtx:Float[], _numMatrices:Int=1 )
+
+	Local cached:Int = bgfxSetTransform( _mtx, _numMatrices )
+
+	For Local pass:Int = 0 Until _numPasses
+
+		bgfxSetTransformCached( cached, _numMatrices )
+
+		Local state := _state ' [ pass ]
+		bgfxSetState( state.m_state )
+
+		For Local tex:Int = 0 Until state.m_numTextures
+			Local texture := state.m_textures[ tex ]
+			bgfxSetTexture( texture.m_stage, texture.m_sampler, texture.m_texture, texture.m_flags )
+		Next
+
+		Local groups:Stack<BgfxUtilsGroup> = _mesh.m_groups
+		Local length:Int = groups.Length()
+
+		For Local ii:Int = 0 Until length
+
+			Local group:BgfxUtilsGroup = groups.Get(ii)
+
+			bgfxSetIndexBuffer( group.m_ibh )
+			bgfxSetVertexBuffer( 0, group.m_vbh )
+			bgfxSubmit( state.m_viewId, state.m_program, 0, ii <> length -1 )
+		Next
+
+	Next
+End
+
+
 '  '/ Blend function separate.
 '  Function BGFX_STATE_BLEND_FUNC_SEPARATE:Void( state:Int[], _srcRGB:Int[], _dstRGB:Int[], _srcA:Int[], _dstA:Int[] )
 '  	' (UINT64_C(0) \
@@ -1744,3 +1776,37 @@ End
 '  	bgfxUtilsMeshLoad(mesh, filePath)
 '  	Return mesh
 '  End
+
+Class BgfxUtilsTextureState
+	Field m_flags   :Int
+	Field m_sampler :Int
+	Field m_texture :Int
+	Field m_stage   :Int
+End
+
+Class BgfxUtilsMeshState
+
+	Field m_numTextures :Int
+	Field m_textures    :BgfxUtilsTextureState[4]
+
+	Field m_state       :Int[2]
+	Field m_program     :Int
+	Field m_viewId      :Int
+
+	Method New()
+		For Local ii:Int = 0 Until m_textures.Length()
+			m_textures[ ii ] = New BgfxUtilsTextureState()
+		End
+	End
+End
+
+Function bgfxUtilsEncodeNormalRgba8:Int(_x:Float, _y:Float=0.0, _z:Float=0.0, _w:Float=0.0)
+
+	Local srcx:Float = _x * 0.5 + 0.5
+	Local srcy:Float = _y * 0.5 + 0.5
+	Local srcz:Float = _z * 0.5 + 0.5
+	Local srcw:Float = _w * 0.5 + 0.5
+
+	Return (Int(srcw * 255) Shl 24) | (Int(srcz * 255) Shl 16) | (Int(srcy * 255) Shl 8) | Int(srcx * 255)
+End
+

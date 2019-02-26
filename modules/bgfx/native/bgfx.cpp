@@ -2268,13 +2268,13 @@ void _bgfx_set_condition( uint16_t _handle, bool _visible )
 // Function bgfxSetTransform:Int( _mtx:Float[], _num:Int=1 )="_bgfx_set_transform"
 // BGFX_C_API uint32_t bgfx_set_transform(const void* _mtx, uint16_t _num);
 // int _bgfx_set_transform( const void * _mtx, int _num )
-void _bgfx_set_transform( Array<float> _mtx, int _num )
+int _bgfx_set_transform( Array<float> _mtx, int _num )
 {
-	bgfx_set_transform( &_mtx[0], _num );
+	return bgfx_set_transform( &_mtx[0], _num );
 }
-void _bgfx_set_transform_null()
+int _bgfx_set_transform_null()
 {
-	bgfx_set_transform( NULL, 1 );
+	return bgfx_set_transform( NULL, 1 );
 }
 
 // Function bgfxAllocTransform:Int( _transform:BgfxTransform, _num:Int )="_bgfx_alloc_transform"
