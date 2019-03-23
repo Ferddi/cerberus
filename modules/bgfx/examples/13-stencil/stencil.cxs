@@ -311,58 +311,14 @@ Function MtxBillboard:Void( _result:Float[], _view:Float[], _pos:Float[], _scale
 	_result[15] = 1.0
 End
 
-Const UNIFORMS_PARAMS_AMBIENT_PASS  :Int = 0
-Const UNIFORMS_PARAMS_LIGHTING_PASS :Int = 1
-Const UNIFORMS_PARAMS_LIGHT_COUNT   :Int = 2
-Const UNIFORMS_PARAMS_LIGHT_INDEX   :Int = 3
-
-Class UniformsParams
-
-	Field toArray        :Float[4]
-
-	Field m_ambientPass  :Float
-	Field m_lightingPass :Float
-	Field m_lightCount   :Float
-	Field m_lightIndex   :Float
-
-	Method ToArray:Float[]()
-		toArray[0] = m_ambientPass
-		toArray[1] = m_lightingPass
-		toArray[2] = m_lightCount
-		toArray[3] = m_lightIndex
-	End
-End
-
-Class UniformsSvParams
-
-	Field toArray         :Float[4]
-
-	Field m_useStencilTex :Float
-	Field m_dfail         :Float
-	Field m_unused0       :Float
-	Field m_unused1       :Float
-
-	Method ToArray:Float[]()
-		toArray[0] = m_useStencilTex
-		toArray[1] = m_dfail
-		toArray[2] = m_unused0
-		toArray[3] = m_unused1
-	End
-End
-
 Class Uniforms
 
 	Method Init:Void()
 
-'		m_params.m_ambientPass   = 1.0
-'		m_params.m_lightingPass  = 1.0
-'		m_params.m_lightCount    = 4.0
-'		m_params.m_lightIndex    = 4.0
-
-		m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
-		m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
-		m_params[ UNIFORMS_PARAMS_LIGHT_COUNT   ] = 4.0
-		m_params[ UNIFORMS_PARAMS_LIGHT_INDEX   ] = 4.0
+		m_params[ PARAMS_AMBIENT_PASS  ] = 1.0
+		m_params[ PARAMS_LIGHTING_PASS ] = 1.0
+		m_params[ PARAMS_LIGHT_COUNT   ] = 4.0
+		m_params[ PARAMS_LIGHT_INDEX   ] = 4.0
 
 		m_ambient[0] = 0.02
 		m_ambient[1] = 0.02
@@ -436,9 +392,18 @@ Class Uniforms
 		bgfxDestroyUniform(u_lightRgbInnerR)
 	End
 
-	' Field m_params             := New UniformsParams()
+	Const PARAMS_AMBIENT_PASS      :Int = 0
+	Const PARAMS_LIGHTING_PASS     :Int = 1
+	Const PARAMS_LIGHT_COUNT       :Int = 2
+	Const PARAMS_LIGHT_INDEX       :Int = 3
+
+	Const SVPARAMS_USE_STENCIL_TEX :Int = 0
+	Const SVPARAMS_DFAIL           :Int = 1
+	Const SVPARAMS_UNUSED10        :Int = 2
+	Const SVPARAMS_UNUSED11        :Int = 3
+
 	Field m_params             :Float[4]
-	Field m_svparams           := New UniformsSvParams()
+	Field m_svparams           :Float[4]
 
 	Field m_ambient            :Float[4]
 	Field m_diffuse            :Float[4]
@@ -1071,14 +1036,10 @@ Class StencilExample Extends App
 
 		' Update settings.
 		Local numLights:Int = m_numLights
-'		s_uniforms.m_params.m_ambientPass  = 1.0
-'		s_uniforms.m_params.m_lightingPass = 1.0
-'		s_uniforms.m_params.m_lightCount   = Float(m_numLights)
-'		s_uniforms.m_params.m_lightIndex   = 0.0
-		s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
-		s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
-		s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_COUNT   ] = Float(m_numLights)
-		s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_INDEX   ] = 0.0
+		s_uniforms.m_params[ Uniforms.PARAMS_AMBIENT_PASS  ] = 1.0
+		s_uniforms.m_params[ Uniforms.PARAMS_LIGHTING_PASS ] = 1.0
+		s_uniforms.m_params[ Uniforms.PARAMS_LIGHT_COUNT   ] = Float(m_numLights)
+		s_uniforms.m_params[ Uniforms.PARAMS_LIGHT_INDEX   ] = 0.0
 		s_uniforms.m_color[3]              = m_reflectionValue
 
 		' Time.
@@ -1186,11 +1147,8 @@ Class StencilExample Extends App
 			' First pass - Draw plane.
 
 			' Setup params for this scene.
-'			s_uniforms.m_params.m_ambientPass = 1.0
-'			s_uniforms.m_params.m_lightingPass = 1.0
-			s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
-			s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
-
+			s_uniforms.m_params[ Uniforms.PARAMS_AMBIENT_PASS  ] = 1.0
+			s_uniforms.m_params[ Uniforms.PARAMS_LIGHTING_PASS ] = 1.0
 
 			' Floor.
 			MeshSubmitStencil( m_hplaneMesh,
@@ -1281,9 +1239,8 @@ Class StencilExample Extends App
 			' First pass - Draw entire scene. (ambient only).
 '			s_uniforms.m_params.m_ambientPass  = 1.0
 '			s_uniforms.m_params.m_lightingPass = 0.0
-			s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
-			s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 0.0
-
+			s_uniforms.m_params[ Uniforms.PARAMS_AMBIENT_PASS  ] = 1.0
+			s_uniforms.m_params[ Uniforms.PARAMS_LIGHTING_PASS ] = 0.0
 
 			' Bunny.
 			MeshSubmitStencil( m_bunnyMesh,
@@ -1363,14 +1320,10 @@ Class StencilExample Extends App
 				Next
 
 				' Draw entire scene. (lighting pass only. blending is on)
-'				s_uniforms.m_params.m_ambientPass  = 0.0
-'				s_uniforms.m_params.m_lightingPass = 1.0
-'				s_uniforms.m_params.m_lightCount   = 1.0
-'				s_uniforms.m_params.m_lightIndex   = Float( ii )
-				s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 0.0
-				s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
-				s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_COUNT   ] = 1.0
-				s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHT_INDEX   ] = Float( ii )
+				s_uniforms.m_params[ Uniforms.PARAMS_AMBIENT_PASS  ] = 0.0
+				s_uniforms.m_params[ Uniforms.PARAMS_LIGHTING_PASS ] = 1.0
+				s_uniforms.m_params[ Uniforms.PARAMS_LIGHT_COUNT   ] = 1.0
+				s_uniforms.m_params[ Uniforms.PARAMS_LIGHT_INDEX   ] = Float( ii )
 
 				' Bunny.
 				MeshSubmitStencil( m_bunnyMesh,
@@ -1401,10 +1354,8 @@ Class StencilExample Extends App
 			Next
 
 			' Reset these to default..
-'			s_uniforms.m_params.m_ambientPass  = 1.0
-'			s_uniforms.m_params.m_lightingPass = 1.0
-			s_uniforms.m_params[ UNIFORMS_PARAMS_AMBIENT_PASS  ] = 1.0
-			s_uniforms.m_params[ UNIFORMS_PARAMS_LIGHTING_PASS ] = 1.0
+			s_uniforms.m_params[ Uniforms.PARAMS_AMBIENT_PASS  ] = 1.0
+			s_uniforms.m_params[ Uniforms.PARAMS_LIGHTING_PASS ] = 1.0
 		End
 
 		' lights
