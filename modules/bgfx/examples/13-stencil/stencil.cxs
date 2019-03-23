@@ -31,16 +31,6 @@ Const RENDER_VIEWID_RANGE1_PASS_7:Int = 13
 
 Const MAX_NUM_LIGHTS:Int = 5
 
-Function EncodeNormalRgba8:Int(_x:Float, _y:Float=0.0, _z:Float=0.0, _w:Float=0.0)
-
-	Local srcx:Float = _x * 0.5 + 0.5
-	Local srcy:Float = _y * 0.5 + 0.5
-	Local srcz:Float = _z * 0.5 + 0.5
-	Local srcw:Float = _w * 0.5 + 0.5
-
-	Return (Int(srcw * 255) Shl 24) | (Int(srcz * 255) Shl 16) | (Int(srcy * 255) Shl 8) | Int(srcx * 255)
-End
-
 Class PosNormalTexcoordVertex
 
 	Field m_x      :Float
@@ -58,7 +48,7 @@ Class PosNormalTexcoordVertex
 		Self.m_y      = m_y
 		Self.m_z      = m_z
 
-		Self.m_normal = EncodeNormalRgba8( m_nx, m_ny, m_nz )
+		Self.m_normal = bgfxUtilsEncodeNormalRgba8( m_nx, m_ny, m_nz )
 '  		Print "m_nx=" + m_nx + " m_ny=" + m_ny + " m_nz=" + m_nz + " m_normal=" + IntToHex(m_normal)
 
 		Self.m_u      = m_u
