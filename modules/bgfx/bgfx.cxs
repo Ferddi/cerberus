@@ -591,8 +591,10 @@ Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_add"
 Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_sub"
 Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_sub"
 Function bxVec3Dot:Float( _a:Float[], _b:Float[] )="_bx_vec3_dot"
-
-
+Function bxMtxIdentity:Float( _result:Float[] )="_bx_mtx_identity"
+Function bxToRad:Float( _deg:Float )="_bx_to_rad"
+Function bxMtxTranspose:Void( _result:Float[], _a:Float[] )="_bx_mtx_transpose"
+Function bxVec3MulMtxH:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx_h"
 
 
 Function bgfxReadPixels:Void( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )="_bgfx_read_pixels"

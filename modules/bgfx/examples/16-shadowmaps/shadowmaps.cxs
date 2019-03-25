@@ -1,0 +1,3278 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Import camera
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+Const RENDERVIEW_SHADOWMAP_0_ID :Int = 1
+Const RENDERVIEW_SHADOWMAP_1_ID :Int = 2
+Const RENDERVIEW_SHADOWMAP_2_ID :Int = 3
+Const RENDERVIEW_SHADOWMAP_3_ID :Int = 4
+Const RENDERVIEW_SHADOWMAP_4_ID :Int = 5
+Const RENDERVIEW_VBLUR_0_ID     :Int = 6
+Const RENDERVIEW_HBLUR_0_ID     :Int = 7
+Const RENDERVIEW_VBLUR_1_ID     :Int = 8
+Const RENDERVIEW_HBLUR_1_ID     :Int = 9
+Const RENDERVIEW_VBLUR_2_ID     :Int = 10
+Const RENDERVIEW_HBLUR_2_ID     :Int = 11
+Const RENDERVIEW_VBLUR_3_ID     :Int = 12
+Const RENDERVIEW_HBLUR_3_ID     :Int = 13
+Const RENDERVIEW_DRAWSCENE_0_ID :Int = 14
+Const RENDERVIEW_DRAWSCENE_1_ID :Int = 15
+Const RENDERVIEW_DRAWDEPTH_0_ID :Int = 16
+Const RENDERVIEW_DRAWDEPTH_1_ID :Int = 17
+Const RENDERVIEW_DRAWDEPTH_2_ID :Int = 18
+Const RENDERVIEW_DRAWDEPTH_3_ID :Int = 19
+
+Class LightType
+	Const SpotLight        :Int = 0
+	Const PointLight       :Int = 1
+	Const DirectionalLight :Int = 2
+	Const Count            :Int = 3
+End
+
+Class DepthImpl
+	Const InvZ   :Int = 0
+	Const Linear :Int = 1
+	Const Count  :Int = 2
+End
+
+Class PackDepth
+	Const RGBA  :Int = 0
+	Const VSM   :Int = 1
+	Const Count :Int = 2
+End
+
+Class SmImpl
+	Const Hard  :Int = 0
+	Const PCF   :Int = 1
+	Const VSM   :Int = 2
+	Const ESM   :Int = 3
+	Const Count :Int = 4
+End
+
+Class SmType
+	Const Single  :Int = 0
+	Const Omni    :Int = 1
+	Const Cascade :Int = 2
+	Const Count   :Int = 3
+End
+
+Class TetrahedronFaces
+	Const Green  :Int = 0
+	Const Yellow :Int = 1
+	Const Blue   :Int = 2
+	Const Red    :Int = 3
+	Const Count  :Int = 4
+End
+
+Class ProjType
+	Const Horizontal :Int = 0
+	Const Vertical   :Int = 1
+	Const Count      :Int = 2
+End
+
+Class ShadowMapRenderTargets
+	Const First  :Int = 0
+	Const Second :Int = 1
+	Const Third  :Int = 2
+	Const Fourth :Int = 3
+	Const Count  :Int = 4
+End
+
+Class PosNormalTexcoordVertex
+
+	Field m_x      :Float
+	Field m_y      :Float
+	Field m_z      :Float
+
+	Field m_normal :Int
+
+	Field m_u      :Float
+	Field m_v      :Float
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_nx:Float, m_ny:Float, m_nz:Float, m_u:Float, m_v:Float )
+
+		Self.m_x      = m_x
+		Self.m_y      = m_y
+		Self.m_z      = m_z
+
+		Self.m_normal = bgfxUtilsEncodeNormalRgba8( m_nx, m_ny, m_nz )
+'  		Print "m_nx=" + m_nx + " m_ny=" + m_ny + " m_nz=" + m_nz + " m_normal=" + IntToHex(m_normal)
+
+		Self.m_u      = m_u
+		Self.m_v      = m_v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_NORMAL,    4, BGFX_ATTRIB_TYPE_UINT8, True, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Const s_texcoord:Float = 5.0
+
+Global s_hplaneVertices:PosNormalTexcoordVertex[] = [
+	New PosNormalTexcoordVertex( -1.0, 0.0,  1.0, 0.0, 1.0, 0.0, s_texcoord, s_texcoord ),
+	New PosNormalTexcoordVertex(  1.0, 0.0,  1.0, 0.0, 1.0, 0.0, s_texcoord, 0.0        ),
+	New PosNormalTexcoordVertex( -1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0,        s_texcoord ),
+	New PosNormalTexcoordVertex(  1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0,        0.0        ) ]
+
+Global s_vplaneVertices:PosNormalTexcoordVertex[] = [
+	New PosNormalTexcoordVertex( -1.0,  1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0,  1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0 ),
+	New PosNormalTexcoordVertex( -1.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0 ),
+	New PosNormalTexcoordVertex(  1.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0 ) ]
+
+Global s_planeIndices:Int[] = [
+	0, 1, 2,
+	1, 3, 2 ]
+
+Function PosNormalTexcoordVertexToDataBuffer:DataBuffer( _vertices:PosNormalTexcoordVertex[] )
+
+	Local bufferAddress  :Int = 0
+	Local verticesCount  :Int = _vertices.Length()
+
+	' there are 6 fields in PosNormalTexcoordVertex (m_x, m_y, m_z, m_normal, m_u & m_v)
+	' each field is 4 bytes in size:
+	Local verticesBuffer := New DataBuffer( verticesCount * 6 * 4 )
+
+	For Local ii:Int = 0 Until verticesCount
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+
+		verticesBuffer.PokeInt( bufferAddress, _vertices[ ii ].m_normal ) ; bufferAddress += 4
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_u ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_v ) ; bufferAddress += 4
+	Next
+
+	Return verticesBuffer
+End
+
+Function Index16ToDataBuffer:DataBuffer( _indices:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	' the size of each index is 16 bit, which is 2 bytes:
+	Local indicesBuffer := New DataBuffer( indicesCount * 2 )
+
+	For Local ii:Int = 0 Until indicesCount
+		indicesBuffer.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+
+	Return indicesBuffer
+End
+
+Global s_flipV       :Bool = False
+Global s_texelHalf   :Float = 0.0
+
+Global s_texColor    :Int
+Global s_shadowMap   :Int[ ShadowMapRenderTargets.Count ]
+Global s_rtShadowMap :Int[ ShadowMapRenderTargets.Count ]
+Global s_rtBlur      :Int
+
+Function MtxBillboard:Void( _result:Float[], _view:Float[], _pos:Float[], _scale:Float[] )
+
+	_result[  0 ] = _view[  0 ] * _scale[ 0 ]
+	_result[  1 ] = _view[  4 ] * _scale[ 0 ]
+	_result[  2 ] = _view[  8 ] * _scale[ 0 ]
+	_result[  3 ] = 0.0
+
+	_result[  4 ] = _view[  1 ] * _scale[ 1 ]
+	_result[  5 ] = _view[  5 ] * _scale[ 1 ]
+	_result[  6 ] = _view[  9 ] * _scale[ 1 ]
+	_result[  7 ] = 0.0
+
+	_result[  8 ] = _view[  2 ] * _scale[ 2 ]
+	_result[  9 ] = _view[  6 ] * _scale[ 2 ]
+	_result[ 10 ] = _view[ 10 ] * _scale[ 2 ]
+	_result[ 11 ] = 0.0
+
+	_result[ 12 ] = _pos[ 0 ]
+	_result[ 13 ] = _pos[ 1 ]
+	_result[ 14 ] = _pos[ 2 ]
+	_result[ 15 ] = 1.0
+End
+
+Function MtxYawPitchRoll:Void( _result:Float[], _yaw:Float, _pitch:Float, _roll:Float )
+
+	Local sroll  :Float = Sin( _roll )
+	Local croll  :Float = Cos( _roll )
+	Local spitch :Float = Sin( _pitch )
+	Local cpitch :Float = Cos( _pitch )
+	Local syaw   :Float = Sin( _yaw )
+	Local cyaw   :Float = Cos( _yaw )
+
+	_result[  0 ] = sroll * spitch * syaw + croll * cyaw
+	_result[  1 ] = sroll * cpitch
+	_result[  2 ] = sroll * spitch * cyaw - croll * syaw
+	_result[  3 ] = 0.0
+
+	_result[  4 ] = croll * spitch * syaw - sroll * cyaw
+	_result[  5 ] = croll * cpitch
+	_result[  6 ] = croll * spitch * cyaw + sroll * syaw
+	_result[  7 ] = 0.0
+
+	_result[  8 ] = cpitch * syaw
+	_result[  9 ] = -spitch
+	_result[ 10 ] = cpitch * cyaw
+	_result[ 11 ] = 0.0
+
+	_result[ 12 ] = 0.0
+	_result[ 13 ] = 0.0
+	_result[ 14 ] = 0.0
+	_result[ 15 ] = 1.0
+End
+
+Class Material
+
+	Const AMBIENT_RED     :Int = 0
+	Const AMBIENT_GREEN   :Int = 1
+	Const AMBIENT_BLUE    :Int = 2
+	Const AMBIENT_UNUSED  :Int = 3
+	Const AMBIENT_SIZE    :Int = 4
+
+	Const DIFFUSE_RED     :Int = 0
+	Const DIFFUSE_GREEN   :Int = 1
+	Const DIFFUSE_BLUE    :Int = 2
+	Const DIFFUSE_UNUSED  :Int = 3
+	Const DIFFUSE_SIZE    :Int = 4
+
+	Const SPECULAR_RED    :Int = 0
+	Const SPECULAR_GREEN  :Int = 1
+	Const SPECULAR_BLUE   :Int = 2
+	Const SPECULAR_UNUSED :Int = 3
+	Const SPECULAR_SIZE   :Int = 4
+
+	Field m_ka :Float[ AMBIENT_SIZE  ] ' ambient
+	Field m_kd :Float[ DIFFUSE_SIZE  ] ' diffuse
+	Field m_ks :Float[ SPECULAR_SIZE ] ' specular
+
+	Method SetAmbient:Void( red:Float, green:Float, blue:Float, unused:Float )
+		m_ka[ AMBIENT_RED    ] = red
+		m_ka[ AMBIENT_GREEN  ] = green
+		m_ka[ AMBIENT_BLUE   ] = blue
+		m_ka[ AMBIENT_UNUSED ] = unused
+	End
+
+	Method SetDiffuse:Void( red:Float, green:Float, blue:Float, unused:Float )
+		m_kd[ DIFFUSE_RED    ] = red
+		m_kd[ DIFFUSE_GREEN  ] = green
+		m_kd[ DIFFUSE_BLUE   ] = blue
+		m_kd[ DIFFUSE_UNUSED ] = unused
+	End
+
+	Method SetSpecular:Void( red:Float, green:Float, blue:Float, unused:Float )
+		m_ks[ SPECULAR_RED    ] = red
+		m_ks[ SPECULAR_GREEN  ] = green
+		m_ks[ SPECULAR_BLUE   ] = blue
+		m_ks[ SPECULAR_UNUSED ] = unused
+	End
+End
+
+Class Light
+
+	Const POSITION_X             :Int = 0
+	Const POSITION_Y             :Int = 1
+	Const POSITION_Z             :Int = 2
+	Const POSITION_W             :Int = 3
+	Const POSITION_SIZE          :Int = 4
+
+	Const LIGHT_RED              :Int = 0
+	Const LIGHT_GREEN            :Int = 1
+	Const LIGHT_BLUE             :Int = 2
+	Const LIGHT_POWER            :Int = 3
+	Const LIGHT_SIZE             :Int = 4
+
+	Const SPOT_DIRECTION_X       :Int = 0
+	Const SPOT_DIRECTION_Y       :Int = 1
+	Const SPOT_DIRECTION_Z       :Int = 2
+	Const SPOT_INNER             :Int = 3
+	Const SPOT_SIZE              :Int = 4
+
+	Const ATTENUATION_CONSTANT   :Int = 0
+	Const ATTENUATION_LINEAR     :Int = 1
+	Const ATTENUATION_QUADRANTIC :Int = 2
+	Const SPOT_OUTER             :Int = 3
+	Const ATTENUATION_SIZE       :Int = 4
+
+	Method ComputeViewSpaceComponents:Void( _viewMtx:Float[] )
+
+		bxVec4MulMtx( m_position_viewSpace, m_position, _viewMtx )
+
+		Local tmp:Float[] = [ ' [ SPOT_SIZE ] = [
+			m_spotDirectionInner[ SPOT_DIRECTION_X ],
+			m_spotDirectionInner[ SPOT_DIRECTION_Y ],
+			m_spotDirectionInner[ SPOT_DIRECTION_Z ],
+			0.0 ]
+
+		bxVec4MulMtx( m_spotDirectionInner_viewSpace, tmp, _viewMtx )
+		m_spotDirectionInner_viewSpace[ SPOT_INNER ] = m_spotDirectionInner[ SPOT_INNER ]
+	End
+
+	Field m_position                     :Float[ POSITION_SIZE ]
+	Field m_position_viewSpace           :Float[ POSITION_SIZE ]
+	Field m_ambientPower                 :Float[ LIGHT_SIZE ]
+	Field m_diffusePower                 :Float[ LIGHT_SIZE ]
+	Field m_specularPower                :Float[ LIGHT_SIZE ]
+	Field m_spotDirectionInner           :Float[ SPOT_SIZE ]
+	Field m_spotDirectionInner_viewSpace :Float[ SPOT_SIZE ]
+	Field m_attenuationSpotOuter         :Float[ ATTENUATION_SIZE ]
+
+	Method SetPosition:Void( x:Float, y:Float, z:Float, w:Float )
+
+		m_position[ POSITION_X ] = x
+		m_position[ POSITION_Y ] = y
+		m_position[ POSITION_Z ] = z
+		m_position[ POSITION_W ] = w
+
+		m_position_viewSpace[ POSITION_X ] = 0.0
+		m_position_viewSpace[ POSITION_Y ] = 0.0
+		m_position_viewSpace[ POSITION_Z ] = 0.0
+		m_position_viewSpace[ POSITION_W ] = 0.0
+	End
+
+	Method SetAmbient:Void( red:Float, green:Float, blue:Float, power:Float )
+		m_ambientPower[ LIGHT_RED    ] = red
+		m_ambientPower[ LIGHT_GREEN  ] = green
+		m_ambientPower[ LIGHT_BLUE   ] = blue
+		m_ambientPower[ LIGHT_POWER  ] = power
+	End
+
+	Method SetDiffuse:Void( red:Float, green:Float, blue:Float, power:Float )
+		m_diffusePower[ LIGHT_RED    ] = red
+		m_diffusePower[ LIGHT_GREEN  ] = green
+		m_diffusePower[ LIGHT_BLUE   ] = blue
+		m_diffusePower[ LIGHT_POWER  ] = power
+	End
+
+	Method SetSpecular:Void( red:Float, green:Float, blue:Float, power:Float )
+		m_specularPower[ LIGHT_RED    ] = red
+		m_specularPower[ LIGHT_GREEN  ] = green
+		m_specularPower[ LIGHT_BLUE   ] = blue
+		m_specularPower[ LIGHT_POWER  ] = power
+	End
+
+	Method SetSpotDirection:Void( directionX:Float, directionY:Float, directionZ:Float )
+
+		m_spotDirectionInner[ SPOT_DIRECTION_X ] = directionX
+		m_spotDirectionInner[ SPOT_DIRECTION_Y ] = directionY
+		m_spotDirectionInner[ SPOT_DIRECTION_Z ] = directionZ
+
+		m_spotDirectionInner_viewSpace[ SPOT_DIRECTION_X ] = 0.0
+		m_spotDirectionInner_viewSpace[ SPOT_DIRECTION_Y ] = 0.0
+		m_spotDirectionInner_viewSpace[ SPOT_DIRECTION_Z ] = 0.0
+		m_spotDirectionInner_viewSpace[ SPOT_INNER       ] = 0.0
+	End
+
+	Method SetSpotInnerOuter:Void( inner:Float, outer:Float )
+		m_spotDirectionInner[ SPOT_INNER ] = inner ' spotexponent
+		m_attenuationSpotOuter[ SPOT_OUTER ] = outer ' spotcutoff
+	End
+
+	Method SetAttenuation:Void( constant:Float, linear:Float, quadrantic:Float )
+		m_attenuationSpotOuter[ ATTENUATION_CONSTANT   ] = constant
+		m_attenuationSpotOuter[ ATTENUATION_LINEAR     ] = linear
+		m_attenuationSpotOuter[ ATTENUATION_QUADRANTIC ] = quadrantic
+	End
+End
+
+Class Uniforms
+
+	Method Init:Void()
+
+		m_params0[ PARAMS0_AMBIENT_PASS          ] = 1.0
+		m_params0[ PARAMS0_LIGHTING_PASS         ] = 1.0
+		m_params0[ PARAMS0_UNUSED00              ] = 0.0
+		m_params0[ PARAMS0_UNUSED00              ] = 0.0
+
+		m_params1[ PARAMS1_SHADOW_MAP_BIAS       ] = 0.003
+		m_params1[ PARAMS1_SHADOW_MAP_OFFSET     ] = 0.0
+		m_params1[ PARAMS1_SHADOW_MAP_PARAM0     ] = 0.5
+		m_params1[ PARAMS1_SHADOW_MAP_PARAM1     ] = 1.0
+
+		m_params2[ PARAMS2_DEPTH_VALUE_POW       ] = 1.0
+		m_params2[ PARAMS2_SHOW_SM_COVERAGE      ] = 1.0
+		m_params2[ PARAMS2_SHADOW_MAP_TEXEL_SIZE ] = 1.0 / 512.0
+		m_params2[ PARAMS2_UNUSED23              ] = 0.0
+
+		m_csmFarDistances[ 0 ]      = 30.0
+		m_csmFarDistances[ 1 ]      = 90.0
+		m_csmFarDistances[ 2 ]      = 180.0
+		m_csmFarDistances[ 3 ]      = 1000.0
+
+		m_tetraNormalGreen[ 0 ]     = 0.0
+		m_tetraNormalGreen[ 1 ]     = -0.57735026
+		m_tetraNormalGreen[ 2 ]     = 0.81649661
+
+		m_tetraNormalYellow[ 0 ]    = 0.0
+		m_tetraNormalYellow[ 1 ]    = -0.57735026
+		m_tetraNormalYellow[ 2 ]    = -0.81649661
+
+		m_tetraNormalBlue[ 0 ]      = -0.81649661
+		m_tetraNormalBlue[ 1 ]      = 0.57735026
+		m_tetraNormalBlue[ 2 ]      = 0.0
+
+		m_tetraNormalRed[ 0 ]       = 0.81649661
+		m_tetraNormalRed[ 1 ]       = 0.57735026
+		m_tetraNormalRed[ 2 ]       = 0.0
+
+		m_paramsBlur[ PARAMS_BLUR_X_NUM    ] = 2.0
+		m_paramsBlur[ PARAMS_BLUR_Y_NUM    ] = 2.0
+		m_paramsBlur[ PARAMS_BLUR_X_OFFSET ] = 10.0 / 512.0
+		m_paramsBlur[ PARAMS_BLUR_Y_OFFSET ] = 10.0 / 512.0
+
+		u_params0                   = bgfxCreateUniform( "u_params0",                    BGFX_UNIFORM_TYPE_VEC4 )
+		u_params1                   = bgfxCreateUniform( "u_params1",                    BGFX_UNIFORM_TYPE_VEC4 )
+		u_params2                   = bgfxCreateUniform( "u_params2",                    BGFX_UNIFORM_TYPE_VEC4 )
+		u_color                     = bgfxCreateUniform( "u_color",                      BGFX_UNIFORM_TYPE_VEC4 )
+		u_smSamplingParams          = bgfxCreateUniform( "u_smSamplingParams",           BGFX_UNIFORM_TYPE_VEC4 )
+		u_csmFarDistances           = bgfxCreateUniform( "u_csmFarDistances",            BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightMtx                  = bgfxCreateUniform( "u_lightMtx",                   BGFX_UNIFORM_TYPE_MAT4 )
+
+		u_tetraNormalGreen          = bgfxCreateUniform( "u_tetraNormalGreen",           BGFX_UNIFORM_TYPE_VEC4 )
+		u_tetraNormalYellow         = bgfxCreateUniform( "u_tetraNormalYellow",          BGFX_UNIFORM_TYPE_VEC4 )
+		u_tetraNormalBlue           = bgfxCreateUniform( "u_tetraNormalBlue",            BGFX_UNIFORM_TYPE_VEC4 )
+		u_tetraNormalRed            = bgfxCreateUniform( "u_tetraNormalRed",             BGFX_UNIFORM_TYPE_VEC4 )
+
+		u_shadowMapMtx0             = bgfxCreateUniform( "u_shadowMapMtx0",              BGFX_UNIFORM_TYPE_MAT4 )
+		u_shadowMapMtx1             = bgfxCreateUniform( "u_shadowMapMtx1",              BGFX_UNIFORM_TYPE_MAT4 )
+		u_shadowMapMtx2             = bgfxCreateUniform( "u_shadowMapMtx2",              BGFX_UNIFORM_TYPE_MAT4 )
+		u_shadowMapMtx3             = bgfxCreateUniform( "u_shadowMapMtx3",              BGFX_UNIFORM_TYPE_MAT4 )
+
+		u_lightPosition             = bgfxCreateUniform( "u_lightPosition",              BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightAmbientPower         = bgfxCreateUniform( "u_lightAmbientPower",          BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightDiffusePower         = bgfxCreateUniform( "u_lightDiffusePower",          BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightSpecularPower        = bgfxCreateUniform( "u_lightSpecularPower",         BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightSpotDirectionInner   = bgfxCreateUniform( "u_lightSpotDirectionInner",    BGFX_UNIFORM_TYPE_VEC4 )
+		u_lightAttenuationSpotOuter = bgfxCreateUniform( "u_lightAttenuationSpotOuter",  BGFX_UNIFORM_TYPE_VEC4 )
+
+		u_materialKa                = bgfxCreateUniform( "u_materialKa",                 BGFX_UNIFORM_TYPE_VEC4 )
+		u_materialKd                = bgfxCreateUniform( "u_materialKd",                 BGFX_UNIFORM_TYPE_VEC4 )
+		u_materialKs                = bgfxCreateUniform( "u_materialKs",                 BGFX_UNIFORM_TYPE_VEC4 )
+	End
+
+	Method SetPtrs:Void( _materialPtr:Material, _lightPtr:Light, _colorPtr:Float[], _lightMtxPtr:Float[], _shadowMapMtx0:Float[], _shadowMapMtx1:Float[], _shadowMapMtx2:Float[], _shadowMapMtx3:Float[] )
+
+		m_lightMtxPtr   = _lightMtxPtr
+		m_colorPtr      = _colorPtr
+		m_materialPtr   = _materialPtr
+		m_lightPtr      = _lightPtr
+
+		m_shadowMapMtx0 = _shadowMapMtx0
+		m_shadowMapMtx1 = _shadowMapMtx1
+		m_shadowMapMtx2 = _shadowMapMtx2
+		m_shadowMapMtx3 = _shadowMapMtx3
+	End
+
+	' call this once at initialization
+	Method SubmitConstUniforms:Void()
+		bgfxSetUniform( u_tetraNormalGreen,  m_tetraNormalGreen )
+		bgfxSetUniform( u_tetraNormalYellow, m_tetraNormalYellow )
+		bgfxSetUniform( u_tetraNormalBlue,   m_tetraNormalBlue )
+		bgfxSetUniform( u_tetraNormalRed,    m_tetraNormalRed )
+	End
+
+	' Call this once per frame.
+	Method SubmitPerFrameUniforms:Void()
+
+		bgfxSetUniform( u_params1, m_params1 )
+		bgfxSetUniform( u_params2, m_params2 )
+		bgfxSetUniform( u_smSamplingParams, m_paramsBlur )
+		bgfxSetUniform( u_csmFarDistances, m_csmFarDistances )
+
+		bgfxSetUniform( u_materialKa, m_materialPtr.m_ka )
+		bgfxSetUniform( u_materialKd, m_materialPtr.m_kd )
+		bgfxSetUniform( u_materialKs, m_materialPtr.m_ks )
+
+		bgfxSetUniform( u_lightPosition,             m_lightPtr.m_position_viewSpace )
+		bgfxSetUniform( u_lightAmbientPower,         m_lightPtr.m_ambientPower )
+		bgfxSetUniform( u_lightDiffusePower,         m_lightPtr.m_diffusePower )
+		bgfxSetUniform( u_lightSpecularPower,        m_lightPtr.m_specularPower )
+		bgfxSetUniform( u_lightSpotDirectionInner,   m_lightPtr.m_spotDirectionInner_viewSpace )
+		bgfxSetUniform( u_lightAttenuationSpotOuter, m_lightPtr.m_attenuationSpotOuter )
+	End
+
+	' call this before each draw call
+	Method SubmitPerDrawUniforms:Void()
+
+		bgfxSetUniform( u_shadowMapMtx0, m_shadowMapMtx0 )
+		bgfxSetUniform( u_shadowMapMtx1, m_shadowMapMtx1 )
+		bgfxSetUniform( u_shadowMapMtx2, m_shadowMapMtx2 )
+		bgfxSetUniform( u_shadowMapMtx3, m_shadowMapMtx3 )
+
+		bgfxSetUniform( u_params0,  m_params0 )
+		bgfxSetUniform( u_lightMtx, m_lightMtxPtr )
+		bgfxSetUniform( u_color,    m_colorPtr )
+	End
+
+	Method Destroy:Void()
+
+		bgfxDestroyUniform( u_params0 )
+		bgfxDestroyUniform( u_params1 )
+		bgfxDestroyUniform( u_params2 )
+		bgfxDestroyUniform( u_color )
+		bgfxDestroyUniform( u_smSamplingParams )
+		bgfxDestroyUniform( u_csmFarDistances )
+
+		bgfxDestroyUniform( u_materialKa )
+		bgfxDestroyUniform( u_materialKd )
+		bgfxDestroyUniform( u_materialKs )
+
+		bgfxDestroyUniform( u_tetraNormalGreen )
+		bgfxDestroyUniform( u_tetraNormalYellow )
+		bgfxDestroyUniform( u_tetraNormalBlue )
+		bgfxDestroyUniform( u_tetraNormalRed )
+
+		bgfxDestroyUniform( u_shadowMapMtx0 )
+		bgfxDestroyUniform( u_shadowMapMtx1 )
+		bgfxDestroyUniform( u_shadowMapMtx2 )
+		bgfxDestroyUniform( u_shadowMapMtx3 )
+
+		bgfxDestroyUniform( u_lightMtx )
+		bgfxDestroyUniform( u_lightPosition )
+		bgfxDestroyUniform( u_lightAmbientPower )
+		bgfxDestroyUniform( u_lightDiffusePower )
+		bgfxDestroyUniform( u_lightSpecularPower )
+		bgfxDestroyUniform( u_lightSpotDirectionInner )
+		bgfxDestroyUniform( u_lightAttenuationSpotOuter )
+	End
+
+	Const PARAMS0_AMBIENT_PASS          :Int = 0
+	Const PARAMS0_LIGHTING_PASS         :Int = 1
+	Const PARAMS0_UNUSED00              :Int = 2
+	Const PARAMS0_UNUSED01              :Int = 3
+	Const PARAMS0_SIZE                  :Int = 4
+
+	Const PARAMS1_SHADOW_MAP_BIAS       :Int = 0
+	Const PARAMS1_SHADOW_MAP_OFFSET     :Int = 1
+	Const PARAMS1_SHADOW_MAP_PARAM0     :Int = 2
+	Const PARAMS1_SHADOW_MAP_PARAM1     :Int = 3
+	Const PARAMS1_SIZE                  :Int = 4
+
+	Const PARAMS2_DEPTH_VALUE_POW       :Int = 0
+	Const PARAMS2_SHOW_SM_COVERAGE      :Int = 1
+	Const PARAMS2_SHADOW_MAP_TEXEL_SIZE :Int = 2
+	Const PARAMS2_UNUSED23              :Int = 3
+	Const PARAMS2_SIZE                  :Int = 4
+
+	Const PARAMS_BLUR_X_NUM             :Int = 0
+	Const PARAMS_BLUR_Y_NUM             :Int = 1
+	Const PARAMS_BLUR_X_OFFSET          :Int = 2
+	Const PARAMS_BLUR_Y_OFFSET          :Int = 3
+	Const PARAMS_BLUR_SIZE              :Int = 4
+
+	Field m_params0                     :Float[ PARAMS0_SIZE ]
+	Field m_params1                     :Float[ PARAMS1_SIZE ]
+	Field m_params2                     :Float[ PARAMS2_SIZE ]
+	Field m_paramsBlur                  :Float[ PARAMS_BLUR_SIZE ]
+
+	Field m_tetraNormalGreen            :Float[ 4 ] ' float m_tetraNormalGreen[3];
+	Field m_tetraNormalYellow           :Float[ 4 ] ' float m_tetraNormalYellow[3];
+	Field m_tetraNormalBlue             :Float[ 4 ] ' float m_tetraNormalBlue[3];
+	Field m_tetraNormalRed              :Float[ 4 ] ' float m_tetraNormalRed[3];
+	Field m_csmFarDistances             :Float[ 4 ]
+
+	Field m_lightMtxPtr                 :Float[]
+	Field m_colorPtr                    :Float[]
+	Field m_lightPtr                    := New Light()
+	Field m_shadowMapMtx0               :Float[]
+	Field m_shadowMapMtx1               :Float[]
+	Field m_shadowMapMtx2               :Float[]
+	Field m_shadowMapMtx3               :Float[]
+	Field m_materialPtr                 := New Material()
+
+' Private
+	Field u_params0                     :Int
+	Field u_params1                     :Int
+	Field u_params2                     :Int
+	Field u_color                       :Int
+	Field u_smSamplingParams            :Int
+	Field u_csmFarDistances             :Int
+
+	Field u_materialKa                  :Int
+	Field u_materialKd                  :Int
+	Field u_materialKs                  :Int
+
+	Field u_tetraNormalGreen            :Int
+	Field u_tetraNormalYellow           :Int
+	Field u_tetraNormalBlue             :Int
+	Field u_tetraNormalRed              :Int
+
+	Field u_shadowMapMtx0               :Int
+	Field u_shadowMapMtx1               :Int
+	Field u_shadowMapMtx2               :Int
+	Field u_shadowMapMtx3               :Int
+
+	Field u_lightMtx                    :Int
+	Field u_lightPosition               :Int
+	Field u_lightAmbientPower           :Int
+	Field u_lightDiffusePower           :Int
+	Field u_lightSpecularPower          :Int
+	Field u_lightSpotDirectionInner     :Int
+	Field u_lightAttenuationSpotOuter   :Int
+End
+
+Global s_uniforms := New Uniforms()
+
+Class RenderState
+
+	Const DefaultState             :Int = 0
+	Const ShadowMap_PackDepth      :Int = 1
+	Const ShadowMap_PackDepthHoriz :Int = 2
+	Const ShadowMap_PackDepthVert  :Int = 3
+	Const Custom_BlendLightTexture :Int = 4
+	Const Custom_DrawPlaneBottom   :Int = 5
+	Const Count                    :Int = 6
+
+	Field m_state           :Int[ 2 ]
+	Field m_blendFactorRgba :Int
+	Field m_fstencil        :Int
+	Field m_bstencil        :Int
+End
+
+Global s_renderStates:RenderState[ RenderState.Count ]
+
+Function InitRenderStates:Void()
+
+	For Local ii:Int = 0 Until RenderState.Count
+		s_renderStates[ ii ] = New RenderState()
+	Next
+
+	'
+	' @Cleanup: temporary until I figure out a better way to do 64-bit int
+	'
+
+	Local rs:RenderState
+
+	rs = s_renderStates[ RenderState.DefaultState ]
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $0000001f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RenderState.ShadowMap_PackDepth ]
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $0000001f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RenderState.ShadowMap_PackDepthHoriz ]
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $0000001f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $1113ff01
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RenderState.ShadowMap_PackDepthVert ]
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $0000001f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $1113ff00
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RenderState.Custom_BlendLightTexture ]
+
+	rs.m_state[0]        = $01000060
+	rs.m_state[1]        = $0434301f
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+
+	rs = s_renderStates[ RenderState.Custom_DrawPlaneBottom ]
+
+	rs.m_state[0]        = $01000010
+	rs.m_state[1]        = $00000007
+	rs.m_blendFactorRgba = $ffffffff
+	rs.m_fstencil        = $00000000
+	rs.m_bstencil        = $00000000
+End
+
+Class ViewState
+
+	Field m_width  :Int
+	Field m_height :Int
+
+	Field m_view   :Float[ 16 ]
+	Field m_proj   :Float[ 16 ]
+
+	Method New( _width:Int=0, _height:Int=0 )
+		Self.m_width  = _width
+		Self.m_height = _height
+	End
+End
+
+Class ClearValues
+
+	Field m_clearRgba    :Int
+	Field m_clearDepth   :Float
+	Field m_clearStencil :Int
+
+	Method New( _clearRgba:Int=$30303000, _clearDepth:Float=1.0, _clearStencil:Int=0 )
+		Self.m_clearRgba    = _clearRgba
+		Self.m_clearDepth   = _clearDepth
+		Self.m_clearStencil = _clearStencil
+	End
+End
+
+Function MeshSubmitShadowMaps:Void( _mesh:BgfxUtilsMesh, _viewId:Int, _mtx:Float[], _program:Int, _renderState:RenderState, _submitShadowMaps:Bool=False )
+	Local texture:Int = BGFX_INVALID_HANDLE
+	MeshSubmitShadowMaps( _mesh, _viewId, _mtx, _program, _renderState, texture, _submitShadowMaps )
+End
+	
+Function MeshSubmitShadowMaps:Void( _mesh:BgfxUtilsMesh, _viewId:Int, _mtx:Float[], _program:Int, _renderState:RenderState, _texture:Int, _submitShadowMaps:Bool=False )
+
+	Local groups := _mesh.m_groups
+	Local length :Int = groups.Length()
+
+	For Local ii:Int = 0 Until length
+
+		Local group := groups.Get( ii )
+
+		' Set uniforms
+		s_uniforms.SubmitPerDrawUniforms()
+
+		' Set model matrix for rendering.
+		bgfxSetTransform( _mtx )
+		bgfxSetIndexBuffer( group.m_ibh )
+		bgfxSetVertexBuffer( 0, group.m_vbh )
+
+		' Set texture
+		If BGFX_INVALID_HANDLE <> _texture Then
+			bgfxSetTexture( 0, s_texColor, _texture )
+		Endif
+
+		If _submitShadowMaps Then
+			For Local ii:Int = 0 Until ShadowMapRenderTargets.Count
+				bgfxSetTexture( 4 + ii, s_shadowMap[ ii ], bgfxGetTexture( s_rtShadowMap[ ii ] ) )
+			Next
+		Endif
+
+		' Apply render state
+		bgfxSetStencil( _renderState.m_fstencil, _renderState.m_bstencil )
+		bgfxSetState( _renderState.m_state, _renderState.m_blendFactorRgba )
+
+		' Submit
+		bgfxSubmit( _viewId, _program )
+	Next
+
+'  	Print "_renderState.m_state[0]=" + IntToHex(_renderState.m_state[0]) +
+'  		" _renderState.m_state[1]=" + IntToHex(_renderState.m_state[1]) + 
+'  		" _renderState.m_blendFactorRgba=" + IntToHex(_renderState.m_blendFactorRgba) +
+'  		" _renderState.m_fstencil=" + IntToHex(_renderState.m_fstencil) +
+'  		" _renderState.m_bstencil=" + IntToHex(_renderState.m_bstencil)
+End
+
+Class PosColorTexCoord0Vertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_rgba :Int
+
+	Field m_u    :Float
+	Field m_v    :Float
+
+	Method New( _x:Float, _y:Float, _z:Float, _rgba:Float, _u:Float, _v:Float )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_rgba = _rgba
+'  		Print "m_nx=" + m_nx + " m_ny=" + m_ny + " m_nz=" + m_nz + " m_normal=" + IntToHex(m_normal)
+
+		Self.m_u    = _u
+		Self.m_v    = _v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global _tvb := New BgfxTransientVertexBuffer()
+
+Function ScreenSpaceQuad:Void( _textureWidth:Float, _textureHeight:Float, _originBottomLeft:Bool=False, _width:Float=1.0, _height:Float=1.0 )
+
+	If 3 = bgfxGetAvailTransientVertexBuffer( 3, PosColorTexCoord0Vertex.ms_decl ) Then
+
+		bgfxAllocTransientVertexBuffer( _tvb, 3, PosColorTexCoord0Vertex.ms_decl )
+
+		Local vertex     :Int   = 0 
+
+		Local zz         :Float = 0.0
+
+		Local minx       :Float = -_width
+		Local maxx       :Float =  _width
+		Local miny       :Float = 0.0
+		Local maxy       :Float = _height * 2.0
+
+		Local texelHalfW :Float = s_texelHalf / _textureWidth
+		Local texelHalfH :Float = s_texelHalf / _textureHeight
+		Local minu       :Float = -1.0 + texelHalfW
+		Local maxu       :Float =  1.0 + texelHalfW
+
+		Local minv       :Float = texelHalfH
+		Local maxv       :Float = 2.0 + texelHalfH
+
+		If _originBottomLeft Then
+
+			Local temp:Float = minv
+			minv = maxv
+			maxv = temp
+
+			minv -= 1.0
+			maxv -= 1.0
+		Endif
+
+		_tvb.PokeFloat( vertex, minx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxy      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxv      ) ; vertex += 4
+
+		bgfxSetTransientVertexBuffer( 0, _tvb )
+	Endif
+End
+
+Function WorldSpaceFrustumCorners:Void( _corners24f:Float[][], _near:Float, _far:Float, _projWidth:Float, _projHeight:Float, _invViewMtx:Float[] )
+
+	' Define frustum corners in view space.
+	Local nw:Float = _near * _projWidth
+	Local nh:Float = _near * _projHeight
+	Local fw:Float = _far  * _projWidth
+	Local fh:Float = _far  * _projHeight
+
+	Local corners:Float[][] = [
+		[ -nw,  nh, _near ],
+		[  nw,  nh, _near ],
+		[  nw, -nh, _near ],
+		[ -nw, -nh, _near ],
+		[ -fw,  fh, _far  ],
+		[  fw,  fh, _far  ],
+		[  fw, -fh, _far  ],
+		[ -fw, -fh, _far  ] ]
+
+	Local numCorners:Int = corners.Length()
+
+	' Convert them to world space.
+	For Local ii:Int = 0 Until numCorners
+		bxVec3MulMtx( _corners24f[ ii ], corners[ ii ], _invViewMtx )
+	Next
+End
+
+' /**
+'  * _splits = { near0, far0, near1, far1... nearN, farN }
+'  * N = _numSplits
+'  */
+Function SplitFrustum:Void( _splits:Float[], _numSplits:Int, _near:Float, _far:Float, _splitWeight:Float=0.75 )
+
+	Local l          :Float = _splitWeight
+	Local ratio      :Float = _far / _near
+	Local numSlices  :Int   = _numSplits * 2
+	Local numSlicesf :Float = Float( numSlices )
+
+	' First slice.
+	_splits[ 0 ] = _near
+
+	Local ff:Int = 1
+
+	For Local nn:Int = 2 Until numSlices Step 2
+
+		Local si    :Float = Float(ff) / numSlicesf
+		' Local nearp :Float = l * (_near * bx::pow( ratio, si ) ) + ( 1 - l ) * ( _near + ( _far - _near ) * si )
+		Local nearp :Float = l * ( _near * Pow( ratio, si ) ) + ( 1 - l ) * ( _near + ( _far - _near ) * si )
+
+		_splits[ nn ] = nearp          ' near
+		_splits[ ff ] = nearp * 1.005  ' far from previous split
+
+		ff += 2
+	Next
+
+	' Last slice.
+	_splits[ numSlices -1 ] = _far
+End
+
+Class Programs
+
+	Method New()
+
+		For Local ii:Int = 0 Until DepthImpl.Count
+			m_packDepth[ ii ] = New Int[ PackDepth.Count ]
+		Next
+
+		For Local ii:Int = 0 Until SmType.Count
+
+			m_colorLighting[ ii ] = New Int[ DepthImpl.Count ][]
+
+			For Local jj:Int = 0 Until DepthImpl.Count
+				m_colorLighting[ ii ][ jj ] = New Int[ SmImpl.Count ]
+			Next
+		Next
+	End
+
+	Method Init:Void()
+
+		' Misc.
+		m_black        = bgfxUtilsLoadProgram( "vs_shadowmaps_color",         "fs_shadowmaps_color_black" )
+		m_texture      = bgfxUtilsLoadProgram( "vs_shadowmaps_texture",       "fs_shadowmaps_texture" )
+		m_colorTexture = bgfxUtilsLoadProgram( "vs_shadowmaps_color_texture", "fs_shadowmaps_color_texture" )
+
+		' Blur.
+		m_vBlur[ PackDepth.RGBA ] = bgfxUtilsLoadProgram( "vs_shadowmaps_vblur", "fs_shadowmaps_vblur" )
+		m_hBlur[ PackDepth.RGBA ] = bgfxUtilsLoadProgram( "vs_shadowmaps_hblur", "fs_shadowmaps_hblur" )
+		m_vBlur[ PackDepth.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_vblur", "fs_shadowmaps_vblur_vsm" )
+		m_hBlur[ PackDepth.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_hblur", "fs_shadowmaps_hblur_vsm" )
+
+		' Draw depth.
+		m_drawDepth[ PackDepth.RGBA ] = bgfxUtilsLoadProgram( "vs_shadowmaps_unpackdepth", "fs_shadowmaps_unpackdepth" )
+		m_drawDepth[ PackDepth.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_unpackdepth", "fs_shadowmaps_unpackdepth_vsm" )
+
+		' Pack depth.
+		m_packDepth[ DepthImpl.InvZ   ][ PackDepth.RGBA ] = bgfxUtilsLoadProgram( "vs_shadowmaps_packdepth", "fs_shadowmaps_packdepth" )
+		m_packDepth[ DepthImpl.InvZ   ][ PackDepth.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_packdepth", "fs_shadowmaps_packdepth_vsm" )
+
+		m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] = bgfxUtilsLoadProgram( "vs_shadowmaps_packdepth_linear", "fs_shadowmaps_packdepth_linear" )
+		m_packDepth[ DepthImpl.Linear ][ PackDepth.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_packdepth_linear", "fs_shadowmaps_packdepth_vsm_linear" )
+
+		' Color lighting.
+		m_colorLighting[ SmType.Single  ][ DepthImpl.InvZ   ][ SmImpl.Hard ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_hard" )
+		m_colorLighting[ SmType.Single  ][ DepthImpl.InvZ   ][ SmImpl.PCF  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_pcf" )
+		m_colorLighting[ SmType.Single  ][ DepthImpl.InvZ   ][ SmImpl.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_vsm" )
+		m_colorLighting[ SmType.Single  ][ DepthImpl.InvZ   ][ SmImpl.ESM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_esm" )
+
+		m_colorLighting[ SmType.Single  ][ DepthImpl.Linear ][ SmImpl.Hard ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_hard_linear" )
+		m_colorLighting[ SmType.Single  ][ DepthImpl.Linear ][ SmImpl.PCF  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_pcf_linear" )
+		m_colorLighting[ SmType.Single  ][ DepthImpl.Linear ][ SmImpl.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_vsm_linear" )
+		m_colorLighting[ SmType.Single  ][ DepthImpl.Linear ][ SmImpl.ESM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_esm_linear" )
+
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.InvZ   ][ SmImpl.Hard ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_hard_omni" )
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.InvZ   ][ SmImpl.PCF  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_pcf_omni" )
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.InvZ   ][ SmImpl.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_vsm_omni" )
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.InvZ   ][ SmImpl.ESM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_esm_omni" )
+
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.Linear ][ SmImpl.Hard ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_hard_linear_omni" )
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.Linear ][ SmImpl.PCF  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_pcf_linear_omni" )
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.Linear ][ SmImpl.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_vsm_linear_omni" )
+		m_colorLighting[ SmType.Omni    ][ DepthImpl.Linear ][ SmImpl.ESM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_esm_linear_omni" )
+
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ   ][ SmImpl.Hard ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_hard_csm" )
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ   ][ SmImpl.PCF  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_pcf_csm" )
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ   ][ SmImpl.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_vsm_csm" )
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ   ][ SmImpl.ESM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_esm_csm" )
+
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.Hard ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_hard_linear_csm" )
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.PCF  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_pcf_linear_csm" )
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.VSM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_vsm_linear_csm" )
+		m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.ESM  ] = bgfxUtilsLoadProgram( "vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_esm_linear_csm" )
+	End
+
+	Method Destroy:Void()
+
+		' Color lighting.
+		For Local ii:Int = 0 Until SmType.Count
+			For Local jj:Int = 0 Until DepthImpl.Count
+				For Local kk:Int = 0 Until SmImpl.Count
+					bgfxDestroyProgram( m_colorLighting[ ii ][ jj ][ kk ] )
+				Next
+			Next
+		Next
+
+		' Pack depth.
+		For Local ii:Int = 0 Until DepthImpl.Count
+			For Local jj:Int = 0 Until PackDepth.Count
+				bgfxDestroyProgram( m_packDepth[ ii ][ jj ] )
+			Next
+		Next
+
+		' Draw depth.
+		For Local ii:Int = 0 Until PackDepth.Count
+			bgfxDestroyProgram( m_drawDepth[ ii ] )
+		Next
+
+		' Hblur.
+		For Local ii:Int = 0 Until PackDepth.Count
+			bgfxDestroyProgram( m_hBlur[ ii ] )
+		Next
+
+		' Vblur.
+		For Local ii:Int = 0 Until PackDepth.Count
+			bgfxDestroyProgram( m_vBlur[ ii ] )
+		Next
+
+		' Misc.
+		bgfxDestroyProgram( m_colorTexture )
+		bgfxDestroyProgram( m_texture )
+		bgfxDestroyProgram( m_black )
+	End
+
+	Field m_black         :Int
+	Field m_texture       :Int
+	Field m_colorTexture  :Int
+	Field m_vBlur         :Int[ PackDepth.Count ]
+	Field m_hBlur         :Int[ PackDepth.Count ]
+	Field m_drawDepth     :Int[ PackDepth.Count ]
+	Field m_packDepth     :Int[ DepthImpl.Count ][] ' [ PackDepth.Count ]
+	Field m_colorLighting :Int[ SmType.Count ][][] ' [ DepthImpl.Count ][ SmImpl.Count ]
+End
+
+Global s_programs := New Programs()
+
+Class ShadowMapSettings
+
+	Field m_sizePwrTwo        :Float
+	Field m_sizePwrTwoMin     :Float
+	Field m_sizePwrTwoMax     :Float
+	Field m_sizePwrTwoStep    :Float
+
+	Field m_depthValuePow     :Float
+	Field m_depthValuePowMin  :Float
+	Field m_depthValuePowMax  :Float
+	Field m_depthValuePowStep :Float
+
+	Field m_near              :Float
+	Field m_nearMin           :Float
+	Field m_nearMax           :Float
+	Field m_nearStep          :Float
+
+	Field m_far               :Float
+	Field m_farMin            :Float
+	Field m_farMax            :Float
+	Field m_farStep           :Float
+
+	Field m_bias              :Float
+	Field m_biasMin           :Float
+	Field m_biasMax           :Float
+	Field m_biasStep          :Float
+
+	Field m_normalOffset      :Float
+	Field m_normalOffsetMin   :Float
+	Field m_normalOffsetMax   :Float
+	Field m_normalOffsetStep  :Float
+
+	Field m_customParam0      :Float
+	Field m_customParam0Min   :Float
+	Field m_customParam0Max   :Float
+	Field m_customParam0Step  :Float
+
+	Field m_customParam1      :Float
+	Field m_customParam1Min   :Float
+	Field m_customParam1Max   :Float
+	Field m_customParam1Step  :Float
+
+	Field m_xNum              :Float
+	Field m_xNumMin           :Float
+	Field m_xNumMax           :Float
+	Field m_xNumStep          :Float
+
+	Field m_yNum              :Float
+	Field m_yNumMin           :Float
+	Field m_yNumMax           :Float
+	Field m_yNumStep          :Float
+
+	Field m_xOffset           :Float
+	Field m_xOffsetMin        :Float
+	Field m_xOffsetMax        :Float
+	Field m_xOffsetStep       :Float
+
+	Field m_yOffset           :Float
+	Field m_yOffsetMin        :Float
+	Field m_yOffsetMax        :Float
+	Field m_yOffsetStep       :Float
+
+	Field m_doBlur            :Bool
+	Field m_progPack          :Int
+	Field m_progDraw          :Int
+
+	Method SetSizePwrTwo:Void( _sizePwrTwo:Float, _sizePwrTwoMin:Float, _sizePwrTwoMax:Float, _sizePwrTwoStep:Float )
+		m_sizePwrTwo     = _sizePwrTwo
+		m_sizePwrTwoMin  = _sizePwrTwoMin
+		m_sizePwrTwoMax  = _sizePwrTwoMax
+		m_sizePwrTwoStep = _sizePwrTwoStep
+	End
+
+	Method SetDepthValuePow:Void( _depthValuePow:Float, _depthValuePowMin:Float, _depthValuePowMax:Float, _depthValuePowStep:Float )
+		m_depthValuePow     = _depthValuePow
+		m_depthValuePowMin  = _depthValuePowMin
+		m_depthValuePowMax  = _depthValuePowMax
+		m_depthValuePowStep = _depthValuePowStep
+	End
+
+	Method SetNear:Void( _near:Float, _nearMin:Float, _nearMax:Float, _nearStep:Float )
+		m_near     = _near
+		m_nearMin  = _nearMin
+		m_nearMax  = _nearMax
+		m_nearStep = _nearStep
+	End
+
+	Method SetFar:Void( _far:Float, _farMin:Float, _farMax:Float, _farStep:Float )
+		m_far     = _far
+		m_farMin  = _farMin
+		m_farMax  = _farMax
+		m_farStep = _farStep
+	End
+
+	Method SetBias:Void( _bias:Float, _biasMin:Float, _biasMax:Float, _biasStep:Float )
+		m_bias     = _bias
+		m_biasMin  = _biasMin
+		m_biasMax  = _biasMax
+		m_biasStep = _biasStep
+	End
+
+	Method SetNormalOffset:Void( _normalOffset:Float, _normalOffsetMin:Float, _normalOffsetMax:Float, _normalOffsetStep:Float )
+		m_normalOffset     = _normalOffset
+		m_normalOffsetMin  = _normalOffsetMin
+		m_normalOffsetMax  = _normalOffsetMax
+		m_normalOffsetStep = _normalOffsetStep
+	End
+
+	Method SetCustomParam0:Void( _customParam0:Float, _customParam0Min:Float, _customParam0Max:Float, _customParam0Step:Float )
+		m_customParam0     = _customParam0
+		m_customParam0Min  = _customParam0Min
+		m_customParam0Max  = _customParam0Max
+		m_customParam0Step = _customParam0Step
+	End
+
+	Method SetCustomParam1:Void( _customParam1:Float, _customParam1Min:Float, _customParam1Max:Float, _customParam1Step:Float )
+		m_customParam1     = _customParam1
+		m_customParam1Min  = _customParam1Min
+		m_customParam1Max  = _customParam1Max
+		m_customParam1Step = _customParam1Step
+	End
+
+	Method SetXNum:Void( _xNum:Float, _xNumMin:Float, _xNumMax:Float, _xNumStep:Float )
+		m_xNum     = _xNum
+		m_xNumMin  = _xNumMin
+		m_xNumMax  = _xNumMax
+		m_xNumStep = _xNumStep
+	End
+
+	Method SetYNum:Void( _yNum:Float, _yNumMin:Float, _yNumMax:Float, _yNumStep:Float )
+		m_yNum     = _yNum
+		m_yNumMin  = _yNumMin
+		m_yNumMax  = _yNumMax
+		m_yNumStep = _yNumStep
+	End
+
+	Method SetXOffset:Void( _xOffset:Float, _xOffsetMin:Float, _xOffsetMax:Float, _xOffsetStep:Float )
+		m_xOffset     = _xOffset
+		m_xOffsetMin  = _xOffsetMin
+		m_xOffsetMax  = _xOffsetMax
+		m_xOffsetStep = _xOffsetStep
+	End
+
+	Method SetYOffset:Void( _yOffset:Float, _yOffsetMin:Float, _yOffsetMax:Float, _yOffsetStep:Float )
+		m_yOffset     = _yOffset
+		m_yOffsetMin  = _yOffsetMin
+		m_yOffsetMax  = _yOffsetMax
+		m_yOffsetStep = _yOffsetStep
+	End
+
+	Method SetDoBlur:Void( _doBlur:Bool )
+		m_doBlur = _doBlur
+	End
+
+	Method SetProgPack:Void( _progPack:Int )
+		m_progPack = _progPack
+	End
+
+	Method SetProgDraw:Void( _progDraw:Int )
+		m_progDraw = _progDraw
+	End
+End
+
+Class SceneSettings
+
+	Field m_lightType         :Int
+	Field m_depthImpl         :Int
+	Field m_smImpl            :Int
+
+	Field m_spotOuterAngle    :Float
+	Field m_spotInnerAngle    :Float
+	Field m_fovXAdjust        :Float
+	Field m_fovYAdjust        :Float
+	Field m_coverageSpotL     :Float
+	Field m_splitDistribution :Float
+
+	Field m_numSplits         :Int
+
+	Field m_updateLights      :Bool
+	Field m_updateScene       :Bool
+	Field m_drawDepthBuffer   :Bool
+	Field m_showSmCoverage    :Bool
+	Field m_stencilPack       :Bool
+	Field m_stabilize         :Bool
+End
+
+Class ShadowmapsExample Extends App
+
+	Field bgfxCaps               := New BgfxCaps()
+
+'  	Field m_width                :Int ' use DeviceWidth directly
+'  	Field m_height               :Int ' use DeviceHeight directly
+'  	Field m_debug                :Int = BGFX_DEBUG_NONE
+	Field m_debug                :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset                :Int ' = BGFX_RESET_VSYNC
+
+	Field m_viewState            :ViewState
+	Field m_clearValues          :ClearValues
+
+	Field m_posDecl              :BgfxVertexDecl
+
+	Field m_texFigure            :Int
+	Field m_texFlare             :Int
+	Field m_texFieldstone        :Int
+
+	Field m_bunnyMesh            :BgfxUtilsMesh
+	Field m_treeMesh             :BgfxUtilsMesh
+	Field m_cubeMesh             :BgfxUtilsMesh
+	Field m_hollowcubeMesh       :BgfxUtilsMesh
+	Field m_hplaneMesh           :BgfxUtilsMesh
+	Field m_vplaneMesh           :BgfxUtilsMesh
+
+	Field m_color                :Float[ 4 ]
+	Field m_defaultMaterial      := New Material()
+	Field m_pointLight           := New Light()
+	Field m_directionalLight     := New Light()
+
+	Field m_lightMtx             :Float[ 16 ]
+	Field m_shadowMapMtx         :Float[ ShadowMapRenderTargets.Count ][] ' [ 16 ]
+
+	Field m_smSettings           :ShadowMapSettings[ LightType.Count ][][] ' [ DepthImpl.Count ][ SmImpl.Count ]
+	Field m_settings             := New SceneSettings()
+
+	Field m_currentShadowMapSize :Int
+
+	Field m_timeAccumulatorLight :Float
+	Field m_timeAccumulatorScene :Float
+
+	' Setup instance matrices.
+	Const floorScale             :Float = 550.0
+	Const numTrees               :Int = 10
+	Const shadowMapPasses        :Int = ShadowMapRenderTargets.Count
+
+	Field mtxFloor               :Float[ 16 ]
+	Field mtxBunny               :Float[ 16 ]
+	Field mtxHollowcube          :Float[ 16 ]
+	Field mtxCube                :Float[ 16 ]
+	Field mtxTrees               :Float[ numTrees ][] ' [ 16 ]
+	Field lightView              :Float[ shadowMapPasses ][] ' [ 16 ]
+	Field lightProj              :Float[ shadowMapPasses ][] ' [ 16 ]
+	Field mtxYpr                 :Float[ TetrahedronFaces.Count ][] ' [ 16 ]
+	Field screenProj             :Float[ 16 ]
+	Field screenView             :Float[ 16 ]
+
+	Const maxNumSplits           :Int = 4
+	Const numCorners             :Int = 8
+	Field frustumCorners         :Float[ maxNumSplits ][][] ' [ numCorners ][ 3 ]
+
+	Field fbTexturesDataBuffer   :DataBuffer[ ShadowMapRenderTargets.Count ]
+
+	Field last                   :Int
+
+	Method InitArrays:Void()
+
+		For Local ii:Int = 0 Until ShadowMapRenderTargets.Count
+			m_shadowMapMtx[ ii ] = New Float[ 16 ]
+		Next
+
+		For Local ii:Int = 0 Until LightType.Count
+			m_smSettings[ ii ] = New ShadowMapSettings[ DepthImpl.Count ][]
+
+			For Local jj:Int = 0 Until DepthImpl.Count
+				m_smSettings[ ii ][ jj ] = New ShadowMapSettings[ 16 ]
+
+				For Local kk:Int = 0 Until 16
+					m_smSettings[ ii ][ jj ][ kk ] = New ShadowMapSettings()
+				Next
+			Next
+		Next
+
+		For Local ii:Int = 0 Until numTrees
+			mtxTrees[ ii ] = New Float[ 16 ]
+		Next
+
+		For Local ii:Int = 0 Until shadowMapPasses
+			lightView[ ii ] = New Float[ 16 ]
+		Next
+
+		For Local ii:Int = 0 Until shadowMapPasses
+			lightProj[ ii ] = New Float[ 16 ]
+		Next
+
+		For Local ii:Int = 0 Until TetrahedronFaces.Count
+			mtxYpr[ ii ] = New Float[ 16 ]
+		Next
+
+		For Local ii:Int = 0 Until maxNumSplits
+
+			frustumCorners[ ii ] = New Float[ numCorners ][]
+
+			For Local jj:Int = 0 Until numCorners
+				frustumCorners[ ii ][ jj ] = New Float[ 3 ]
+			Next
+		Next
+	End
+
+	Method OnCreate:Int()
+
+'  		For Local ii:Int = 0 Until MAX_NUM_LIGHTS
+'  			m_lightRgbInnerR [ ii ] = New Float[4]
+'  			lightPosRadius   [ ii ] = New Float[4]
+'  			reflectedLights  [ ii ] = New Float[4]
+'  		Next
+'  
+'  		For Local ii:Int = 0 Until columnMtx.Length()
+'  			columnMtx[ ii ] = New Float[ 16 ]
+'  		Next
+'  
+'  		For Local ii:Int = 0 Until cubeMtx.Length()
+'  			cubeMtx[ ii ] = New Float[ 16 ]
+'  		Next
+
+		InitArrays()
+
+		SetUpdateRate( 60 )
+
+		InitRenderStates()
+
+		m_viewState   = New ViewState( DeviceWidth(), DeviceHeight() )
+		m_clearValues = New ClearValues( $00000000, 1.0, 0 )
+
+		m_debug = BGFX_DEBUG_NONE
+		m_reset = BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Setup root path for binary shaders. Shader binaries are different
+		' for each renderer.
+		Select bgfxGetRendererType()
+
+		Case BGFX_RENDERER_TYPE_DIRECT3D9
+			s_texelHalf = 0.5
+
+		Case BGFX_RENDERER_TYPE_OPENGL, BGFX_RENDERER_TYPE_OPENGLES
+			s_flipV = True
+		End
+
+		' Uniforms.
+		s_uniforms.Init()
+		s_texColor = bgfxCreateUniform( "s_texColor",  BGFX_UNIFORM_TYPE_INT1 )
+		s_shadowMap[ 0 ] = bgfxCreateUniform( "s_shadowMap0", BGFX_UNIFORM_TYPE_INT1 )
+		s_shadowMap[ 1 ] = bgfxCreateUniform( "s_shadowMap1", BGFX_UNIFORM_TYPE_INT1 )
+		s_shadowMap[ 2 ] = bgfxCreateUniform( "s_shadowMap2", BGFX_UNIFORM_TYPE_INT1 )
+		s_shadowMap[ 3 ] = bgfxCreateUniform( "s_shadowMap3", BGFX_UNIFORM_TYPE_INT1 )
+
+		' Programs.
+		s_programs.Init()
+
+		' Vertex declarations.
+		PosNormalTexcoordVertex.Init()
+
+		m_posDecl = New BgfxVertexDecl()
+		bgfxVertexDeclBegin( m_posDecl )
+		bgfxVertexDeclAdd( m_posDecl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( m_posDecl )
+
+		PosColorTexCoord0Vertex.Init()
+
+		' Textures.
+		m_texFigure     = bgfxUtilsLoadTexture( "textures/figure-rgba.dds" )
+		m_texFlare      = bgfxUtilsLoadTexture( "textures/flare.dds" )
+		m_texFieldstone = bgfxUtilsLoadTexture( "textures/fieldstone-rgba.dds" )
+
+		' Meshes.
+		m_bunnyMesh      = bgfxUtilsMeshLoad( "meshes/bunny.bin" )
+		m_treeMesh       = bgfxUtilsMeshLoad( "meshes/tree.bin" )
+		m_cubeMesh       = bgfxUtilsMeshLoad( "meshes/cube.bin" )
+		m_hollowcubeMesh = bgfxUtilsMeshLoad( "meshes/hollowcube.bin" )
+		m_hplaneMesh     = bgfxUtilsMeshLoad( PosNormalTexcoordVertexToDataBuffer( s_hplaneVertices ), PosNormalTexcoordVertex.ms_decl, Index16ToDataBuffer( s_planeIndices ) )
+		m_vplaneMesh     = bgfxUtilsMeshLoad( PosNormalTexcoordVertexToDataBuffer( s_vplaneVertices ), PosNormalTexcoordVertex.ms_decl, Index16ToDataBuffer( s_planeIndices ) )
+
+		' Materials.
+		m_defaultMaterial.SetAmbient( 1.0, 1.0, 1.0, 0.0 )
+		m_defaultMaterial.SetDiffuse( 1.0, 1.0, 1.0, 0.0 )
+		m_defaultMaterial.SetSpecular( 1.0, 1.0, 1.0, 0.0 ) ' exponent
+
+		' Lights.
+		m_pointLight.SetPosition( 0.0, 0.0, 0.0, 1.0 )
+		m_pointLight.SetAmbient( 1.0, 1.0, 1.0, 0.0 )
+		m_pointLight.SetDiffuse( 1.0, 1.0, 1.0, 850.0 )
+		m_pointLight.SetSpecular( 1.0, 1.0, 1.0, 0.0 )
+		m_pointLight.SetSpotDirection( 0.0, -0.4, -0.6 )
+		m_pointLight.SetSpotInnerOuter( 0.0, 91.0 ) ' spotexponent, spotcutoff
+		m_pointLight.SetAttenuation( 1.0, 0.0, 1.0 )
+
+		m_directionalLight.SetPosition( 0.5, -1.0, 0.1, 0.0 )
+		m_directionalLight.SetAmbient( 1.0, 1.0, 1.0, 0.02 )
+		m_directionalLight.SetDiffuse( 1.0, 1.0, 1.0, 0.4 )
+		m_directionalLight.SetSpecular( 1.0, 1.0, 1.0, 0.0 )
+		m_directionalLight.SetSpotDirection( 0.0, 0.0, 0.0 )
+		m_directionalLight.SetSpotInnerOuter( 1.0, 1.0 ) ' spotexponent, spotcutoff
+		m_directionalLight.SetAttenuation( 0.0, 0.0, 0.0 )
+
+		' Setup uniforms.
+		m_color[ 0 ] = 1.0
+		m_color[ 1 ] = 1.0
+		m_color[ 2 ] = 1.0
+		m_color[ 3 ] = 1.0
+		s_uniforms.SetPtrs( m_defaultMaterial,
+						   m_pointLight,
+						   m_color,
+						   m_lightMtx,
+						   m_shadowMapMtx[ ShadowMapRenderTargets.First  ],
+						   m_shadowMapMtx[ ShadowMapRenderTargets.Second ],
+						   m_shadowMapMtx[ ShadowMapRenderTargets.Third  ],
+						   m_shadowMapMtx[ ShadowMapRenderTargets.Fourth ] )
+		s_uniforms.SubmitConstUniforms()
+
+		' Settings.
+		' ShadowMapSettings smSettings[ LightType.Count ][ DepthImpl.Count ][ SmImpl.Count ] =
+
+		Local sms:ShadowMapSettings
+
+		'-------------------------------------------------------------------------
+		' spot light, inverse z
+		'-------------------------------------------------------------------------
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.InvZ ][ SmImpl.Hard ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0035, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.0012, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 500.0, 1.0, 1000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.InvZ ][ SmImpl.Hard ] )
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.InvZ ][ SmImpl.PCF ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 99.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.007, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 500.0, 1.0, 1000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.InvZ ][ SmImpl.PCF ] )
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.InvZ ][ SmImpl.VSM ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 8.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.045, 0.0, 0.1, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.02, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam1( 450.0, 1.0, 1000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.VSM ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.InvZ ][ SmImpl.VSM ] )
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.InvZ ][ SmImpl.ESM ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 3.0, 1.0, 10.0, 0.01 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.02, 0.0, 0.3, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 9000.0, 1.0, 15000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.InvZ ][ SmImpl.ESM ] )
+
+		'-------------------------------------------------------------------------
+		' spot light, linear
+		'-------------------------------------------------------------------------
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.Linear ][ SmImpl.Hard ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0025, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.0012, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 500.0, 1.0, 1000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.Linear ][ SmImpl.Hard ] )
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.Linear ][ SmImpl.PCF ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 99.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0025, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05,  0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 2000.0, 1.0, 2000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.Linear ][ SmImpl.PCF ] )
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.Linear ][ SmImpl.VSM ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.006, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.02, 0.0, 0.1, 0.00001 )
+		sms.SetCustomParam1( 300.0, 1.0, 1500.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.VSM ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.Linear ][ SmImpl.VSM ] )
+
+		sms = m_smSettings[ LightType.SpotLight ][ DepthImpl.Linear ][ SmImpl.ESM ]
+
+		sms.SetSizePwrTwo( 10.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 0.01 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0055, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 2500.0, 1.0, 5000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Single ][ DepthImpl.Linear ][ SmImpl.ESM ] )
+
+		'-------------------------------------------------------------------------
+		' point light, inverse z
+		'-------------------------------------------------------------------------
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.InvZ ][ SmImpl.Hard ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.006, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 50.0, 1.0, 300.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetYOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.InvZ ][ SmImpl.Hard ] )
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.InvZ ][ SmImpl.PCF ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 99.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.004, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 50.0, 1.0, 300.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.001 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.InvZ ][ SmImpl.PCF ] )
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.InvZ ][ SmImpl.VSM ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 8.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.055, 0.0, 0.1, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.02, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam1( 450.0, 1.0, 900.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetYOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.VSM ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.InvZ ][ SmImpl.VSM ] )
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.InvZ ][ SmImpl.ESM ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 10.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 3.0, 1.0, 10.0, 0.01 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.035, 0.0, 0.1, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 9000.0, 1.0, 15000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetYOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.InvZ ][ SmImpl.ESM ] )
+
+		'-------------------------------------------------------------------------
+		' point light, linear
+		'-------------------------------------------------------------------------
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.Linear ][ SmImpl.Hard ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.003, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 120.0, 1.0, 300.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetYOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.Linear ][ SmImpl.Hard ] )
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.Linear ][ SmImpl.PCF ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 99.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0035, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 120.0, 1.0, 300.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.001 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.Linear ][ SmImpl.PCF ] )
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.Linear ][ SmImpl.VSM ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.006, 0.0, 0.1, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.02, 0.0, 0.1, 0.00001 )
+		sms.SetCustomParam1( 400.0, 1.0, 900.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetYOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.VSM ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.Linear ][ SmImpl.VSM ] )
+
+		sms = m_smSettings[ LightType.PointLight ][ DepthImpl.Linear ][ SmImpl.ESM ]
+
+		sms.SetSizePwrTwo( 12.0, 9.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 0.01 )
+		sms.SetFar( 250.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.007, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.05, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 8000.0, 1.0, 15000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetYOffset( 0.25, 0.0, 2.0, 0.001 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Omni ][ DepthImpl.Linear ][ SmImpl.ESM ] )
+
+		'-------------------------------------------------------------------------
+		' directional light, inverse z
+		'-------------------------------------------------------------------------
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.InvZ ][ SmImpl.Hard ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0012, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 200.0, 1.0, 400.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetYOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ ][ SmImpl.Hard ] )
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.InvZ ][ SmImpl.PCF ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 99.0, 1.0 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0012, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 200.0, 1.0, 400.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ ][ SmImpl.PCF ] )
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.InvZ ][ SmImpl.VSM ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.004, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.02, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam1( 2500.0, 1.0, 5000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetYOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.VSM ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ ][ SmImpl.VSM ] )
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.InvZ ][ SmImpl.ESM ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 0.01 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.004, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 9500.0, 1.0, 15000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetYOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.InvZ ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.InvZ ][ SmImpl.ESM ] )
+
+		'-------------------------------------------------------------------------
+		' directional light, linear
+		'-------------------------------------------------------------------------
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.Linear ][ SmImpl.Hard ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0012, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 500.0, 1.0, 1000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetYOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.Hard ] )
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.Linear ][ SmImpl.PCF ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 99.0, 1.0 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.0012, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 200.0, 1.0, 400.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 8.0, 1.0 )
+		sms.SetXOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetYOffset( 1.0, 0.0, 3.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.PCF ] )
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.Linear ][ SmImpl.VSM ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 1.0 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.004, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.02, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam1( 2500.0, 1.0, 5000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetYOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.VSM ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.VSM ] )
+
+		sms = m_smSettings[ LightType.DirectionalLight ][ DepthImpl.Linear ][ SmImpl.ESM ]
+
+		sms.SetSizePwrTwo( 11.0, 7.0, 12.0, 1.0 )
+		sms.SetDepthValuePow( 1.0, 1.0, 20.0, 1.0 )
+		sms.SetNear( 1.0, 1.0, 10.0, 0.01 )
+		sms.SetFar( 550.0, 100.0, 2000.0, 50.0 )
+		sms.SetBias( 0.004, 0.0, 0.01, 0.00001 )
+		sms.SetNormalOffset( 0.001, 0.0, 0.04, 0.00001 )
+		sms.SetCustomParam0( 0.7, 0.0, 1.0, 0.01 )
+		sms.SetCustomParam1( 9500.0, 1.0, 15000.0, 1.0 )
+		sms.SetXNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetYNum( 2.0, 0.0, 4.0, 1.0 )
+		sms.SetXOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetYOffset( 0.2, 0.0, 1.0, 0.01 )
+		sms.SetDoBlur( True )
+		sms.SetProgPack( s_programs.m_packDepth[ DepthImpl.Linear ][ PackDepth.RGBA ] )
+		sms.SetProgDraw( s_programs.m_colorLighting[ SmType.Cascade ][ DepthImpl.Linear ][ SmImpl.ESM ] )
+
+		m_settings.m_lightType         = LightType.SpotLight
+		m_settings.m_depthImpl         = DepthImpl.InvZ
+		m_settings.m_smImpl            = SmImpl.Hard
+		m_settings.m_spotOuterAngle    = 45.0
+		m_settings.m_spotInnerAngle    = 30.0
+		m_settings.m_fovXAdjust        = 0.0
+		m_settings.m_fovYAdjust        = 0.0
+		m_settings.m_coverageSpotL     = 90.0
+		m_settings.m_splitDistribution = 0.6
+		m_settings.m_numSplits         = 4
+		m_settings.m_updateLights      = True
+		m_settings.m_updateScene       = True
+		m_settings.m_drawDepthBuffer   = False
+		m_settings.m_showSmCoverage    = False
+		m_settings.m_stencilPack       = True
+		m_settings.m_stabilize         = True
+
+		Local currentSmSettings := m_smSettings[ m_settings.m_lightType ][ m_settings.m_depthImpl ][ m_settings.m_smImpl ]
+
+		' Render targets.
+		Local shadowMapSize:Int = 1 Shl currentSmSettings.m_sizePwrTwo
+		m_currentShadowMapSize = shadowMapSize
+
+		Local currentShadowMapSizef:Float = Float( Int( m_currentShadowMapSize ) )
+		s_uniforms.m_params2[ Uniforms.PARAMS2_SHADOW_MAP_TEXEL_SIZE ] = 1.0 / currentShadowMapSizef
+
+		For Local ii:Int = 0 Until ShadowMapRenderTargets.Count
+
+			Local fbTextures:Int[ 2 ]
+
+			fbTextures[ 0 ] = bgfxCreateTexture2D( m_currentShadowMapSize, m_currentShadowMapSize, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_RT )
+			fbTextures[ 1 ] = bgfxCreateTexture2D( m_currentShadowMapSize, m_currentShadowMapSize, False, 1, BGFX_TEXTURE_FORMAT_D24S8, BGFX_TEXTURE_RT )
+
+			fbTexturesDataBuffer[ ii ] = New DataBuffer( fbTextures.Length() * 2 )
+
+			fbTexturesDataBuffer[ ii ].PokeShort( 0, fbTextures[ 0 ] )
+			fbTexturesDataBuffer[ ii ].PokeShort( 2, fbTextures[ 1 ] )
+
+			s_rtShadowMap[ ii ] = bgfxCreateFrameBufferFromHandles( fbTextures.Length(), fbTexturesDataBuffer[ ii ], True )
+		Next
+
+		s_rtBlur = bgfxCreateFrameBuffer( m_currentShadowMapSize, m_currentShadowMapSize, BGFX_TEXTURE_FORMAT_BGRA8 )
+
+		' Setup camera.
+		Local initialPos:Float[] = [ 0.0, 60.0, -105.0 ]
+		CameraCreate()
+		CameraSetPosition( initialPos )
+		CameraSetVerticalAngle( -0.45 )
+		' CameraGetViewMtx( m_viewState.m_view )
+
+		m_timeAccumulatorLight = 0.0
+		m_timeAccumulatorScene = 0.0
+	End
+
+	Method OnUpdate:Int()
+
+'  		If KeyHit(KEY_SPACE) Then
+'  			If m_scene = STENCIL_REFLECTION_SCENE Then
+'  				m_scene = PROJECTION_SHADOWS_SCENE
+'  				m_numLights = 1
+'  			Else
+'  				m_scene = STENCIL_REFLECTION_SCENE
+'  				m_numLights = 4
+'  			Endif
+'  		Endif
+'  
+'  		If KeyHit(KEY_LEFT) Then
+'  			m_numLights -= 1
+'  			If m_numLights < 1 Then m_numLights = 1
+'  		Endif
+'  
+'  		If KeyHit(KEY_RIGHT) Then
+'  			m_numLights += 1
+'  			If m_numLights >= 5 Then m_numLights = 5
+'  		Endif
+'  
+'  		If KeyDown(KEY_DOWN) Then
+'  			m_reflectionValue -= 0.01
+'  			If m_reflectionValue <= 0.0 Then m_reflectionValue = 0.0
+'  		Endif
+'  
+'  		If KeyDown(KEY_UP) Then
+'  			m_reflectionValue += 0.01
+'  			If m_reflectionValue >= 1.0 Then m_reflectionValue = 1.0
+'  		Endif
+'  
+'  		If KeyHit(KEY_L) Then
+'  			If m_updateLights Then m_updateLights = False Else m_updateLights = True
+'  		Endif
+'  
+'  		If KeyHit(KEY_S) Then
+'  			If m_updateScene Then m_updateScene = False Else m_updateScene = True
+'  		Endif
+
+'  			if ( ImGui::RadioButton("Spot light", m_settings.m_lightType == LightType::SpotLight ))
+'  			{
+'  				m_settings.m_lightType = LightType::SpotLight; bLtChanged = true;
+'  			}
+'  			if ( ImGui::RadioButton("Point light", m_settings.m_lightType == LightType::PointLight ))
+'  			{
+'  				m_settings.m_lightType = LightType::PointLight; bLtChanged = true;
+'  			}
+'  			if ( ImGui::RadioButton("Directional light", m_settings.m_lightType == LightType::DirectionalLight ))
+'  			{
+'  				m_settings.m_lightType = LightType::DirectionalLight; bLtChanged = true;
+'  			}
+
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		bgfxUtilsMeshUnload( m_bunnyMesh )
+'  		bgfxUtilsMeshUnload( m_treeMesh )
+'  		bgfxUtilsMeshUnload( m_cubeMesh )
+'  		bgfxUtilsMeshUnload( m_hollowcubeMesh )
+'  		bgfxUtilsMeshUnload( m_hplaneMesh )
+'  		bgfxUtilsMeshUnload( m_vplaneMesh )
+'  
+'  		bgfxDestroyTexture( m_texFigure )
+'  		bgfxDestroyTexture( m_texFieldstone )
+'  		bgfxDestroyTexture( m_texFlare )
+'  
+'  		For Local ii:Int = 0 Until ShadowMapRenderTargets.Count
+'  			bgfxDestroyFrameBuffer( s_rtShadowMap[ ii ] )
+'  		Next
+'  		bgfxDestroyFrameBuffer( s_rtBlur )
+'  
+'  		s_programs.destroy();
+'  
+'  		bgfxDestroyUniformHandle( s_texColor )
+'  		bgfxDestroyUniformHandle( s_shadowMap[ 3 ] )
+'  		bgfxDestroyUniformHandle( s_shadowMap[ 2 ] )
+'  		bgfxDestroyUniformHandle( s_shadowMap[ 1 ] )
+'  		bgfxDestroyUniformHandle( s_shadowMap[ 0 ] )
+'  
+'  		s_uniforms.Destroy()
+'  
+'  		CameraDestroy()
+'  		' imguiDestroy()
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
+
+	Field m_tvb := New BgfxTransientVertexBuffer() ' for crafting shadow maps
+	Field state :Int[ 2 ]
+	Field bLtChanged:Bool = False
+
+	Method OnRender:Int()
+
+		' DebugStop()
+
+		m_viewState.m_width  = DeviceWidth()
+		m_viewState.m_height = DeviceHeight()
+
+		' Set view and projection matrices.
+		Local camFovy    :Float = 60.0
+		Local camAspect  :Float = Float( Int( m_viewState.m_width ) ) / Float( Int( m_viewState.m_height ) )
+		Local camNear    :Float = 0.1
+		Local camFar     :Float = 2000.0
+		Local projHeight :Float = Tan( camFovy * 0.5 ) ' bx::tan(bx::toRad(camFovy)*0.5f);
+		Local projWidth  :Float = projHeight * camAspect
+
+		bgfxGetCaps( bgfxCaps )
+		bxMtxProj( m_viewState.m_proj, camFovy, camAspect, camNear, camFar, bgfxCaps.GetHomogeneousDepth() )
+		CameraGetViewMtx( m_viewState.m_view )
+
+		Local currentShadowMapSizef:Float = Float( Int( m_currentShadowMapSize ) )
+		s_uniforms.m_params2[ Uniforms.PARAMS2_SHADOW_MAP_TEXEL_SIZE ] = 1.0 / currentShadowMapSizef
+
+		s_uniforms.SubmitConstUniforms()
+
+		'-------------------------------------------------------------------------
+		Local currentSmSettings:ShadowMapSettings = m_smSettings[ m_settings.m_lightType ][ m_settings.m_depthImpl ][ m_settings.m_smImpl ]
+
+		' Update uniforms.
+
+		s_uniforms.m_params1[ Uniforms.PARAMS1_SHADOW_MAP_BIAS   ] = currentSmSettings.m_bias
+		s_uniforms.m_params1[ Uniforms.PARAMS1_SHADOW_MAP_OFFSET ] = currentSmSettings.m_normalOffset
+		s_uniforms.m_params1[ Uniforms.PARAMS1_SHADOW_MAP_PARAM0 ] = currentSmSettings.m_customParam0
+		s_uniforms.m_params1[ Uniforms.PARAMS1_SHADOW_MAP_PARAM1 ] = currentSmSettings.m_customParam1
+
+		s_uniforms.m_params2[ Uniforms.PARAMS2_DEPTH_VALUE_POW   ] = currentSmSettings.m_depthValuePow
+		s_uniforms.m_params2[ Uniforms.PARAMS2_SHOW_SM_COVERAGE  ] = 0.0
+		If m_settings.m_showSmCoverage Then s_uniforms.m_params2[ Uniforms.PARAMS2_SHOW_SM_COVERAGE  ] = 1.0
+
+		s_uniforms.m_paramsBlur[ Uniforms.PARAMS_BLUR_X_NUM      ] = currentSmSettings.m_xNum
+		s_uniforms.m_paramsBlur[ Uniforms.PARAMS_BLUR_Y_NUM      ] = currentSmSettings.m_yNum
+		s_uniforms.m_paramsBlur[ Uniforms.PARAMS_BLUR_X_OFFSET   ] = currentSmSettings.m_xOffset
+		s_uniforms.m_paramsBlur[ Uniforms.PARAMS_BLUR_Y_OFFSET   ] = currentSmSettings.m_yOffset
+
+		s_uniforms.m_lightPtr = m_pointLight
+
+		If LightType.DirectionalLight = m_settings.m_lightType Then
+			s_uniforms.m_lightPtr = m_directionalLight
+		Endif
+
+
+		If LightType.SpotLight = m_settings.m_lightType Then
+			m_pointLight.m_attenuationSpotOuter[ Light.SPOT_OUTER ] = m_settings.m_spotOuterAngle
+			m_pointLight.m_spotDirectionInner[ Light.SPOT_INNER ] = m_settings.m_spotInnerAngle
+		Else
+			m_pointLight.m_attenuationSpotOuter[ Light.SPOT_OUTER ] = 91.0 'above 90.0f means point light
+		Endif
+
+		s_uniforms.SubmitPerFrameUniforms()
+
+		' Time.
+		Local now       :Int = Millisecs()
+		Local frameTime :Int = now - last
+		last = now
+		Local deltaTime :Float = Float( frameTime ) * 0.001
+
+		' Update camera.
+		CameraUpdate( deltaTime )
+
+		' Update view mtx.
+		CameraGetViewMtx( m_viewState.m_view )
+
+		' Update lights.
+		m_pointLight.ComputeViewSpaceComponents( m_viewState.m_view )
+		m_directionalLight.ComputeViewSpaceComponents( m_viewState.m_view )
+
+		' Update time accumulators.
+		If m_settings.m_updateLights Then m_timeAccumulatorLight += deltaTime
+		If m_settings.m_updateScene  Then m_timeAccumulatorScene += deltaTime
+
+		' Setup lights.
+		m_pointLight.m_position[ Light.POSITION_X ] = Cosr( m_timeAccumulatorLight ) * 20.0
+		m_pointLight.m_position[ Light.POSITION_Y ] = 26.0
+		m_pointLight.m_position[ Light.POSITION_Z ] = Sinr( m_timeAccumulatorLight ) * 20.0
+		m_pointLight.m_spotDirectionInner[ Light.SPOT_DIRECTION_X ] = -m_pointLight.m_position[ Light.POSITION_X ]
+		m_pointLight.m_spotDirectionInner[ Light.SPOT_DIRECTION_Y ] = -m_pointLight.m_position[ Light.POSITION_Y ]
+		m_pointLight.m_spotDirectionInner[ Light.SPOT_DIRECTION_Z ] = -m_pointLight.m_position[ Light.POSITION_Z ]
+
+		m_directionalLight.m_position[ Light.POSITION_X ] = -Cosr( m_timeAccumulatorLight )
+		m_directionalLight.m_position[ Light.POSITION_Y ] = -1.0
+		m_directionalLight.m_position[ Light.POSITION_Z ] = -Sinr( m_timeAccumulatorLight )
+
+'  		Const floorScale      :Float = 550.0
+'  		Const numTrees        :Int = 10
+'  		Const shadowMapPasses :Int = ShadowMapRenderTargets.Count
+'  
+'  		Field mtxFloor        :Float[ 16 ]
+'  		Field mtxBunny        :Float[ 16 ]
+'  		Field mtxHollowcube   :Float[ 16 ]
+'  		Field mtxCube         :Float[ 16 ]
+'  		Field mtxTrees        :Float[ numTrees ][] ' [ 16 ]
+'  		Field lightView       :Float[ shadowMapPasses ][] ' [ 16 ]
+'  		Field lightProj       :Float[ shadowMapPasses ][] ' [ 16 ]
+'  		Field mtxYpr          :Float[ TetrahedronFaces.Count ][] ' [ 16 ]
+'  		Field screenProj      :Float[ 16 ]
+'  		Field screenView      :Float[ 16 ]
+
+		bxMtxSRT( mtxFloor, floorScale, floorScale, floorScale, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 )
+		bxMtxSRT( mtxBunny, 5.0, 5.0, 5.0, 0.0, 1.56 - m_timeAccumulatorScene, 0.0, 15.0, 5.0, 0.0 )
+		bxMtxSRT( mtxHollowcube, 2.5, 2.5, 2.5, 0.0, 1.56 - m_timeAccumulatorScene, 0.0, 0.0, 10.0, 0.0 )
+		bxMtxSRT( mtxCube, 2.5, 2.5, 2.5, 0.0, 1.56 - m_timeAccumulatorScene, 0.0, -15.0, 5.0, 0.0 )
+
+		For Local ii:Int = 0 Until numTrees
+			Local tx:Float = Sin( Float( ii ) * 360 / Float( numTrees ) ) * 60.0
+			Local tz:Float = Cos( Float( ii ) * 360 / Float( numTrees ) ) * 60.0
+			bxMtxSRT( mtxTrees[ ii ], 2.0, 2.0, 2.0, 0.0, Float( ii ), 0.0, tx, 0.0, tz )
+		Next
+
+		' Compute transform matrices.
+		bxMtxIdentity( screenView )
+		bxMtxOrtho( screenProj, 0.0, 1.0, 1.0, 0.0, 0.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+
+		If LightType.SpotLight = m_settings.m_lightType Then
+
+			Local fovy   :Float = m_settings.m_coverageSpotL
+			Local aspect :Float = 1.0
+			bxMtxProj( lightProj[ ProjType.Horizontal ], fovy, aspect, currentSmSettings.m_near, currentSmSettings.m_far, False )
+
+			'For linear depth, prevent depth division by variable w-component in shaders and divide here by far plane
+			If DepthImpl.Linear = m_settings.m_depthImpl Then
+				lightProj[ ProjType.Horizontal ][ 10 ] /= currentSmSettings.m_far
+				lightProj[ ProjType.Horizontal ][ 14 ] /= currentSmSettings.m_far
+			Endif
+
+			Local at:Float[ 3 ]
+			bxVec3Add( at, m_pointLight.m_position, m_pointLight.m_spotDirectionInner )
+			bxMtxLookAt( lightView[ TetrahedronFaces.Green ], m_pointLight.m_position, at )
+
+		Else If LightType.PointLight = m_settings.m_lightType Then
+
+			Local ypr:Float[][] = [ ' float ypr[TetrahedronFaces.Count][3]
+				[ bxToRad(   0.0 ), bxToRad(  27.36780516 ), bxToRad( 0.0 ) ],
+				[ bxToRad( 180.0 ), bxToRad(  27.36780516 ), bxToRad( 0.0 ) ],
+				[ bxToRad( -90.0 ), bxToRad( -27.36780516 ), bxToRad( 0.0 ) ],
+				[ bxToRad(  90.0 ), bxToRad( -27.36780516 ), bxToRad( 0.0 ) ] ]
+
+			If m_settings.m_stencilPack Then
+
+				Local fovx   :Float = 143.98570868 + 3.51 + m_settings.m_fovXAdjust
+				Local fovy   :Float = 125.26438968 + 9.85 + m_settings.m_fovYAdjust
+				Local aspect :Float = Tan( fovx * 0.5 ) / Tan( fovy * 0.5 )
+
+				bxMtxProj( lightProj[ ProjType.Vertical ], fovx, aspect, currentSmSettings.m_near, currentSmSettings.m_far, False )
+
+				'For linear depth, prevent depth division by variable w-component in shaders and divide here by far plane
+				If DepthImpl.Linear = m_settings.m_depthImpl Then
+					lightProj[ ProjType.Vertical ][ 10 ] /= currentSmSettings.m_far
+					lightProj[ ProjType.Vertical ][ 14 ] /= currentSmSettings.m_far
+				Endif
+
+				ypr[ TetrahedronFaces.Green  ][ 2 ] = bxToRad( 180.0 )
+				ypr[ TetrahedronFaces.Yellow ][ 2 ] = bxToRad(   0.0 )
+				ypr[ TetrahedronFaces.Blue   ][ 2 ] = bxToRad(  90.0 )
+				ypr[ TetrahedronFaces.Red    ][ 2 ] = bxToRad( -90.0 )
+			Endif
+
+			Local fovx   :Float = 143.98570868 + 7.8 + m_settings.m_fovXAdjust
+			Local fovy   :Float = 125.26438968 + 3.0 + m_settings.m_fovYAdjust
+			Local aspect :Float = Tan( fovx * 0.5 ) / Tan( fovy * 0.5 )
+
+			bxMtxProj( lightProj[ ProjType.Horizontal ], fovy, aspect, currentSmSettings.m_near, currentSmSettings.m_far, bgfxCaps.GetHomogeneousDepth() )
+
+			'For linear depth, prevent depth division by variable w component in shaders and divide here by far plane
+			If DepthImpl.Linear = m_settings.m_depthImpl Then
+				lightProj[ ProjType.Horizontal ][ 10 ] /= currentSmSettings.m_far
+				lightProj[ ProjType.Horizontal ][ 14 ] /= currentSmSettings.m_far
+			Endif
+
+			For Local ii:Int = 0 Until TetrahedronFaces.Count
+
+				Local mtxTmp :Float[ 16 ]
+				
+				MtxYawPitchRoll( mtxTmp, ypr[ ii ][ 0 ], ypr[ ii ][ 1 ], ypr[ ii ][ 2 ] )
+
+				Local vecTmp0:Float[] = [ mtxTmp[  0 ], mtxTmp[  1 ], mtxTmp[  2 ], mtxTmp[  3 ] ]
+				Local vecTmp4:Float[] = [ mtxTmp[  4 ], mtxTmp[  5 ], mtxTmp[  6 ], mtxTmp[  7 ] ]
+				Local vecTmp8:Float[] = [ mtxTmp[  8 ], mtxTmp[  9 ], mtxTmp[ 10 ], mtxTmp[ 11 ] ]
+
+				bxMtxTranspose( mtxYpr[ii], mtxTmp )
+
+				For Local jj:Int = 0 Until 12
+					lightView[ ii ][ jj ] = mtxYpr[ ii ][ jj ]
+				Next
+				lightView[ ii ][ 12 ] = -bxVec3Dot( m_pointLight.m_position, vecTmp0 )
+				lightView[ ii ][ 13 ] = -bxVec3Dot( m_pointLight.m_position, vecTmp4 )
+				lightView[ ii ][ 14 ] = -bxVec3Dot( m_pointLight.m_position, vecTmp8 )
+				lightView[ ii ][ 15 ] = 1.0
+			Next
+
+		Else ' If LightType.DirectionalLight = settings.m_lightType Then
+
+			' Setup light view mtx.
+			Local eye:Float[ 3 ]
+			eye[ 0 ] = -m_directionalLight.m_position[ Light.POSITION_X ]
+			eye[ 1 ] = -m_directionalLight.m_position[ Light.POSITION_Y ]
+			eye[ 2 ] = -m_directionalLight.m_position[ Light.POSITION_Z ]
+
+			Local at:Float[] = [ 0.0, 0.0, 0.0 ]
+			bxMtxLookAt( lightView[ 0 ], eye, at )
+
+			' Compute camera inverse view mtx.
+			Local mtxViewInv:Float[ 16 ]
+			bxMtxInverse( mtxViewInv, m_viewState.m_view )
+
+			' Compute split distances.
+			' Const maxNumSplits:Int = 4
+			If maxNumSplits >= m_settings.m_numSplits Then
+				Print "Error! Max num splits."
+			Endif
+
+			Local splitSlices:Float[ maxNumSplits * 2 ]
+			SplitFrustum( splitSlices, Int( m_settings.m_numSplits ), currentSmSettings.m_near, currentSmSettings.m_far, m_settings.m_splitDistribution )
+
+			' Update uniforms.
+			Local ff:Int = 1
+			For Local ii:Int = 0 Until m_settings.m_numSplits
+				' This lags for 1 frame, but it's not a problem.
+				s_uniforms.m_csmFarDistances[ ii ] = splitSlices[ ff ]
+				ff += 2
+			Next
+
+			Local mtxProj:Float[ 16 ]
+			bxMtxOrtho( mtxProj, 1.0, -1.0, 1.0, -1.0, -currentSmSettings.m_far, currentSmSettings.m_far, 0.0, bgfxCaps.GetHomogeneousDepth() )
+
+			' Const numCorners:Int = 8
+			' Local frustumCorners:Float[ maxNumSplits ][ numCorners ][ 3 ]
+
+			Local nn:Int
+
+			nn = 0
+			ff = 1
+
+			For Local ii:Int = 0 Until m_settings.m_numSplits
+
+				' Compute frustum corners for one split in world space.
+				WorldSpaceFrustumCorners( frustumCorners[ ii ], splitSlices[ nn ], splitSlices[ ff ], projWidth, projHeight, mtxViewInv )
+
+				Local min:Float[] = [  9000.0,  9000.0,  9000.0 ]
+				Local max:Float[] = [ -9000.0, -9000.0, -9000.0 ]
+
+				For Local jj:Int = 0 Until numCorners
+
+					' Transform to light space.
+					Local lightSpaceFrustumCorner:Float[ 3 ]
+					bxVec3MulMtx( lightSpaceFrustumCorner, frustumCorners[ ii ][ jj ], lightView[ 0 ] )
+
+					' Update bounding box.
+					min[ 0 ] = Min( min[ 0 ], lightSpaceFrustumCorner[ 0 ] )
+					max[ 0 ] = Max( max[ 0 ], lightSpaceFrustumCorner[ 0 ] )
+					min[ 1 ] = Min( min[ 1 ], lightSpaceFrustumCorner[ 1 ] )
+					max[ 1 ] = Max( max[ 1 ], lightSpaceFrustumCorner[ 1 ] )
+					min[ 2 ] = Min( min[ 2 ], lightSpaceFrustumCorner[ 2 ] )
+					max[ 2 ] = Max( max[ 2 ], lightSpaceFrustumCorner[ 2 ] )
+				Next
+
+				Local minproj:Float[ 3 ]
+				Local maxproj:Float[ 3 ]
+
+				bxVec3MulMtxH( minproj, min, mtxProj )
+				bxVec3MulMtxH( maxproj, max, mtxProj )
+
+				Local offsetx :Float
+				Local offsety :Float
+				Local scalex  :Float
+				Local scaley  :Float
+
+				scalex = 2.0 / ( maxproj[ 0 ] - minproj[ 0 ] )
+				scaley = 2.0 / ( maxproj[ 1 ] - minproj[ 1 ] )
+
+				If m_settings.m_stabilize Then
+					Const quantizer:Float = 64.0
+					scalex = quantizer / Ceil( quantizer / scalex )
+					scaley = quantizer / Ceil( quantizer / scaley )
+				Endif
+
+				offsetx = 0.5 * ( maxproj[ 0 ] + minproj[ 0 ] ) * scalex
+				offsety = 0.5 * ( maxproj[ 1 ] + minproj[ 1 ] ) * scaley
+
+				If m_settings.m_stabilize Then
+					Local halfSize:Float = currentShadowMapSizef * 0.5
+					offsetx = Ceil( offsetx * halfSize ) / halfSize
+					offsety = Ceil( offsety * halfSize ) / halfSize
+				Endif
+
+				Local mtxCrop:Float[ 16 ]
+				bxMtxIdentity( mtxCrop )
+				mtxCrop[  0 ] = scalex
+				mtxCrop[  5 ] = scaley
+				mtxCrop[ 12 ] = offsetx
+				mtxCrop[ 13 ] = offsety
+
+				bxMtxMul( lightProj[ ii ], mtxCrop, mtxProj )
+
+				nn += 2
+				ff += 2
+			Next
+		Endif
+
+		' Reset render targets.
+		Const invalidRt:Int = BGFX_INVALID_HANDLE ' bgfxFrameBufferHandle
+		For Local ii:Int = 0 Until RENDERVIEW_DRAWDEPTH_3_ID +1
+			bgfxSetViewFrameBuffer( ii, invalidRt )
+		Next
+
+		' Determine on-screen rectangle size where depth buffer will be drawn.
+		Local depthRectHeight :Int = Int( Float( m_viewState.m_height ) / 2.5 )
+		Local depthRectWidth  :Int = depthRectHeight
+		Local depthRectX      :Int = 0
+		Local depthRectY      :Int = m_viewState.m_height - depthRectHeight
+
+		' Setup views and render targets.
+		bgfxSetViewRect( 0, 0, 0, m_viewState.m_width, m_viewState.m_height )
+		bgfxSetViewTransform( 0, m_viewState.m_view, m_viewState.m_proj )
+
+		If LightType.SpotLight = m_settings.m_lightType Then
+
+			' /**
+			'  * RENDERVIEW_SHADOWMAP_0_ID - Clear shadow map. (used as convenience, otherwise render_pass_1 could be cleared)
+			'  * RENDERVIEW_SHADOWMAP_1_ID - Craft shadow map.
+			'  * RENDERVIEW_VBLUR_0_ID - Vertical blur.
+			'  * RENDERVIEW_HBLUR_0_ID - Horizontal blur.
+			'  * RENDERVIEW_DRAWSCENE_0_ID - Draw scene.
+			'  * RENDERVIEW_DRAWSCENE_1_ID - Draw floor bottom.
+			'  * RENDERVIEW_DRAWDEPTH_0_ID - Draw depth buffer.
+			'  */
+
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_1_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_VBLUR_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_HBLUR_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_DRAWSCENE_0_ID, 0, 0, m_viewState.m_width, m_viewState.m_height )
+			bgfxSetViewRect( RENDERVIEW_DRAWSCENE_1_ID, 0, 0, m_viewState.m_width, m_viewState.m_height )
+			bgfxSetViewRect( RENDERVIEW_DRAWDEPTH_0_ID, depthRectX, depthRectY, depthRectWidth, depthRectHeight )
+
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_1_ID, lightView[ 0 ], lightProj[ProjType.Horizontal] )
+			bgfxSetViewTransform( RENDERVIEW_VBLUR_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_HBLUR_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWSCENE_0_ID, m_viewState.m_view, m_viewState.m_proj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWSCENE_1_ID, m_viewState.m_view, m_viewState.m_proj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWDEPTH_0_ID, screenView, screenProj )
+
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_0_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_1_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_VBLUR_0_ID, s_rtBlur )
+			bgfxSetViewFrameBuffer( RENDERVIEW_HBLUR_0_ID, s_rtShadowMap[ 0 ] )
+
+		Else If LightType.PointLight = m_settings.m_lightType Then
+
+			' /**
+			'  * RENDERVIEW_SHADOWMAP_0_ID - Clear entire shadow map.
+			'  * RENDERVIEW_SHADOWMAP_1_ID - Craft green tetrahedron shadow face.
+			'  * RENDERVIEW_SHADOWMAP_2_ID - Craft yellow tetrahedron shadow face.
+			'  * RENDERVIEW_SHADOWMAP_3_ID - Craft blue tetrahedron shadow face.
+			'  * RENDERVIEW_SHADOWMAP_4_ID - Craft red tetrahedron shadow face.
+			'  * RENDERVIEW_VBLUR_0_ID - Vertical blur.
+			'  * RENDERVIEW_HBLUR_0_ID - Horizontal blur.
+			'  * RENDERVIEW_DRAWSCENE_0_ID - Draw scene.
+			'  * RENDERVIEW_DRAWSCENE_1_ID - Draw floor bottom.
+			'  * RENDERVIEW_DRAWDEPTH_0_ID - Draw depth buffer.
+			'  */
+
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+
+			If m_settings.m_stencilPack Then
+
+				Local f:Int = m_currentShadowMapSize     ' full size
+				Local h:Int = m_currentShadowMapSize / 2 ' half size
+
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_1_ID, 0, 0, f, h )
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_2_ID, 0, h, f, h )
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_3_ID, 0, 0, h, f )
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_4_ID, h, 0, h, f )
+			Else
+
+				Local h:Int = m_currentShadowMapSize / 2 ' half size
+
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_1_ID, 0, 0, h, h )
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_2_ID, h, 0, h, h )
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_3_ID, 0, h, h, h )
+				bgfxSetViewRect( RENDERVIEW_SHADOWMAP_4_ID, h, h, h, h )
+			Endif
+
+			bgfxSetViewRect( RENDERVIEW_VBLUR_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_HBLUR_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_DRAWSCENE_0_ID, 0, 0, m_viewState.m_width, m_viewState.m_height )
+			bgfxSetViewRect( RENDERVIEW_DRAWSCENE_1_ID, 0, 0, m_viewState.m_width, m_viewState.m_height )
+			bgfxSetViewRect( RENDERVIEW_DRAWDEPTH_0_ID, depthRectX, depthRectY, depthRectWidth, depthRectHeight )
+
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_1_ID, lightView[ TetrahedronFaces.Green  ], lightProj[ ProjType.Horizontal ] )
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_2_ID, lightView[ TetrahedronFaces.Yellow ], lightProj[ ProjType.Horizontal ] )
+
+			If m_settings.m_stencilPack Then
+
+				bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_3_ID, lightView[ TetrahedronFaces.Blue ], lightProj[ ProjType.Vertical ] )
+				bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_4_ID, lightView[ TetrahedronFaces.Red  ], lightProj[ ProjType.Vertical ] )
+			Else
+
+				bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_3_ID, lightView[ TetrahedronFaces.Blue ], lightProj[ ProjType.Horizontal ] )
+				bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_4_ID, lightView[ TetrahedronFaces.Red  ], lightProj[ ProjType.Horizontal ] ) 
+			Endif
+
+			bgfxSetViewTransform( RENDERVIEW_VBLUR_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_HBLUR_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWSCENE_0_ID, m_viewState.m_view, m_viewState.m_proj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWSCENE_1_ID, m_viewState.m_view, m_viewState.m_proj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWDEPTH_0_ID, screenView, screenProj )
+
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_0_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_1_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_2_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_3_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_4_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_VBLUR_0_ID, s_rtBlur )
+			bgfxSetViewFrameBuffer( RENDERVIEW_HBLUR_0_ID, s_rtShadowMap[0] )
+
+		Else ' LightType.DirectionalLight = settings.m_lightType
+
+			' /**
+			'  * RENDERVIEW_SHADOWMAP_1_ID - Craft shadow map for first  split.
+			'  * RENDERVIEW_SHADOWMAP_2_ID - Craft shadow map for second split.
+			'  * RENDERVIEW_SHADOWMAP_3_ID - Craft shadow map for third  split.
+			'  * RENDERVIEW_SHADOWMAP_4_ID - Craft shadow map for fourth split.
+			'  * RENDERVIEW_VBLUR_0_ID - Vertical   blur for first  split.
+			'  * RENDERVIEW_HBLUR_0_ID - Horizontal blur for first  split.
+			'  * RENDERVIEW_VBLUR_1_ID - Vertical   blur for second split.
+			'  * RENDERVIEW_HBLUR_1_ID - Horizontal blur for second split.
+			'  * RENDERVIEW_VBLUR_2_ID - Vertical   blur for third  split.
+			'  * RENDERVIEW_HBLUR_2_ID - Horizontal blur for third  split.
+			'  * RENDERVIEW_VBLUR_3_ID - Vertical   blur for fourth split.
+			'  * RENDERVIEW_HBLUR_3_ID - Horizontal blur for fourth split.
+			'  * RENDERVIEW_DRAWSCENE_0_ID - Draw scene.
+			'  * RENDERVIEW_DRAWSCENE_1_ID - Draw floor bottom.
+			'  * RENDERVIEW_DRAWDEPTH_0_ID - Draw depth buffer for first  split.
+			'  * RENDERVIEW_DRAWDEPTH_1_ID - Draw depth buffer for second split.
+			'  * RENDERVIEW_DRAWDEPTH_2_ID - Draw depth buffer for third  split.
+			'  * RENDERVIEW_DRAWDEPTH_3_ID - Draw depth buffer for fourth split.
+			'  */
+
+			depthRectHeight = m_viewState.m_height / 3
+			depthRectWidth  = depthRectHeight
+			depthRectX = 0
+			depthRectY = m_viewState.m_height - depthRectHeight
+
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_1_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_2_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_3_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_SHADOWMAP_4_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_VBLUR_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_HBLUR_0_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_VBLUR_1_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_HBLUR_1_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_VBLUR_2_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_HBLUR_2_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_VBLUR_3_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_HBLUR_3_ID, 0, 0, m_currentShadowMapSize, m_currentShadowMapSize )
+			bgfxSetViewRect( RENDERVIEW_DRAWSCENE_0_ID, 0, 0, m_viewState.m_width, m_viewState.m_height )
+			bgfxSetViewRect( RENDERVIEW_DRAWSCENE_1_ID, 0, 0, m_viewState.m_width, m_viewState.m_height )
+			bgfxSetViewRect( RENDERVIEW_DRAWDEPTH_0_ID, depthRectX + ( 0 * depthRectWidth ), depthRectY, depthRectWidth, depthRectHeight )
+			bgfxSetViewRect( RENDERVIEW_DRAWDEPTH_1_ID, depthRectX + ( 1 * depthRectWidth ), depthRectY, depthRectWidth, depthRectHeight )
+			bgfxSetViewRect( RENDERVIEW_DRAWDEPTH_2_ID, depthRectX + ( 2 * depthRectWidth ), depthRectY, depthRectWidth, depthRectHeight )
+			bgfxSetViewRect( RENDERVIEW_DRAWDEPTH_3_ID, depthRectX + ( 3 * depthRectWidth ), depthRectY, depthRectWidth, depthRectHeight )
+
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_1_ID, lightView[ 0 ], lightProj[ 0 ] )
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_2_ID, lightView[ 0 ], lightProj[ 1 ] )
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_3_ID, lightView[ 0 ], lightProj[ 2 ] )
+			bgfxSetViewTransform( RENDERVIEW_SHADOWMAP_4_ID, lightView[ 0 ], lightProj[ 3 ] )
+			bgfxSetViewTransform( RENDERVIEW_VBLUR_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_HBLUR_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_VBLUR_1_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_HBLUR_1_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_VBLUR_2_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_HBLUR_2_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_VBLUR_3_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_HBLUR_3_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWSCENE_0_ID, m_viewState.m_view, m_viewState.m_proj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWSCENE_1_ID, m_viewState.m_view, m_viewState.m_proj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWDEPTH_0_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWDEPTH_1_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWDEPTH_2_ID, screenView, screenProj )
+			bgfxSetViewTransform( RENDERVIEW_DRAWDEPTH_3_ID, screenView, screenProj )
+
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_1_ID, s_rtShadowMap[ 0 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_2_ID, s_rtShadowMap[ 1 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_3_ID, s_rtShadowMap[ 2 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_SHADOWMAP_4_ID, s_rtShadowMap[ 3 ] )
+			bgfxSetViewFrameBuffer( RENDERVIEW_VBLUR_0_ID, s_rtBlur )           ' vblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_HBLUR_0_ID, s_rtShadowMap[ 0 ] ) ' hblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_VBLUR_1_ID, s_rtBlur )           ' vblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_HBLUR_1_ID, s_rtShadowMap[ 1 ] ) ' hblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_VBLUR_2_ID, s_rtBlur )           ' vblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_HBLUR_2_ID, s_rtShadowMap[ 2 ] ) ' hblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_VBLUR_3_ID, s_rtBlur )           ' vblur
+			bgfxSetViewFrameBuffer( RENDERVIEW_HBLUR_3_ID, s_rtShadowMap[ 3 ] ) ' hblur
+		Endif
+
+		' Clear backbuffer at beginning.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, m_clearValues.m_clearRgba, m_clearValues.m_clearDepth, m_clearValues.m_clearStencil )
+		bgfxTouch( 0 )
+
+		' Clear shadowmap rendertarget at beginning.
+		Local flags0:Int = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH | BGFX_CLEAR_STENCIL
+		If LightType.DirectionalLight = m_settings.m_lightType Then
+			flags0 = 0
+		Endif
+
+		bgfxSetViewClear( RENDERVIEW_SHADOWMAP_0_ID, flags0,
+						   $fefefefe, 'blur fails on completely white regions
+						   m_clearValues.m_clearDepth,
+						   m_clearValues.m_clearStencil )
+		bgfxTouch( RENDERVIEW_SHADOWMAP_0_ID )
+
+		Local flags1:Int = 0
+		If LightType.DirectionalLight = m_settings.m_lightType Then
+			flags1 = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH
+		Endif
+
+		For Local ii:Int = 0 Until 4
+			bgfxSetViewClear( RENDERVIEW_SHADOWMAP_1_ID + ii, flags1,
+							   $fefefefe, 'blur fails on completely white regions
+							   m_clearValues.m_clearDepth,
+							   m_clearValues.m_clearStencil )
+			bgfxTouch( RENDERVIEW_SHADOWMAP_1_ID + ii )
+		Next
+
+		' Render.
+
+		' Craft shadow map.
+		' {
+			' Craft stencil mask for point light shadow map packing.
+			If LightType.PointLight = m_settings.m_lightType And m_settings.m_stencilPack Then
+
+				If 6 = bgfxGetAvailTransientVertexBuffer( 6, m_posDecl ) Then
+
+					bgfxAllocTransientVertexBuffer( m_tvb, 6, m_posDecl )
+
+					Const min     :Float = 0.0
+					Const max     :Float = 1.0
+					Const center  :Float = 0.5
+					Const zz      :Float = 0.0
+
+					Local address :Int = 0
+
+					m_tvb.PokeFloat( address, min    ) ; address += 4
+					m_tvb.PokeFloat( address, min    ) ; address += 4
+					m_tvb.PokeFloat( address, zz     ) ; address += 4
+
+					m_tvb.PokeFloat( address, max    ) ; address += 4
+					m_tvb.PokeFloat( address, min    ) ; address += 4
+					m_tvb.PokeFloat( address, zz     ) ; address += 4
+
+					m_tvb.PokeFloat( address, center ) ; address += 4
+					m_tvb.PokeFloat( address, center ) ; address += 4
+					m_tvb.PokeFloat( address, zz     ) ; address += 4
+
+					m_tvb.PokeFloat( address, center ) ; address += 4
+					m_tvb.PokeFloat( address, center ) ; address += 4
+					m_tvb.PokeFloat( address, zz     ) ; address += 4
+
+					m_tvb.PokeFloat( address, max    ) ; address += 4
+					m_tvb.PokeFloat( address, max    ) ; address += 4
+					m_tvb.PokeFloat( address, zz     ) ; address += 4
+
+					m_tvb.PokeFloat( address, min    ) ; address += 4
+					m_tvb.PokeFloat( address, max    ) ; address += 4
+					m_tvb.PokeFloat( address, zz     ) ; address += 4
+
+					Local state0:Int[2]
+
+					state0[ 0 ] = 0
+					state0[ 1 ] = 0
+
+					bgfxSetState( state0 )
+					bgfxSetStencil( $2228ff01 )
+'  					bgfxSetStencil( BGFX_STENCIL_TEST_ALWAYS
+'  									 | BGFX_STENCIL_FUNC_REF(1)
+'  									 | BGFX_STENCIL_FUNC_RMASK(0xff)
+'  									 | BGFX_STENCIL_OP_FAIL_S_REPLACE
+'  									 | BGFX_STENCIL_OP_FAIL_Z_REPLACE
+'  									 | BGFX_STENCIL_OP_PASS_Z_REPLACE )
+					bgfxSetTransientVertexBuffer( 0, m_tvb )
+					bgfxSubmit( RENDERVIEW_SHADOWMAP_0_ID, s_programs.m_black )
+				Endif
+			Endif
+
+			' Draw scene into shadowmap.
+			Local drawNum:Int
+			If LightType.SpotLight = m_settings.m_lightType Then
+				drawNum = 1
+			Else If LightType.PointLight = m_settings.m_lightType Then
+				drawNum = 4
+			Else ' LightType.DirectionalLight = settings.m_lightType
+				drawNum = Int( m_settings.m_numSplits )
+			Endif
+
+			For Local ii:Int = 0 Until drawNum
+
+				Local viewId:Int = RENDERVIEW_SHADOWMAP_1_ID + ii
+
+				Local renderStateIndex:Int = RenderState.ShadowMap_PackDepth
+				If LightType.PointLight = m_settings.m_lightType And m_settings.m_stencilPack Then
+					renderStateIndex = Int( RenderState.ShadowMap_PackDepthVert )
+					If ii < 2 Then
+						renderStateIndex = Int( RenderState.ShadowMap_PackDepthHoriz )
+					Endif
+				Endif
+
+				' Floor.
+				MeshSubmitShadowMaps( m_hplaneMesh, viewId, mtxFloor, currentSmSettings.m_progPack, s_renderStates[ renderStateIndex ] )
+
+				' Bunny.
+				MeshSubmitShadowMaps( m_bunnyMesh, viewId, mtxBunny, currentSmSettings.m_progPack, s_renderStates[ renderStateIndex ] )
+
+				' Hollow cube.
+				MeshSubmitShadowMaps( m_hollowcubeMesh, viewId, mtxHollowcube, currentSmSettings.m_progPack, s_renderStates[ renderStateIndex ] )
+
+				' Cube.
+				MeshSubmitShadowMaps( m_cubeMesh, viewId, mtxCube, currentSmSettings.m_progPack, s_renderStates[ renderStateIndex ] )
+
+				' Trees.
+				For Local jj:Int = 0 Until numTrees
+					MeshSubmitShadowMaps( m_treeMesh, viewId, mtxTrees[ jj ], currentSmSettings.m_progPack, s_renderStates[ renderStateIndex ] )
+				Next
+			Next
+		' }
+
+		Local depthType:Int = PackDepth.RGBA
+		If SmImpl.VSM = m_settings.m_smImpl Then
+			depthType = PackDepth.VSM
+		Endif
+
+		Local bVsmOrEsm:Bool = (SmImpl.VSM = m_settings.m_smImpl) Or (SmImpl.ESM = m_settings.m_smImpl)
+
+		' Blur shadow map.
+		If bVsmOrEsm And currentSmSettings.m_doBlur Then
+
+			bgfxUtilsClear64Bit(state)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_R)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_G)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_B)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_A)
+
+			bgfxSetTexture( 4, s_shadowMap[ 0 ], bgfxGetTexture( s_rtShadowMap[ 0 ] ) )
+			bgfxSetState( state ) ' BGFX_STATE_WRITE_RGBA | BGFX_STATE_WRITE_A )
+			ScreenSpaceQuad( currentShadowMapSizef, currentShadowMapSizef, s_flipV )
+			bgfxSubmit( RENDERVIEW_VBLUR_0_ID, s_programs.m_vBlur[ depthType ] )
+
+			bgfxSetTexture( 4, s_shadowMap[ 0 ], bgfxGetTexture( s_rtBlur ) )
+			bgfxSetState( state ) ' BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A )
+			ScreenSpaceQuad( currentShadowMapSizef, currentShadowMapSizef, s_flipV )
+			bgfxSubmit( RENDERVIEW_HBLUR_0_ID, s_programs.m_hBlur[ depthType ] )
+
+			If LightType.DirectionalLight = m_settings.m_lightType Then
+
+				Local jj:Int = 2
+
+				For Local ii:Int = 1 Until m_settings.m_numSplits
+
+					Local viewId:Int = RENDERVIEW_VBLUR_0_ID + jj
+
+					bgfxSetTexture( 4, s_shadowMap[ 0 ], bgfxGetTexture( s_rtShadowMap[ ii ] ) )
+					bgfxSetState( state ) ' BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A )
+					ScreenSpaceQuad( currentShadowMapSizef, currentShadowMapSizef, s_flipV )
+					bgfxSubmit( viewId, s_programs.m_vBlur[ depthType ] )
+
+					bgfxSetTexture( 4, s_shadowMap[ 0 ], bgfxGetTexture( s_rtBlur ) )
+					bgfxSetState( state ) ' BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A )
+					ScreenSpaceQuad( currentShadowMapSizef, currentShadowMapSizef, s_flipV )
+					bgfxSubmit( viewId +1, s_programs.m_hBlur[ depthType ] )
+
+					jj += 2
+				Next
+
+			Endif
+		Endif
+
+		' Draw scene.
+		' {
+			' Setup shadow mtx.
+			Local mtxShadow:Float[ 16 ]
+
+			Local ymul:Float = -0.5 ; If s_flipV Then ymul = 0.5
+			Local zadd:Float = 0.5 ; If DepthImpl.Linear = m_settings.m_depthImpl Then zadd = 0.0
+
+			Local mtxBias:Float[] = [
+				0.5, 0.0,  0.0,  0.0,
+				0.0, ymul, 0.0,  0.0,
+				0.0, 0.0,  0.5,  0.0,
+				0.5, 0.5,  zadd, 1.0 ]
+
+			If LightType.SpotLight = m_settings.m_lightType Then
+
+				Local mtxTmp:Float[ 16 ]
+				bxMtxMul( mtxTmp, lightProj[ ProjType.Horizontal ], mtxBias )
+				bxMtxMul( mtxShadow, lightView[ 0 ], mtxTmp ) ' lightViewProjBias
+
+			Else If LightType.PointLight = m_settings.m_lightType Then
+
+				Local s:Float = -1.0 ; If s_flipV Then s = 1.0 ' sign
+
+				zadd = 0.5 ; If DepthImpl.Linear = m_settings.m_depthImpl Then zadd = 0.0
+
+				' [ 2 ][ TetrahedronFaces.Count ][ 16 ]
+				Local mtxCropBias:Float[][][] = [ [ [
+				
+					' settings.m_stencilPack == false
+
+						' D3D: Green, OGL: Blue
+						0.25,   0.0,  0.0,  0.0,
+						0.0,  s*0.25, 0.0,  0.0,
+						0.0,    0.0,  0.5,  0.0,
+						0.25,   0.25, zadd, 1.0 ], [
+						' D3D: Yellow, OGL: Red
+						0.25,   0.0,  0.0,  0.0,
+						0.0,  s*0.25, 0.0,  0.0,
+						0.0,    0.0,  0.5,  0.0,
+						0.75,   0.25, zadd, 1.0 ], [
+						' D3D: Blue, OGL: Green
+						0.25,   0.0,  0.0,  0.0,
+						0.0,  s*0.25, 0.0,  0.0,
+						0.0,    0.0,  0.5,  0.0,
+						0.25,   0.75, zadd, 1.0 ], [
+						' D3D: Red, OGL: Yellow
+						0.25,   0.0,  0.0,  0.0,
+						0.0,  s*0.25, 0.0,  0.0,
+						0.0,    0.0,  0.5,  0.0,
+						0.75,   0.75, zadd, 1.0 ] ], [ [
+
+					' settings.m_stencilPack == true
+
+						' D3D: Red, OGL: Blue
+						0.25,   0.0, 0.0,  0.0,
+						0.0,  s*0.5, 0.0,  0.0,
+						0.0,    0.0, 0.5,  0.0,
+						0.25,   0.5, zadd, 1.0 ], [
+						' D3D: Blue, OGL: Red
+						0.25,   0.0, 0.0,  0.0,
+						0.0,  s*0.5, 0.0,  0.0,
+						0.0,    0.0, 0.5,  0.0,
+						0.75,   0.5, zadd, 1.0 ], [
+						' D3D: Green, OGL: Green
+						0.5,   0.0,  0.0,  0.0,
+						0.0, s*0.25, 0.0,  0.0,
+						0.0,   0.0,  0.5,  0.0,
+						0.5,   0.75, zadd, 1.0 ], [
+						' D3D: Yellow, OGL: Yellow
+						0.5,   0.0,  0.0,  0.0,
+						0.0, s*0.25, 0.0,  0.0,
+						0.0,   0.0,  0.5,  0.0,
+						0.5,   0.25, zadd, 1.0 ] ] ]
+
+				'Use as: [stencilPack][flipV][tetrahedronFace]
+				Local cropBiasIndices:Int[][][] = [ [  ' [2][2][4]
+					' settings.m_stencilPack == false
+						[ 0, 1, 2, 3 ],       ' flipV == false
+						[ 2, 3, 0, 1 ] ], [   ' flipV == true
+					' settings.m_stencilPack == true
+						[ 3, 2, 0, 1 ],       ' flipV == false
+						[ 2, 3, 0, 1 ] ] ]    ' flipV == true
+
+				For Local ii:Int = 0 Until TetrahedronFaces.Count
+
+					Local projType  :Int = ProjType.Horizontal
+
+					If m_settings.m_stencilPack And ii > 1 Then projType = ProjType.Vertical
+
+					Local biasIndex :Int = cropBiasIndices[ m_settings.m_stencilPack ][ Int( s_flipV ) ][ ii ]
+
+					Local mtxTmp:Float[ 16 ]
+					bxMtxMul( mtxTmp, mtxYpr[ ii ], lightProj[ projType ] )
+					bxMtxMul( m_shadowMapMtx[ ii ], mtxTmp, mtxCropBias[ m_settings.m_stencilPack ][ biasIndex ] ) ' mtxYprProjBias
+				Next
+
+				bxMtxTranslate( mtxShadow, 'lightInvTranslate
+								-m_pointLight.m_position[ Light.POSITION_X ],
+								-m_pointLight.m_position[ Light.POSITION_Y ],
+								-m_pointLight.m_position[ Light.POSITION_Z ] )
+
+			Else ' LightType.DirectionalLight == settings.m_lightType
+
+				For Local ii:Int = 0 Until m_settings.m_numSplits
+					Local mtxTmp:Float[ 16 ]
+					bxMtxMul( mtxTmp, lightProj[ ii ], mtxBias )
+					bxMtxMul( m_shadowMapMtx[ ii ], lightView[ 0 ], mtxTmp ) ' lViewProjCropBias
+				Next
+			Endif
+
+			' Floor.
+			If LightType.DirectionalLight <> m_settings.m_lightType Then
+				bxMtxMul( m_lightMtx, mtxFloor, mtxShadow ) ' not needed for directional light
+			Endif
+			MeshSubmitShadowMaps( m_hplaneMesh, RENDERVIEW_DRAWSCENE_0_ID, mtxFloor, currentSmSettings.m_progDraw, s_renderStates[ RenderState.DefaultState ], True )
+
+			' Bunny.
+			If LightType.DirectionalLight <> m_settings.m_lightType Then
+				bxMtxMul( m_lightMtx, mtxBunny, mtxShadow )
+			Endif
+			MeshSubmitShadowMaps( m_bunnyMesh, RENDERVIEW_DRAWSCENE_0_ID, mtxBunny, currentSmSettings.m_progDraw, s_renderStates[ RenderState.DefaultState ], True )
+
+			' Hollow cube.
+			If LightType.DirectionalLight <> m_settings.m_lightType Then
+				bxMtxMul( m_lightMtx, mtxHollowcube, mtxShadow )
+			Endif
+			MeshSubmitShadowMaps( m_hollowcubeMesh, RENDERVIEW_DRAWSCENE_0_ID, mtxHollowcube, currentSmSettings.m_progDraw, s_renderStates[ RenderState.DefaultState ], True )
+
+			' Cube.
+			If LightType.DirectionalLight <> m_settings.m_lightType Then
+				bxMtxMul( m_lightMtx, mtxCube, mtxShadow )
+			Endif
+			MeshSubmitShadowMaps( m_cubeMesh, RENDERVIEW_DRAWSCENE_0_ID, mtxCube, currentSmSettings.m_progDraw, s_renderStates[ RenderState.DefaultState ], True )
+
+			' Trees.
+			For Local ii:Int = 0 Until numTrees
+				If LightType.DirectionalLight <> m_settings.m_lightType Then
+					bxMtxMul( m_lightMtx, mtxTrees[ ii ], mtxShadow )
+				Endif
+				MeshSubmitShadowMaps( m_treeMesh, RENDERVIEW_DRAWSCENE_0_ID, mtxTrees[ ii ], currentSmSettings.m_progDraw, s_renderStates[ RenderState.DefaultState ], True )
+			Next
+
+			' Lights.
+			If LightType.SpotLight = m_settings.m_lightType Or LightType.PointLight = m_settings.m_lightType Then
+				Local lightScale:Float[] = [ 1.5, 1.5, 1.5 ]
+				Local mtx:Float[ 16 ]
+				MtxBillboard( mtx, m_viewState.m_view, m_pointLight.m_position, lightScale )
+				MeshSubmitShadowMaps( m_vplaneMesh, RENDERVIEW_DRAWSCENE_0_ID, mtx, s_programs.m_colorTexture, s_renderStates[ RenderState.Custom_BlendLightTexture ], m_texFlare )
+			Endif
+
+			' Draw floor bottom.
+			Local floorBottomMtx:Float[16]
+			bxMtxSRT(floorBottomMtx, floorScale, floorScale, floorScale, 0.0, 0.0, 0.0, 0.0, -0.1, 0.0 )
+
+			MeshSubmitShadowMaps( m_hplaneMesh, RENDERVIEW_DRAWSCENE_1_ID, floorBottomMtx, s_programs.m_texture, s_renderStates[ RenderState.Custom_DrawPlaneBottom ], m_texFigure )
+		' }
+
+		' Draw depth rect.
+		If m_settings.m_drawDepthBuffer Then
+
+			bgfxUtilsClear64Bit(state)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_R)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_G)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_B)
+			bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_A)
+
+			bgfxSetTexture( 4, s_shadowMap[ 0 ], bgfxGetTexture( s_rtShadowMap[ 0 ] ) )
+			bgfxSetState( state )
+			ScreenSpaceQuad( currentShadowMapSizef, currentShadowMapSizef, s_flipV )
+			bgfxSubmit( RENDERVIEW_DRAWDEPTH_0_ID, s_programs.m_drawDepth[ depthType ] )
+
+			If LightType.DirectionalLight = m_settings.m_lightType Then
+
+				For Local ii:Int = 1 Until m_settings.m_numSplits
+
+					bgfxUtilsClear64Bit(state)
+					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_R)
+					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_G)
+					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_B)
+					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_A)
+
+					bgfxSetTexture( 4, s_shadowMap[ 0 ], bgfxGetTexture( s_rtShadowMap[ ii ] ) )
+					bgfxSetState( state )
+					ScreenSpaceQuad( currentShadowMapSizef, currentShadowMapSizef, s_flipV )
+					bgfxSubmit( RENDERVIEW_DRAWDEPTH_0_ID + ii, s_programs.m_drawDepth[ depthType ] )
+				Next
+	
+			Endif
+		Endif
+
+		' Update render target size.
+		Local shadowMapSize:Int = 1 Shl Int( currentSmSettings.m_sizePwrTwo )
+		If bLtChanged Or m_currentShadowMapSize <> shadowMapSize Then
+
+			m_currentShadowMapSize = shadowMapSize
+			s_uniforms.m_params2[ Uniforms.PARAMS2_SHADOW_MAP_TEXEL_SIZE ] = 1.0 / currentShadowMapSizef
+
+			' {
+				bgfxDestroyFrameBuffer( s_rtShadowMap[ 0 ] )
+
+				Local fbTextures:Int[ 2 ]
+
+				fbTextures[ 0 ] = bgfxCreateTexture2D( m_currentShadowMapSize, m_currentShadowMapSize, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_RT )
+				fbTextures[ 1 ] = bgfxCreateTexture2D( m_currentShadowMapSize, m_currentShadowMapSize, False, 1, BGFX_TEXTURE_FORMAT_D24S8, BGFX_TEXTURE_RT )
+
+				fbTexturesDataBuffer[ 0 ].PokeShort( 0, fbTextures[ 0 ] )
+				fbTexturesDataBuffer[ 0 ].PokeShort( 2, fbTextures[ 1 ] )
+
+				s_rtShadowMap[ 0 ] = bgfxCreateFrameBufferFromHandles( fbTextures.Length(), fbTexturesDataBuffer[ 0 ], True )
+			' }
+
+			If LightType.DirectionalLight = m_settings.m_lightType Then
+
+				For Local ii:Int = 1 Until ShadowMapRenderTargets.Count
+					' {
+					bgfxDestroyFrameBuffer( s_rtShadowMap[ ii ] )
+
+					Local fbTextures:Int[ 2 ]
+
+					fbTextures[ 0 ] = bgfxCreateTexture2D( m_currentShadowMapSize, m_currentShadowMapSize, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, BGFX_TEXTURE_RT )
+					fbTextures[ 1 ] = bgfxCreateTexture2D( m_currentShadowMapSize, m_currentShadowMapSize, False, 1, BGFX_TEXTURE_FORMAT_D24S8, BGFX_TEXTURE_RT )
+
+					fbTexturesDataBuffer[ ii ].PokeShort( 0, fbTextures[ 0 ] )
+					fbTexturesDataBuffer[ ii ].PokeShort( 2, fbTextures[ 1 ] )
+
+					s_rtShadowMap[ ii ] = bgfxCreateFrameBufferFromHandles( fbTextures.Length(), fbTexturesDataBuffer[ ii ], True )
+					' }
+				Next
+			Endif
+
+			bgfxDestroyFrameBuffer( s_rtBlur )
+			s_rtBlur = bgfxCreateFrameBuffer( m_currentShadowMapSize, m_currentShadowMapSize, BGFX_TEXTURE_FORMAT_BGRA8 )
+		Endif
+
+'  		DrawText( "
+
+'  		DrawText( "      [SPACE] Scene: " + SceneToString(), 8, 14 * 1 )
+'  		DrawText( "[LEFT][RIGHT] Lights: " + m_numLights, 8, 14 * 2 )
+'  		DrawText( "   [UP][DOWN] Reflection value: " + m_reflectionValue, 8, 14 * 3 )
+'  		DrawText( "          [L] Update lights: " + BoolToString( m_updateLights ), 8, 14 * 4 )
+'  		DrawText( "          [S] Update scene: " + BoolToString( m_updateScene ), 8, 14 * 5 )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 16-shadowmaps"
+	Print "Description: Shadow maps example."
+	New ShadowmapsExample()
+	Return 0
+End
+
+'  
+'  Const MAX_NUM_LIGHTS:Int = 5
+'  
+'  Global s_cubeVertices:PosNormalTexcoordVertex[] = [
+'  	New PosNormalTexcoordVertex( -1.0,  1.0,  1.0,  0.0,  1.0,  0.0, 1.0, 1.0 ),
+'  	New PosNormalTexcoordVertex(  1.0,  1.0,  1.0,  0.0,  1.0,  0.0, 0.0, 1.0 ),
+'  	New PosNormalTexcoordVertex( -1.0,  1.0, -1.0,  0.0,  1.0,  0.0, 1.0, 0.0 ),
+'  	New PosNormalTexcoordVertex(  1.0,  1.0, -1.0,  0.0,  1.0,  0.0, 0.0, 0.0 ),
+'  	New PosNormalTexcoordVertex( -1.0, -1.0,  1.0,  0.0, -1.0,  0.0, 1.0, 1.0 ),
+'  	New PosNormalTexcoordVertex(  1.0, -1.0,  1.0,  0.0, -1.0,  0.0, 0.0, 1.0 ),
+'  	New PosNormalTexcoordVertex( -1.0, -1.0, -1.0,  0.0, -1.0,  0.0, 1.0, 0.0 ),
+'  	New PosNormalTexcoordVertex(  1.0, -1.0, -1.0,  0.0, -1.0,  0.0, 0.0, 0.0 ),
+'  	New PosNormalTexcoordVertex(  1.0, -1.0,  1.0,  0.0,  0.0,  1.0, 0.0, 0.0 ),
+'  	New PosNormalTexcoordVertex(  1.0,  1.0,  1.0,  0.0,  0.0,  1.0, 0.0, 1.0 ),
+'  	New PosNormalTexcoordVertex( -1.0, -1.0,  1.0,  0.0,  0.0,  1.0, 1.0, 0.0 ),
+'  	New PosNormalTexcoordVertex( -1.0,  1.0,  1.0,  0.0,  0.0,  1.0, 1.0, 1.0 ),
+'  	New PosNormalTexcoordVertex(  1.0, -1.0, -1.0,  0.0,  0.0, -1.0, 0.0, 0.0 ),
+'  	New PosNormalTexcoordVertex(  1.0,  1.0, -1.0,  0.0,  0.0, -1.0, 0.0, 1.0 ),
+'  	New PosNormalTexcoordVertex( -1.0, -1.0, -1.0,  0.0,  0.0, -1.0, 1.0, 0.0 ),
+'  	New PosNormalTexcoordVertex( -1.0,  1.0, -1.0,  0.0,  0.0, -1.0, 1.0, 1.0 ),
+'  	New PosNormalTexcoordVertex(  1.0,  1.0, -1.0,  1.0,  0.0,  0.0, 1.0, 1.0 ),
+'  	New PosNormalTexcoordVertex(  1.0,  1.0,  1.0,  1.0,  0.0,  0.0, 0.0, 1.0 ),
+'  	New PosNormalTexcoordVertex(  1.0, -1.0, -1.0,  1.0,  0.0,  0.0, 1.0, 0.0 ),
+'  	New PosNormalTexcoordVertex(  1.0, -1.0,  1.0,  1.0,  0.0,  0.0, 0.0, 0.0 ),
+'  	New PosNormalTexcoordVertex( -1.0,  1.0, -1.0, -1.0,  0.0,  0.0, 1.0, 1.0 ),
+'  	New PosNormalTexcoordVertex( -1.0,  1.0,  1.0, -1.0,  0.0,  0.0, 0.0, 1.0 ),
+'  	New PosNormalTexcoordVertex( -1.0, -1.0, -1.0, -1.0,  0.0,  0.0, 1.0, 0.0 ),
+'  	New PosNormalTexcoordVertex( -1.0, -1.0,  1.0, -1.0,  0.0,  0.0, 0.0, 0.0 ) ]
+'  
+'  Global s_cubeIndices:Int[] = [
+'  	0,  1,  2,
+'  	1,  3,  2,
+'  	4,  6,  5,
+'  	5,  6,  7,
+'  	8,  9,  10,
+'  	9,  11, 10,
+'  	12, 14, 13,
+'  	13, 14, 15,
+'  	16, 17, 18,
+'  	17, 19, 18,
+'  	20, 22, 21,
+'  	21, 22, 23 ]
+'  
+'  Global s_viewMask  :Int = 0
+'  Global s_clearMask :Int = 0
+'  
+'  Function SetViewClearMask:Void( _viewMask:Int, _flags:Int, _rgba:Int, _depth:Float, _stencil:Int )
+'  
+'  	Local view     :Int = 0
+'  	Local viewMask :Int = _viewMask
+'  	Local ntz      :Int = bxCntTZ( _viewMask )
+'  
+'  	Repeat
+'  
+'  		viewMask Shr= ntz
+'  		view += ntz
+'  
+'  		bgfxSetViewClear( view, _flags, _rgba, _depth, _stencil )
+'  
+'  		viewMask Shr= 1
+'  		view += 1
+'  		ntz = bxCntTZ( viewMask )
+'  
+'  		If viewMask = 0 Then
+'  			Exit
+'  		Endif
+'  	Forever
+'  End
+'  
+'  Function SetViewTransformMask:Void( _viewMask:Int, _view:Float[], _proj:Float[] )
+'  
+'  	Local view     :Int = 0
+'  	Local viewMask :Int = _viewMask
+'  	Local ntz      :Int = bxCntTZ( _viewMask )
+'  
+'  	Repeat
+'  
+'  		viewMask Shr= ntz
+'  		view += ntz
+'  
+'  		bgfxSetViewTransform( view, _view, _proj )
+'  
+'  		viewMask Shr= 1
+'  		view += 1
+'  		ntz = bxCntTZ( viewMask )
+'  
+'  		If viewMask = 0 Then
+'  			Exit
+'  		Endif
+'  	Forever
+'  End
+'  
+'  Function SetViewRectMask:Void( _viewMask:Int, _x:Int, _y:Int, _width:Int, _height:Int )
+'  
+'  	Local view     :Int = 0
+'  	Local viewMask :Int = _viewMask
+'  	Local ntz      :Int = bxCntTZ( _viewMask )
+'  
+'  	Repeat
+'  
+'  		viewMask Shr= ntz
+'  		view += ntz
+'  
+'  		bgfxSetViewRect( view, _x, _y, _width, _height )
+'  
+'  		viewMask Shr= 1
+'  		view += 1
+'  		ntz = bxCntTZ( viewMask )
+'  
+'  		If viewMask = 0 Then
+'  			Exit
+'  		Endif
+'  	Forever
+'  End
+'  
+'  ' _p - plane, _n - normal
+'  Function MtxReflected:Void( _result:Float[], _p:Float[], _n:Float[] )
+'  
+'  	Local dot:Float = bxVec3Dot( _p, _n )
+'  
+'  	_result[ 0] =  1.0 -   2.0 * _n[0] * _n[0]  ' 1-2Nx^2
+'  	_result[ 1] = -2.0 * _n[0] * _n[1]          ' -2*Nx*Ny
+'  	_result[ 2] = -2.0 * _n[0] * _n[2]          ' -2*NxNz
+'  	_result[ 3] =  0.0                          ' 0
+'  
+'  	_result[ 4] = -2.0 * _n[0] * _n[1]          ' -2*NxNy
+'  	_result[ 5] =  1.0 -   2.0 * _n[1] * _n[1]  ' 1-2*Ny^2
+'  	_result[ 6] = -2.0 * _n[1] * _n[2]          ' -2*NyNz
+'  	_result[ 7] =  0.0                          ' 0
+'  
+'  	_result[ 8] = -2.0 * _n[0] * _n[2]          ' -2*NxNz
+'  	_result[ 9] = -2.0 * _n[1] * _n[2]          ' -2NyNz
+'  	_result[10] =  1.0 -   2.0 * _n[2] * _n[2]  ' 1-2*Nz^2
+'  	_result[11] =  0.0                          ' 0
+'  
+'  	_result[12] =  2.0 * dot * _n[0]            ' 2*dot*Nx
+'  	_result[13] =  2.0 * dot * _n[1]            ' 2*dot*Ny
+'  	_result[14] =  2.0 * dot * _n[2]            ' 2*dot*Nz
+'  	_result[15] =  1.0                          ' 1
+'  End
+'  
+'  Function MtxShadow:Void( _result:Float[], _ground:Float[], _light:Float[] )
+'  
+'  	Local dot:Float = _ground[0] * _light[0] + _ground[1] * _light[1] + _ground[2] * _light[2] + _ground[3] * _light[3]
+'  
+'  	_result[ 0] = dot - _light[0] * _ground[0]
+'  	_result[ 1] = 0.0 - _light[1] * _ground[0]
+'  	_result[ 2] = 0.0 - _light[2] * _ground[0]
+'  	_result[ 3] = 0.0 - _light[3] * _ground[0]
+'  
+'  	_result[ 4] = 0.0 - _light[0] * _ground[1]
+'  	_result[ 5] = dot - _light[1] * _ground[1]
+'  	_result[ 6] = 0.0 - _light[2] * _ground[1]
+'  	_result[ 7] = 0.0 - _light[3] * _ground[1]
+'  
+'  	_result[ 8] = 0.0 - _light[0] * _ground[2]
+'  	_result[ 9] = 0.0 - _light[1] * _ground[2]
+'  	_result[10] = dot - _light[2] * _ground[2]
+'  	_result[11] = 0.0 - _light[3] * _ground[2]
+'  
+'  	_result[12] = 0.0 - _light[0] * _ground[3]
+'  	_result[13] = 0.0 - _light[1] * _ground[3]
+'  	_result[14] = 0.0 - _light[2] * _ground[3]
+'  	_result[15] = dot - _light[3] * _ground[3]
+'  End
+'  
+'  
+'  
+'  
+'  
+'  Function ClearView:Void( _id:Int, _flags:Int, _clearValues:ClearValues )
+'  
+'  	bgfxSetViewClear( _id, _flags, _clearValues.m_clearRgba, _clearValues.m_clearDepth, _clearValues.m_clearStencil )
+'  
+'  	' Keep track of cleared views
+'  	s_clearMask |= 1 Shl _id
+'  End
+'  
+'  Function ClearViewMask:Void( _viewMask:Int, _flags:Int, _clearValues:ClearValues )
+'  
+'  	SetViewClearMask( _viewMask, _flags, _clearValues.m_clearRgba, _clearValues.m_clearDepth, _clearValues.m_clearStencil )
+'  
+'  	' Keep track of cleared views
+'  	s_clearMask |= _viewMask
+'  End
+'  
+'  Global invalidTexture:Int = $ffffffff
+'  
+'  Function MeshSubmitStencil:Void( _mesh:BgfxUtilsMesh, _id:Int, _mtx:Float[], _program:Int, _renderState:RenderState )
+'  	Local texture:Int = BGFX_INVALID_HANDLE
+'  	MeshSubmitStencil( _mesh, _id, _mtx, _program, _renderState, invalidTexture )
+'  End
+'  	
+'  Function MeshSubmitStencil:Void( _mesh:BgfxUtilsMesh, _id:Int, _mtx:Float[], _program:Int, _renderState:RenderState, _texture:Int )
+'  
+'  	Local groups := _mesh.m_groups
+'  	Local length :Int = groups.Length()
+'  
+'  	For Local ii:Int = 0 Until length
+'  
+'  		Local group := groups.Get( ii )
+'  
+'  		' Set uniforms
+'  		s_uniforms.SubmitPerDrawUniforms()
+'  
+'  		' Set model matrix for rendering.
+'  		bgfxSetTransform( _mtx )
+'  		bgfxSetIndexBuffer( group.m_ibh )
+'  		bgfxSetVertexBuffer( 0, group.m_vbh )
+'  
+'  		' Set texture
+'  		bgfxSetTexture( 0, s_texColor, _texture )
+'  
+'  		' Apply render state
+'  		bgfxSetStencil( _renderState.m_fstencil, _renderState.m_bstencil )
+'  		bgfxSetState( _renderState.m_state, _renderState.m_blendFactorRgba )
+'  
+'  		' Submit
+'  		bgfxSubmit( _id, _program )
+'  
+'  		' Keep track of submited view ids
+'  		s_viewMask |= 1 Shl _id
+'  	Next
+'  
+'  '  	Print "_renderState.m_state[0]=" + IntToHex(_renderState.m_state[0]) +
+'  '  		" _renderState.m_state[1]=" + IntToHex(_renderState.m_state[1]) + 
+'  '  		" _renderState.m_blendFactorRgba=" + IntToHex(_renderState.m_blendFactorRgba) +
+'  '  		" _renderState.m_fstencil=" + IntToHex(_renderState.m_fstencil) +
+'  '  		" _renderState.m_bstencil=" + IntToHex(_renderState.m_bstencil)
+'  End
+'  
+'  

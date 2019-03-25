@@ -1100,6 +1100,26 @@ float _bx_vec3_dot( Array<float> _a, Array<float> _b )
 	return bx::vec3Dot( &_a[0], &_b[0] );
 }
 
+void _bx_mtx_identity( Array<float> _result )
+{
+	bx::mtxIdentity( &_result[0] );
+}
+
+float _bx_to_rad( float _deg )
+{
+	return bx::toRad( _deg );
+}
+
+void _bx_mtx_transpose( Array<float> _result, Array<float> _a )
+{
+	bx::mtxTranspose( &_result[0], &_a[0] );
+}
+
+void _bx_vec3_mul_mtx_h( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtxH( &_result[0], &_vec[0], &_mat[0] );
+}
+
 
 void _calc_tangents(void* _vertices, uint16_t _numVertices, bgfx_vertex_decl_t * _decl, const uint16_t* _indices, uint32_t _numIndices)
 {
