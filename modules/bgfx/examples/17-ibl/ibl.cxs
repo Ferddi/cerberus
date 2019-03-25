@@ -1,0 +1,897 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+' Import camera
+
+Const FLT_MIN:Float = 1.175494e-38
+
+Global s_texelHalf:Float = 0.0
+
+Class Uniforms
+
+	Const NumVec4:Int = 12
+
+	Method Init:Void()
+		u_params = bgfxCreateUniform( "u_params", BGFX_UNIFORM_TYPE_VEC4, NumVec4 )
+	End
+
+	Method Submit:Void()
+		bgfxSetUniform( u_params, m_params, NumVec4 )
+	End
+
+	Method Destroy:Void()
+		bgfxDestroy( u_params )
+	End
+
+	Const Matrix00        :Int = 0
+	Const Matrix01        :Int = 1
+	Const Matrix02        :Int = 2
+	Const Matrix03        :Int = 3
+
+	Const Matrix10        :Int = 4
+	Const Matrix11        :Int = 5
+	Const Matrix12        :Int = 6
+	Const Matrix13        :Int = 7
+
+	Const Matrix20        :Int = 8
+	Const Matrix21        :Int = 9
+	Const Matrix22        :Int = 10
+	Const Matrix23        :Int = 11
+
+	Const Matrix30        :Int = 12
+	Const Matrix31        :Int = 13
+	Const Matrix32        :Int = 14
+	Const Matrix33        :Int = 15
+
+	Const Glossiness      :Int = 16
+	Const Reflectivity    :Int = 17
+	Const Exposure        :Int = 18
+	Const BgType          :Int = 19
+
+	Const MetalOrSpec     :Int = 20
+	Const Unused51        :Int = 21
+	Const Unused52        :Int = 22
+	Const Unused53        :Int = 23
+
+	Const DoDiffuse       :Int = 24
+	Const DoSpecular      :Int = 25
+	Const DoDiffuseIbl    :Int = 26
+	Const DoSpecularIbl   :Int = 27
+
+	Const CameraPositionX :Int = 28
+	Const CameraPositionY :Int = 29
+	Const CameraPositionZ :Int = 30
+	Const Unused73        :Int = 31
+
+	Const DiffuseRed      :Int = 32
+	Const DiffuseGreen    :Int = 33
+	Const DiffuseBlue     :Int = 34
+	Const DiffuseAlpha    :Int = 35
+
+	Const SpecularRed     :Int = 36
+	Const SpecularGreen   :Int = 37
+	Const SpecularBlue    :Int = 38
+	Const SpecularAlpha   :Int = 39
+
+	Const LightDirectionX :Int = 40
+	Const LightDirectionY :Int = 41
+	Const LightDirectionZ :Int = 42
+	Const Unused103       :Int = 43
+
+	Const LightColorRed   :Int = 40
+	Const LightColorGreen :Int = 41
+	Const LightColorBlue  :Int = 42
+	Const Unused113       :Int = 43
+
+	Field m_params :Float[ NumVec4 * 4 ]
+	Field u_params :Int
+End
+
+Class PosColorTexCoord0Vertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_rgba :Int
+
+	Field m_u    :Float
+	Field m_v    :Float
+
+	Method New( _x:Float, _y:Float, _z:Float, _rgba:Float, _u:Float, _v:Float )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_rgba = _rgba
+'  		Print "m_nx=" + m_nx + " m_ny=" + m_ny + " m_nz=" + m_nz + " m_normal=" + IntToHex(m_normal)
+
+		Self.m_u    = _u
+		Self.m_v    = _v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global _tvb := New BgfxTransientVertexBuffer()
+
+Function ScreenSpaceQuad:Void( _textureWidth:Float, _textureHeight:Float, _originBottomLeft:Bool=False, _width:Float=1.0, _height:Float=1.0 )
+
+	If 3 = bgfxGetAvailTransientVertexBuffer( 3, PosColorTexCoord0Vertex.ms_decl ) Then
+
+		bgfxAllocTransientVertexBuffer( _tvb, 3, PosColorTexCoord0Vertex.ms_decl )
+
+		Local vertex     :Int   = 0 
+
+		Local zz         :Float = 0.0
+
+		Local minx       :Float = -_width
+		Local maxx       :Float =  _width
+		Local miny       :Float = 0.0
+		Local maxy       :Float = _height * 2.0
+
+		Local texelHalfW :Float = s_texelHalf / _textureWidth
+		Local texelHalfH :Float = s_texelHalf / _textureHeight
+		Local minu       :Float = -1.0 + texelHalfW
+		Local maxu       :Float =  1.0 + texelHalfW
+
+		Local minv       :Float = texelHalfH
+		Local maxv       :Float = 2.0 + texelHalfH
+
+		If _originBottomLeft Then
+
+			Local temp:Float = minv
+			minv = maxv
+			maxv = temp
+
+			minv -= 1.0
+			maxv -= 1.0
+		Endif
+
+		_tvb.PokeFloat( vertex, minx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxy      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxv      ) ; vertex += 4
+
+		bgfxSetTransientVertexBuffer( 0, _tvb )
+	Endif
+End
+
+Class LightProbe
+
+	Const Bolonga :Int = 0
+	Const Kyoto   :Int = 1
+	Const Count   :Int = 2
+
+	Method Load:Void( _name:String )
+
+		Local filePathLod:String = "textures/" + _name + "_lod.dds"
+		Local filePathIrr:String = "textures/" + _name + "_irr.dds"
+
+		m_tex    = bgfxUtilsLoadTexture( filePathLod, BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP )
+		m_texIrr = bgfxUtilsLoadTexture( filePathIrr, BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP )
+	End
+
+	Method Destroy:Void()
+		bgfxDestroyTexture( m_tex )
+		bgfxDestroyTexture( m_texIrr )
+	End
+
+	Field m_tex    :Int
+	Field m_texIrr :Int
+End
+
+Class Interp3f
+	Field curr:Float[ 3 ]
+	Field dest:Float[ 3 ]
+End
+
+Class Camera
+
+	Method New()
+		Reset();
+	End
+
+	Method Reset:Void()
+
+		m_target.curr[ 0 ] = 0.0
+		m_target.curr[ 1 ] = 0.0
+		m_target.curr[ 2 ] = 0.0
+		m_target.dest[ 0 ] = 0.0
+		m_target.dest[ 1 ] = 0.0
+		m_target.dest[ 2 ] = 0.0
+
+		m_pos.curr[ 0 ] =  0.0
+		m_pos.curr[ 1 ] =  0.0
+		m_pos.curr[ 2 ] = -3.0
+		m_pos.dest[ 0 ] =  0.0
+		m_pos.dest[ 1 ] =  0.0
+		m_pos.dest[ 2 ] = -3.0
+
+		m_orbit[ 0 ] = 0.0
+		m_orbit[ 1 ] = 0.0
+	End
+
+	Method MtxLookAt:Void( _outViewMtx:Float[] )
+		bxMtxLookAt( _outViewMtx, m_pos.curr, m_target.curr )
+	End
+
+	Method Orbit:Void( _dx:Float, _dy:Float )
+		m_orbit[ 0 ] += _dx
+		m_orbit[ 1 ] += _dy
+		Print "m_orbit[ 0 ]=" + m_orbit[ 0 ] + " m_orbit[ 1 ]=" + m_orbit[ 1 ]
+	End
+
+	Method Dolly:Void( _dz:Float )
+
+		Const cnear :Float = 1.0
+		Const cfar  :Float = 10.0
+
+		Local toTarget:Float[] = [
+			m_target.dest[0] - m_pos.dest[0],
+			m_target.dest[1] - m_pos.dest[1],
+			m_target.dest[2] - m_pos.dest[2] ]
+
+		Local toTargetLen    :Float = bxVec3Length( toTarget )
+		Local invToTargetLen :Float = 1.0 / ( toTargetLen + FLT_MIN )
+
+		Local toTargetNorm:Float[] = [
+			toTarget[0] * invToTargetLen,
+			toTarget[1] * invToTargetLen,
+			toTarget[2] * invToTargetLen ]
+
+		Local delta  :Float = toTargetLen * _dz
+		Local newLen :Float = toTargetLen + delta
+
+		If ( cnear < newLen Or _dz < 0.0 ) And ( newLen < cfar Or _dz > 0.0 ) Then
+			m_pos.dest[0] += toTargetNorm[0] * delta
+			m_pos.dest[1] += toTargetNorm[1] * delta
+			m_pos.dest[2] += toTargetNorm[2] * delta
+		Endif
+	End
+
+	Method ConsumeOrbit:Void( _amount:Float )
+
+		Local consume:Float[ 2 ]
+
+		consume[ 0 ] = m_orbit[ 0 ] * _amount
+		consume[ 1 ] = m_orbit[ 1 ] * _amount
+
+		m_orbit[ 0 ] -= consume[ 0 ]
+		m_orbit[ 1 ] -= consume[ 1 ]
+
+		Local toPos:Float[] = [
+			m_pos.curr[ 0 ] - m_target.curr[ 0 ],
+			m_pos.curr[ 1 ] - m_target.curr[ 1 ],
+			m_pos.curr[ 2 ] - m_target.curr[ 2 ] ]
+
+		Local toPosLen    :Float = bxVec3Length( toPos )
+		Local invToPosLen :Float = 1.0 / ( toPosLen + FLT_MIN )
+
+		Local toPosNorm:Float[] = [
+			toPos[ 0 ] * invToPosLen,
+			toPos[ 1 ] * invToPosLen,
+			toPos[ 2 ] * invToPosLen ]
+
+		Local ll:Float[ 2 ]
+		' LatLongFromVec( ll[ 0 ], ll[ 1 ], toPosNorm )
+		' ll[ 0 ] += consume[ 0 ]
+		' ll[ 1 ] -= consume[ 1 ]
+
+		ll[ 0 ] = LatFromVec( toPosNorm ) + consume[ 0 ]
+		ll[ 1 ] = LongFromVec( toPosNorm ) - consume[ 1 ]
+		ll[ 1 ] = Clamp( ll[ 1 ], 0.02, 0.98 )
+
+		Local tmp:Float[ 3 ]
+		VecFromLatLong( tmp, ll[ 0 ], ll[ 1 ] )
+
+		Local diff:Float[ 3 ]
+		diff[ 0 ] = (tmp[ 0 ] - toPosNorm[ 0 ]) * toPosLen
+		diff[ 1 ] = (tmp[ 1 ] - toPosNorm[ 1 ]) * toPosLen
+		diff[ 2 ] = (tmp[ 2 ] - toPosNorm[ 2 ]) * toPosLen
+
+		m_pos.curr[ 0 ] += diff[ 0 ]
+		m_pos.curr[ 1 ] += diff[ 1 ]
+		m_pos.curr[ 2 ] += diff[ 2 ]
+		m_pos.dest[ 0 ] += diff[ 0 ]
+		m_pos.dest[ 1 ] += diff[ 1 ]
+		m_pos.dest[ 2 ] += diff[ 2 ]
+
+'  		Print "m_pos.curr[ 0 ]=" + m_pos.curr[ 0 ] + 
+'  			"m_pos.curr[ 1 ]=" + m_pos.curr[ 1 ] + 
+'  			"m_pos.curr[ 2 ]=" + m_pos.curr[ 2 ] + 
+'  			"m_pos.dest[ 0 ]=" + m_pos.dest[ 0 ] + 
+'  			"m_pos.dest[ 1 ]=" + m_pos.dest[ 1 ] + 
+'  			"m_pos.dest[ 2 ]=" + m_pos.dest[ 2 ]
+	End
+
+	Method Update:Void( _dt:Float )
+
+		Local amount:Float = Min( _dt / 0.12, 1.0 )
+
+		ConsumeOrbit( amount )
+
+		m_target.curr[ 0 ] = bxLerp( m_target.curr[ 0 ], m_target.dest[ 0 ], amount )
+		m_target.curr[ 1 ] = bxLerp( m_target.curr[ 1 ], m_target.dest[ 1 ], amount )
+		m_target.curr[ 2 ] = bxLerp( m_target.curr[ 2 ], m_target.dest[ 2 ], amount )
+
+		m_pos.curr[ 0 ] = bxLerp( m_pos.curr[ 0 ], m_pos.dest[ 0 ], amount )
+		m_pos.curr[ 1 ] = bxLerp( m_pos.curr[ 1 ], m_pos.dest[ 1 ], amount )
+		m_pos.curr[ 2 ] = bxLerp( m_pos.curr[ 2 ], m_pos.dest[ 2 ], amount )
+	End
+
+	Method EnvViewMtx:Void( _mtx:Float[] )
+
+		Local toTarget:Float[] = [
+			m_target.curr[ 0 ] - m_pos.curr[ 0 ],
+			m_target.curr[ 1 ] - m_pos.curr[ 1 ],
+			m_target.curr[ 2 ] - m_pos.curr[ 2 ] ]
+
+		Local toTargetLen    :Float = bxVec3Length( toTarget )
+		Local invToTargetLen :Float = 1.0 / ( toTargetLen + FLT_MIN )
+
+		Local toTargetNorm:Float[] = [
+			toTarget[ 0 ] * invToTargetLen,
+			toTarget[ 1 ] * invToTargetLen,
+			toTarget[ 2 ] * invToTargetLen ]
+
+		Local tmp:Float[ 3 ]
+		Local fakeUp:Float[] = [ 0.0, 1.0, 0.0 ]
+
+		Local right:Float[3]
+		bxVec3Cross( tmp, fakeUp, toTargetNorm )
+		bxVec3Norm( right, tmp )
+
+		Local up:Float[ 3 ]
+		bxVec3Cross( tmp, toTargetNorm, right )
+		bxVec3Norm( up, tmp )
+
+		_mtx[  0 ] = right[ 0 ]
+		_mtx[  1 ] = right[ 1 ]
+		_mtx[  2 ] = right[ 2 ]
+		_mtx[  3 ] = 0.0
+		_mtx[  4 ] = up[ 0 ]
+		_mtx[  5 ] = up[ 1 ]
+		_mtx[  6 ] = up[ 2 ]
+		_mtx[  7 ] = 0.0
+		_mtx[  8 ] = toTargetNorm[ 0 ]
+		_mtx[  9 ] = toTargetNorm[ 1 ]
+		_mtx[ 10 ] = toTargetNorm[ 2 ]
+		_mtx[ 11 ] = 0.0
+		_mtx[ 12 ] = 0.0
+		_mtx[ 13 ] = 0.0
+		_mtx[ 14 ] = 0.0
+		_mtx[ 15 ] = 1.0
+	End
+
+	Method VecFromLatLong:Void( _vec:Float[], _u:Float, _v:Float )
+
+		Local phi   :Float = _u * 360
+		Local theta :Float = _v * 180
+
+		Local st    :Float = Sin( theta )
+		Local sp    :Float = Sin( phi )
+		Local ct    :Float = Cos( theta )
+		Local cp    :Float = Cos( phi )
+
+		_vec[ 0 ] = -st * sp
+		_vec[ 1 ] =  ct
+		_vec[ 2 ] = -st * cp
+	End
+
+'  	Method LatLongFromVec:Void( _u:Float, _v:Float, _vec:Float[] )
+'  
+'  		Local phi   :Float = ATan2(_vec[0], _vec[2]);
+'  		Local theta :Float = ACos(_vec[1]);
+'  
+'  		_u = (180.0 + phi) * 0.5
+'  		_v = theta
+'  	End
+
+	Method LatFromVec:Float( _vec:Float[] )
+		Local phi:Float = ATan2( _vec[ 0 ], _vec[ 2 ] )
+		Return (180.0 + phi) / 180.0 * 0.5
+	End
+
+	Method LongFromVec:Float( _vec:Float[] )
+		Return ACos( _vec[ 1 ] ) / 180.0
+	End
+
+	Field m_target := New Interp3f()
+	Field m_pos    := New Interp3f()
+	Field m_orbit  :Float[ 2 ]
+End
+
+Class Mouse
+
+	Method New()
+
+		m_dx         = 0.0
+		m_dy         = 0.0
+
+		m_prevMx     = 0.0
+		m_prevMy     = 0.0
+
+		m_scroll     = 0
+		m_scrollPrev = 0
+	End
+
+	Method Update:Void()
+
+		Local _mx     :Float = MouseX()
+		Local _my     :Float = MouseY()
+
+		Local _mz     :Int   = MouseZ()
+
+		Local widthf  :Float = DeviceWidth()
+		Local heightf :Float = DeviceHeight()
+
+		' Delta movement.
+		m_dx = (_mx - m_prevMx) / widthf
+		m_dy = (_my - m_prevMy) / heightf
+
+		m_prevMx = _mx
+		m_prevMy = _my
+
+		' Scroll.
+		m_scroll = _mz - m_scrollPrev
+		m_scrollPrev = _mz
+	End
+
+	Field m_dx         :Float ' Screen space.
+	Field m_dy         :Float
+
+	Field m_prevMx     :Float
+	Field m_prevMy     :Float
+
+	Field m_scroll     :Int
+	Field m_scrollPrev :Int
+End
+
+Class Settings
+
+	Method New()
+
+		m_envRotCurr          =  0.0
+		m_envRotDest          =  0.0
+
+		m_lightDirection[0]   = -0.8
+		m_lightDirection[1]   =  0.2
+		m_lightDirection[2]   = -0.5
+
+		m_lightColor[0]       =  1.0
+		m_lightColor[1]       =  1.0
+		m_lightColor[2]       =  1.0
+
+		m_glossiness          =  0.7
+		m_exposure            =  0.0
+		m_bgType              =  3.0
+		m_radianceSlider      =  2.0
+		m_reflectivity        =  0.85
+
+		m_rgbDiffuse[0]       =  1.0
+		m_rgbDiffuse[1]       =  1.0
+		m_rgbDiffuse[2]       =  1.0
+
+		m_rgbSpecular[0]      =  1.0
+		m_rgbSpecular[1]      =  1.0
+		m_rgbSpecular[2]      =  1.0
+
+		m_lod                 =  0.0
+
+		m_doDiffuse           = False
+		m_doSpecular          = False
+		m_doDiffuseIbl        = True
+		m_doSpecularIbl       = True
+		m_showLightColorWheel = True
+		m_showDiffColorWheel  = True
+		m_showSpecColorWheel  = True
+
+		m_metalOrSpec         = 0
+		m_meshSelection       = 0
+	End
+
+	Field m_envRotCurr          :Float
+	Field m_envRotDest          :Float
+	Field m_lightDirection      :Float[3]
+	Field m_lightColor          :Float[3]
+	Field m_glossiness          :Float
+	Field m_exposure            :Float
+	Field m_radianceSlider      :Float
+	Field m_bgType              :Float
+	Field m_reflectivity        :Float
+	Field m_rgbDiffuse          :Float[3]
+	Field m_rgbSpecular         :Float[3]
+	Field m_lod                 :Float
+
+	Field m_doDiffuse           :Bool
+	Field m_doSpecular          :Bool
+	Field m_doDiffuseIbl        :Bool
+	Field m_doSpecularIbl       :Bool
+	Field m_showLightColorWheel :Bool
+	Field m_showDiffColorWheel  :Bool
+	Field m_showSpecColorWheel  :Bool
+
+	Field m_metalOrSpec         :Int
+	Field m_meshSelection       :Int
+End
+
+Class ShadowmapsExample Extends App
+
+	Field bgfxCaps            := New BgfxCaps()
+
+'  	Field m_width             :Int ' use DeviceWidth directly
+'  	Field m_height            :Int ' use DeviceHeight directly
+'  	Field m_debug             :Int = BGFX_DEBUG_NONE
+	Field m_debug             :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset             :Int ' = BGFX_RESET_VSYNC
+
+	Field m_uniforms          := New Uniforms()
+
+	Field m_lightProbes       :LightProbe[ LightProbe.Count ]
+	Field m_currentLightProbe :Int
+
+	Field u_mtx               :Int
+	Field u_params            :Int
+	Field u_flags             :Int
+	Field u_camPos            :Int
+	Field s_texCube           :Int
+	Field s_texCubeIrr        :Int
+
+	Field m_programMesh       :Int
+	Field m_programSky        :Int
+
+	Field m_meshBunny         :BgfxUtilsMesh
+	Field m_meshOrb           :BgfxUtilsMesh
+
+	Field m_camera            := New Camera()
+	Field m_mouse             := New Mouse()
+	Field m_settings          := New Settings()
+
+	Field last                :Int
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+'  		m_width  = DeviceWidth()
+'  		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = 0 | BGFX_RESET_VSYNC | BGFX_RESET_MSAA_X16 ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set views  clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		' Uniforms.
+		m_uniforms.Init()
+
+		' Vertex declarations.
+		PosColorTexCoord0Vertex.Init()
+
+		For Local ii:Int = 0 Until LightProbe.Count
+			m_lightProbes[ ii ] = New LightProbe()
+		Next
+		m_lightProbes[ LightProbe.Bolonga ].Load( "bolonga" )
+		m_lightProbes[ LightProbe.Kyoto   ].Load( "kyoto" )
+		m_currentLightProbe = LightProbe.Bolonga
+
+		u_mtx         = bgfxCreateUniform( "u_mtx",        BGFX_UNIFORM_TYPE_MAT4 )
+		u_params      = bgfxCreateUniform( "u_params",     BGFX_UNIFORM_TYPE_VEC4 )
+		u_flags       = bgfxCreateUniform( "u_flags",      BGFX_UNIFORM_TYPE_VEC4 )
+		u_camPos      = bgfxCreateUniform( "u_camPos",     BGFX_UNIFORM_TYPE_VEC4 )
+		s_texCube     = bgfxCreateUniform( "s_texCube",    BGFX_UNIFORM_TYPE_INT1 )
+		s_texCubeIrr  = bgfxCreateUniform( "s_texCubeIrr", BGFX_UNIFORM_TYPE_INT1 )
+
+		m_programMesh = bgfxUtilsLoadProgram( "vs_ibl_mesh",   "fs_ibl_mesh" )
+		m_programSky  = bgfxUtilsLoadProgram( "vs_ibl_skybox", "fs_ibl_skybox" )
+
+		m_meshBunny   = bgfxUtilsMeshLoad( "meshes/bunny.bin" )
+		m_meshOrb     = bgfxUtilsMeshLoad( "meshes/orb.bin" )
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		bgfxUtilsMeshUnload( m_meshBunny )
+'  		bgfxUtilsMeshUnload( m_meshOrb )
+'  
+'  		' Cleanup.
+'  		bgfxDestroyProgram( m_programMesh )
+'  		bgfxDestroyProgram( m_programSky )
+'  
+'  		bgfxDestroyUniform( u_camPos )
+'  		bgfxDestroyUniform( u_flags )
+'  		bgfxDestroyUniform( u_params )
+'  		bgfxDestroyUniform( u_mtx )
+'  
+'  		bgfxDestroyTexture( s_texCube )
+'  		bgfxDestroyTexture( s_texCubeIrr )
+'  
+'  		For Local ii:Int = 0 Until LightProbe.Count
+'  			m_lightProbes[ ii ].Destroy()
+'  		Next
+'  
+'  		m_uniforms.destroy()
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
+
+	Field state :Int[ 2 ]
+
+	Method OnRender:Int()
+
+		m_uniforms.m_params[ Uniforms.Glossiness      ] = m_settings.m_glossiness
+		m_uniforms.m_params[ Uniforms.Reflectivity    ] = m_settings.m_reflectivity
+		m_uniforms.m_params[ Uniforms.Exposure        ] = m_settings.m_exposure
+		m_uniforms.m_params[ Uniforms.BgType          ] = m_settings.m_bgType
+		m_uniforms.m_params[ Uniforms.MetalOrSpec     ] = Float( m_settings.m_metalOrSpec )
+		m_uniforms.m_params[ Uniforms.DoDiffuse       ] = 0.0 ; If m_settings.m_doDiffuse     Then m_uniforms.m_params[ Uniforms.DoDiffuse     ] = 1.0
+		m_uniforms.m_params[ Uniforms.DoSpecular      ] = 0.0 ; If m_settings.m_doSpecular    Then m_uniforms.m_params[ Uniforms.DoSpecular    ] = 1.0
+		m_uniforms.m_params[ Uniforms.DoDiffuseIbl    ] = 0.0 ; If m_settings.m_doDiffuseIbl  Then m_uniforms.m_params[ Uniforms.DoDiffuseIbl  ] = 1.0
+		m_uniforms.m_params[ Uniforms.DoSpecularIbl   ] = 0.0 ; If m_settings.m_doSpecularIbl Then m_uniforms.m_params[ Uniforms.DoSpecularIbl ] = 1.0
+
+		m_uniforms.m_params[ Uniforms.DiffuseRed      ] = m_settings.m_rgbDiffuse[ 0 ]
+		m_uniforms.m_params[ Uniforms.DiffuseGreen    ] = m_settings.m_rgbDiffuse[ 1 ]
+		m_uniforms.m_params[ Uniforms.DiffuseBlue     ] = m_settings.m_rgbDiffuse[ 2 ]
+
+		m_uniforms.m_params[ Uniforms.SpecularRed     ] = m_settings.m_rgbSpecular[ 0 ]
+		m_uniforms.m_params[ Uniforms.SpecularGreen   ] = m_settings.m_rgbSpecular[ 1 ]
+		m_uniforms.m_params[ Uniforms.SpecularBlue    ] = m_settings.m_rgbSpecular[ 2 ]
+
+		m_uniforms.m_params[ Uniforms.LightDirectionX ] = m_settings.m_lightDirection[ 0 ]
+		m_uniforms.m_params[ Uniforms.LightDirectionY ] = m_settings.m_lightDirection[ 1 ]
+		m_uniforms.m_params[ Uniforms.LightDirectionZ ] = m_settings.m_lightDirection[ 2 ]
+
+		m_uniforms.m_params[ Uniforms.LightColorRed   ] = m_settings.m_lightColor[ 0 ]
+		m_uniforms.m_params[ Uniforms.LightColorGreen ] = m_settings.m_lightColor[ 1 ]
+		m_uniforms.m_params[ Uniforms.LightColorBlue  ] = m_settings.m_lightColor[ 2 ]
+
+		' Time.
+		Local now          :Int = Millisecs()
+		Local frameTime    :Int = now - last
+		last = now
+		Local deltaTimeSec :Float = Float( frameTime ) * 0.001
+
+		' Camera.
+		' const bool mouseOverGui = ImGui::MouseOverArea();
+		m_mouse.Update()
+		' if (!mouseOverGui)
+		' {
+			If MouseDown( MOUSE_LEFT ) Then
+				m_camera.Orbit( m_mouse.m_dx, m_mouse.m_dy )
+			Else If MouseDown( MOUSE_RIGHT ) Then
+				m_camera.Dolly( m_mouse.m_dx + m_mouse.m_dy )
+			Else If MouseDown( MOUSE_MIDDLE ) Then
+				m_settings.m_envRotDest += m_mouse.m_dx * 2.0
+			Else If 0 <> m_mouse.m_scroll Then
+				m_camera.Dolly( Float( m_mouse.m_scroll ) * 0.05 )
+			Endif
+		' }
+		m_camera.Update( deltaTimeSec )
+
+		m_uniforms.m_params[ Uniforms.CameraPositionX ] = m_camera.m_pos.curr[ 0 ]
+		m_uniforms.m_params[ Uniforms.CameraPositionY ] = m_camera.m_pos.curr[ 1 ]
+		m_uniforms.m_params[ Uniforms.CameraPositionZ ] = m_camera.m_pos.curr[ 2 ]
+
+		' View Transform 0.
+		Local view:Float[ 16 ]
+		bxMtxIdentity( view )
+
+		bgfxGetCaps( bgfxCaps )
+
+		Local proj:Float[ 16 ]
+		bxMtxOrtho( proj, 0.0, 1.0, 1.0, 0.0, 0.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+		bgfxSetViewTransform( 0, view, proj )
+
+		' View Transform 1.
+		m_camera.MtxLookAt( view )
+		bxMtxProj( proj, 45.0, Float( DeviceWidth() ) / Float( DeviceHeight() ), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+		bgfxSetViewTransform( 1, view, proj )
+
+		' View rect.
+		bgfxSetViewRect( 0, 0, 0, Int( DeviceWidth() ), Int( DeviceHeight() ) )
+		bgfxSetViewRect( 1, 0, 0, Int( DeviceWidth() ), Int( DeviceHeight() ) )
+
+		' Env rotation.
+		Local amount:Float = Min( deltaTimeSec / 0.12, 1.0 )
+		m_settings.m_envRotCurr = bxLerp( m_settings.m_envRotCurr, m_settings.m_envRotDest, amount )
+
+		' Env mtx.
+		Local mtxEnvView:Float[ 16 ]
+		m_camera.EnvViewMtx( mtxEnvView )
+		Local mtxEnvRot:Float[ 16 ]
+		bxMtxRotateY( mtxEnvRot, m_settings.m_envRotCurr )
+		' bxMtxMul( m_uniforms.m_mtx, mtxEnvView, mtxEnvRot ) ' Used for Skybox.
+
+		'
+		' @HACK!
+		'
+		bxMtxMul( m_uniforms.m_params, mtxEnvView, mtxEnvRot ) ' Used for Skybox.
+
+		bgfxUtilsClear64Bit(state)
+		bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_RGB)
+'  		bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_G)
+'  		bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_B)
+		bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_A)
+
+		' Submit view 0.
+		bgfxSetTexture( 0, s_texCube, m_lightProbes[ m_currentLightProbe ].m_tex )
+		bgfxSetTexture( 1, s_texCubeIrr, m_lightProbes[ m_currentLightProbe ].m_texIrr )
+		bgfxSetState( state )
+		ScreenSpaceQuad( Float( DeviceWidth() ), Float( DeviceHeight() ), True )
+		m_uniforms.Submit()
+		bgfxSubmit( 0, m_programSky )
+
+		' Submit view 1.
+		m_uniforms.m_params[ Uniforms.Matrix00 ] = mtxEnvRot[  0 ] ' Used for IBL.
+		m_uniforms.m_params[ Uniforms.Matrix01 ] = mtxEnvRot[  1 ]
+		m_uniforms.m_params[ Uniforms.Matrix02 ] = mtxEnvRot[  2 ]
+		m_uniforms.m_params[ Uniforms.Matrix03 ] = mtxEnvRot[  3 ]
+		m_uniforms.m_params[ Uniforms.Matrix10 ] = mtxEnvRot[  4 ]
+		m_uniforms.m_params[ Uniforms.Matrix11 ] = mtxEnvRot[  5 ]
+		m_uniforms.m_params[ Uniforms.Matrix12 ] = mtxEnvRot[  6 ]
+		m_uniforms.m_params[ Uniforms.Matrix13 ] = mtxEnvRot[  7 ]
+		m_uniforms.m_params[ Uniforms.Matrix20 ] = mtxEnvRot[  8 ]
+		m_uniforms.m_params[ Uniforms.Matrix21 ] = mtxEnvRot[  9 ]
+		m_uniforms.m_params[ Uniforms.Matrix22 ] = mtxEnvRot[ 10 ]
+		m_uniforms.m_params[ Uniforms.Matrix23 ] = mtxEnvRot[ 11 ]
+		m_uniforms.m_params[ Uniforms.Matrix30 ] = mtxEnvRot[ 12 ]
+		m_uniforms.m_params[ Uniforms.Matrix31 ] = mtxEnvRot[ 13 ]
+		m_uniforms.m_params[ Uniforms.Matrix32 ] = mtxEnvRot[ 14 ]
+		m_uniforms.m_params[ Uniforms.Matrix33 ] = mtxEnvRot[ 15 ]
+
+		If 0 = m_settings.m_meshSelection Then
+
+			' Submit bunny.
+			Local mtx:Float[ 16 ]
+			bxMtxSRT( mtx, 1.0, 1.0, 1.0, 0.0, PI, 0.0, 0.0, -0.80, 0.0 )
+			bgfxSetTexture( 0, s_texCube,    m_lightProbes[ m_currentLightProbe ].m_tex )
+			bgfxSetTexture( 1, s_texCubeIrr, m_lightProbes[ m_currentLightProbe ].m_texIrr )
+			m_uniforms.Submit()
+			bgfxUtilsMeshSubmit( m_meshBunny, 1, m_programMesh, mtx )
+
+		Else
+
+			' Submit orbs.
+			Local xend:Float = 5.0
+			Local yend:Float = 5.0
+
+			For Local yy:Float = 0 Until yend Step 1.0
+
+				For Local xx:Float = 0 Until xend Step 1.0
+
+					Const scale   :Float =  1.2
+					Const spacing :Float =  2.2
+					const yAdj    :Float = -0.8
+
+					Local mtx :Float[ 16 ]
+
+					Local tx  :Float = 0.0         + ( xx / xend ) * spacing - ( 1.0 + ( scale - 1.0 ) * 0.5 - 1.0 / xend )
+					Local ty  :Float = yAdj / yend + ( yy / yend ) * spacing - ( 1.0 + ( scale - 1.0 ) * 0.5 - 1.0 / yend )
+
+					bxMtxSRT( mtx, scale / xend, scale / xend, scale / xend, 0.0, 0.0, 0.0, tx, ty, 0.0 )
+
+					m_uniforms.m_params[ Uniforms.Glossiness   ] =          xx  * ( 1.0 / xend )
+					m_uniforms.m_params[ Uniforms.Reflectivity ] = ( yend - yy )* ( 1.0 / yend )
+					m_uniforms.m_params[ Uniforms.MetalOrSpec  ] = 0.0
+
+					m_uniforms.Submit();
+
+					bgfxSetTexture( 0, s_texCube,    m_lightProbes[ m_currentLightProbe ].m_tex )
+					bgfxSetTexture( 1, s_texCubeIrr, m_lightProbes[ m_currentLightProbe ].m_texIrr )
+					bgfxUtilsMeshSubmit( m_meshOrb, 1, m_programMesh, mtx )
+				Next
+			Next
+
+		Endif
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 18-ibl"
+	Print "Description: Image-based lighting."
+	New ShadowmapsExample()
+	Return 0
+End
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End

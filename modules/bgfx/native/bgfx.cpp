@@ -1120,6 +1120,24 @@ void _bx_vec3_mul_mtx_h( Array<float> _result, Array<float> _vec, Array<float> _
 	bx::vec3MulMtxH( &_result[0], &_vec[0], &_mat[0] );
 }
 
+float _bx_vec3_length( Array<float> _a )
+{
+	return bx::vec3Length( &_a[0] );
+}
+
+float _bx_lerp( float _a, float _b, float _t )
+{
+	return bx::lerp( _a, _b, _t );
+}
+
+void _bx_mtx_rotate_y( Array<float> _result, float _ay )
+{
+	bx::mtxRotateY( &_result[0], _ay );
+}
+
+
+
+
 
 void _calc_tangents(void* _vertices, uint16_t _numVertices, bgfx_vertex_decl_t * _decl, const uint16_t* _indices, uint32_t _numIndices)
 {
