@@ -1,0 +1,622 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+' Import camera
+
+Const FLT_MIN:Float = 1.175494e-38
+
+Class DrawMode
+
+	Const WireframeShaded :Int = 0
+	Const Wireframe       :Int = 1
+	Const Shaded          :Int = 2
+
+	Function ToString:String( drawMode:Int )
+		Select drawMode
+		Case WireframeShaded
+			Return "Wireframe + Shaded"
+		Case Wireframe
+			Return "Wireframe"
+		Case Shaded
+			Return "Shaded"
+		End
+		Return ""
+	End
+End
+
+Class Interp3f
+	Field curr:Float[ 3 ]
+	Field dest:Float[ 3 ]
+End
+
+Class Camera
+
+	Method New()
+		Reset();
+	End
+
+	Method Reset:Void()
+
+		m_target.curr[ 0 ] = 0.0
+		m_target.curr[ 1 ] = 0.0
+		m_target.curr[ 2 ] = 0.0
+		m_target.dest[ 0 ] = 0.0
+		m_target.dest[ 1 ] = 0.0
+		m_target.dest[ 2 ] = 0.0
+
+		m_pos.curr[ 0 ] =  0.0
+		m_pos.curr[ 1 ] =  0.0
+		m_pos.curr[ 2 ] = -2.0
+		m_pos.dest[ 0 ] =  0.0
+		m_pos.dest[ 1 ] =  0.0
+		m_pos.dest[ 2 ] = -2.0
+
+		m_orbit[ 0 ] = 0.0
+		m_orbit[ 1 ] = 0.0
+	End
+
+	Method MtxLookAt:Void( _outViewMtx:Float[] )
+		bxMtxLookAt( _outViewMtx, m_pos.curr, m_target.curr )
+	End
+
+	Method Orbit:Void( _dx:Float, _dy:Float )
+		m_orbit[ 0 ] += _dx
+		m_orbit[ 1 ] += _dy
+		' Print "m_orbit[ 0 ]=" + m_orbit[ 0 ] + " m_orbit[ 1 ]=" + m_orbit[ 1 ]
+	End
+
+	Method Dolly:Void( _dz:Float )
+
+		Const cnear :Float = 0.01
+		Const cfar  :Float = 10.0
+
+		Local toTarget:Float[] = [
+			m_target.dest[0] - m_pos.dest[0],
+			m_target.dest[1] - m_pos.dest[1],
+			m_target.dest[2] - m_pos.dest[2] ]
+
+		Local toTargetLen    :Float = bxVec3Length( toTarget )
+		Local invToTargetLen :Float = 1.0 / ( toTargetLen + FLT_MIN )
+
+		Local toTargetNorm:Float[] = [
+			toTarget[0] * invToTargetLen,
+			toTarget[1] * invToTargetLen,
+			toTarget[2] * invToTargetLen ]
+
+		Local delta  :Float = toTargetLen * _dz
+		Local newLen :Float = toTargetLen + delta
+
+		If ( cnear < newLen Or _dz < 0.0 ) And ( newLen < cfar Or _dz > 0.0 ) Then
+			m_pos.dest[0] += toTargetNorm[0] * delta
+			m_pos.dest[1] += toTargetNorm[1] * delta
+			m_pos.dest[2] += toTargetNorm[2] * delta
+		Endif
+	End
+
+	Method ConsumeOrbit:Void( _amount:Float )
+
+		Local consume:Float[ 2 ]
+
+		consume[ 0 ] = m_orbit[ 0 ] * _amount
+		consume[ 1 ] = m_orbit[ 1 ] * _amount
+
+		m_orbit[ 0 ] -= consume[ 0 ]
+		m_orbit[ 1 ] -= consume[ 1 ]
+
+		Local toPos:Float[] = [
+			m_pos.curr[ 0 ] - m_target.curr[ 0 ],
+			m_pos.curr[ 1 ] - m_target.curr[ 1 ],
+			m_pos.curr[ 2 ] - m_target.curr[ 2 ] ]
+
+		Local toPosLen    :Float = bxVec3Length( toPos )
+		Local invToPosLen :Float = 1.0 / ( toPosLen + FLT_MIN )
+
+		Local toPosNorm:Float[] = [
+			toPos[ 0 ] * invToPosLen,
+			toPos[ 1 ] * invToPosLen,
+			toPos[ 2 ] * invToPosLen ]
+
+		Local ll:Float[ 2 ]
+		' LatLongFromVec( ll[ 0 ], ll[ 1 ], toPosNorm )
+		' ll[ 0 ] += consume[ 0 ]
+		' ll[ 1 ] -= consume[ 1 ]
+
+		ll[ 0 ] = LatFromVec( toPosNorm ) + consume[ 0 ]
+		ll[ 1 ] = LongFromVec( toPosNorm ) - consume[ 1 ]
+		ll[ 1 ] = Clamp( ll[ 1 ], 0.02, 0.98 )
+
+		Local tmp:Float[ 3 ]
+		VecFromLatLong( tmp, ll[ 0 ], ll[ 1 ] )
+
+		Local diff:Float[ 3 ]
+		diff[ 0 ] = (tmp[ 0 ] - toPosNorm[ 0 ]) * toPosLen
+		diff[ 1 ] = (tmp[ 1 ] - toPosNorm[ 1 ]) * toPosLen
+		diff[ 2 ] = (tmp[ 2 ] - toPosNorm[ 2 ]) * toPosLen
+
+		m_pos.curr[ 0 ] += diff[ 0 ]
+		m_pos.curr[ 1 ] += diff[ 1 ]
+		m_pos.curr[ 2 ] += diff[ 2 ]
+		m_pos.dest[ 0 ] += diff[ 0 ]
+		m_pos.dest[ 1 ] += diff[ 1 ]
+		m_pos.dest[ 2 ] += diff[ 2 ]
+
+'  		Print "m_pos.curr[ 0 ]=" + m_pos.curr[ 0 ] + 
+'  			"m_pos.curr[ 1 ]=" + m_pos.curr[ 1 ] + 
+'  			"m_pos.curr[ 2 ]=" + m_pos.curr[ 2 ] + 
+'  			"m_pos.dest[ 0 ]=" + m_pos.dest[ 0 ] + 
+'  			"m_pos.dest[ 1 ]=" + m_pos.dest[ 1 ] + 
+'  			"m_pos.dest[ 2 ]=" + m_pos.dest[ 2 ]
+	End
+
+	Method Update:Void( _dt:Float )
+
+		Local amount:Float = Min( _dt / 0.12, 1.0 )
+
+		ConsumeOrbit( amount )
+
+		m_target.curr[ 0 ] = bxLerp( m_target.curr[ 0 ], m_target.dest[ 0 ], amount )
+		m_target.curr[ 1 ] = bxLerp( m_target.curr[ 1 ], m_target.dest[ 1 ], amount )
+		m_target.curr[ 2 ] = bxLerp( m_target.curr[ 2 ], m_target.dest[ 2 ], amount )
+
+		m_pos.curr[ 0 ] = bxLerp( m_pos.curr[ 0 ], m_pos.dest[ 0 ], amount )
+		m_pos.curr[ 1 ] = bxLerp( m_pos.curr[ 1 ], m_pos.dest[ 1 ], amount )
+		m_pos.curr[ 2 ] = bxLerp( m_pos.curr[ 2 ], m_pos.dest[ 2 ], amount )
+	End
+
+	Method EnvViewMtx:Void( _mtx:Float[] )
+
+		Local toTarget:Float[] = [
+			m_target.curr[ 0 ] - m_pos.curr[ 0 ],
+			m_target.curr[ 1 ] - m_pos.curr[ 1 ],
+			m_target.curr[ 2 ] - m_pos.curr[ 2 ] ]
+
+		Local toTargetLen    :Float = bxVec3Length( toTarget )
+		Local invToTargetLen :Float = 1.0 / ( toTargetLen + FLT_MIN )
+
+		Local toTargetNorm:Float[] = [
+			toTarget[ 0 ] * invToTargetLen,
+			toTarget[ 1 ] * invToTargetLen,
+			toTarget[ 2 ] * invToTargetLen ]
+
+		Local tmp:Float[ 3 ]
+		Local fakeUp:Float[] = [ 0.0, 1.0, 0.0 ]
+
+		Local right:Float[3]
+		bxVec3Cross( tmp, fakeUp, toTargetNorm )
+		bxVec3Norm( right, tmp )
+
+		Local up:Float[ 3 ]
+		bxVec3Cross( tmp, toTargetNorm, right )
+		bxVec3Norm( up, tmp )
+
+		_mtx[  0 ] = right[ 0 ]
+		_mtx[  1 ] = right[ 1 ]
+		_mtx[  2 ] = right[ 2 ]
+		_mtx[  3 ] = 0.0
+		_mtx[  4 ] = up[ 0 ]
+		_mtx[  5 ] = up[ 1 ]
+		_mtx[  6 ] = up[ 2 ]
+		_mtx[  7 ] = 0.0
+		_mtx[  8 ] = toTargetNorm[ 0 ]
+		_mtx[  9 ] = toTargetNorm[ 1 ]
+		_mtx[ 10 ] = toTargetNorm[ 2 ]
+		_mtx[ 11 ] = 0.0
+		_mtx[ 12 ] = 0.0
+		_mtx[ 13 ] = 0.0
+		_mtx[ 14 ] = 0.0
+		_mtx[ 15 ] = 1.0
+	End
+
+	Method VecFromLatLong:Void( _vec:Float[], _u:Float, _v:Float )
+
+		Local phi   :Float = _u * 360
+		Local theta :Float = _v * 180
+
+		Local st    :Float = Sin( theta )
+		Local sp    :Float = Sin( phi )
+		Local ct    :Float = Cos( theta )
+		Local cp    :Float = Cos( phi )
+
+		_vec[ 0 ] = -st * sp
+		_vec[ 1 ] =  ct
+		_vec[ 2 ] = -st * cp
+	End
+
+'  	Method LatLongFromVec:Void( _u:Float, _v:Float, _vec:Float[] )
+'  
+'  		Local phi   :Float = ATan2(_vec[0], _vec[2]);
+'  		Local theta :Float = ACos(_vec[1]);
+'  
+'  		_u = (180.0 + phi) * 0.5
+'  		_v = theta
+'  	End
+
+	Method LatFromVec:Float( _vec:Float[] )
+		Local phi:Float = ATan2( _vec[ 0 ], _vec[ 2 ] )
+		Return (180.0 + phi) / 180.0 * 0.5
+	End
+
+	Method LongFromVec:Float( _vec:Float[] )
+		Return ACos( _vec[ 1 ] ) / 180.0
+	End
+
+	Field m_target := New Interp3f()
+	Field m_pos    := New Interp3f()
+	Field m_orbit  :Float[ 2 ]
+End
+
+Class Mouse
+
+	Method New()
+
+		m_dx         = 0.0
+		m_dy         = 0.0
+
+		m_prevMx     = 0.0
+		m_prevMy     = 0.0
+
+		m_scroll     = 0
+		m_scrollPrev = 0
+	End
+
+	Method Update:Void()
+
+		Local _mx     :Float = MouseX()
+		Local _my     :Float = MouseY()
+
+		Local _mz     :Int   = MouseZ()
+
+		Local widthf  :Float = DeviceWidth()
+		Local heightf :Float = DeviceHeight()
+
+		' Delta movement.
+		m_dx = (_mx - m_prevMx) / widthf
+		m_dy = (_my - m_prevMy) / heightf
+
+		m_prevMx = _mx
+		m_prevMy = _my
+
+		' Scroll.
+		m_scroll = _mz - m_scrollPrev
+		m_scrollPrev = _mz
+	End
+
+	Field m_dx         :Float ' Screen space.
+	Field m_dy         :Float
+
+	Field m_prevMx     :Float
+	Field m_prevMy     :Float
+
+	Field m_scroll     :Int
+	Field m_scrollPrev :Int
+End
+
+Class MeshMtx
+
+	Const Bunny       :Int = 0
+	Const Hollowcubes :Int = 1
+	Const Orb         :Int = 2
+
+	Function ToString:String( mesh:Int )
+		Select mesh
+		Case 0
+			Return "Bunny"
+		Case 1
+			Return "Hollowcubes"
+		Case 2
+			Return "Orb"
+		End
+		Return ""
+	End
+
+	Method New( _path:String,
+		_scale  :Float = 1.0, 
+		_rotX   :Float = 0.0,
+		_rotY   :Float = 0.0,
+		_rotZ   :Float = 0.0,
+		_transX :Float = 0.0,
+		_transY :Float = 0.0,
+		_transZ :Float = 0.0 )
+
+		m_mesh = bgfxUtilsMeshLoad( _path )
+		bxMtxSRT( m_mtx, _scale, _scale, _scale, _rotX, _rotY, _rotZ, _transX, _transY, _transZ )
+	End
+
+	Method Destroy:Void()
+		If Null <> m_mesh Then
+			bgfxUtilsMeshUnload( m_mesh )
+		Endif
+	End
+
+	Field m_mesh :BgfxUtilsMesh
+	Field m_mtx  :Float[ 16 ]
+End
+
+Class Uniforms
+
+	Const NumVec4:Int = 3
+
+	Method Init:Void()
+
+		m_params[ m_camPosX      ] =  0.0
+		m_params[ m_camPosY      ] =  1.0
+		m_params[ m_camPosZ      ] = -2.5
+		m_params[ m_unused0      ] =  0.0
+
+		m_params[ m_wfColorRed   ] =  1.0
+		m_params[ m_wfColorGreen ] =  0.0
+		m_params[ m_wfColorBlue  ] =  0.0
+		m_params[ m_wfColorAlpha ] =  1.0
+
+		m_params[ m_drawEdges    ] =  0.0
+		m_params[ m_wfThickness  ] =  1.5
+		m_params[ m_unused1      ] =  0.0
+		m_params[ m_unused2      ] =  0.0
+
+		u_params = bgfxCreateUniform( "u_params", BGFX_UNIFORM_TYPE_VEC4, NumVec4 )
+	End
+
+	Method Submit:Void()
+		bgfxSetUniform( u_params, m_params, NumVec4 )
+	End
+
+	Method Destroy:Void()
+		bgfxDestroyUniform( u_params )
+	End
+
+	Const m_camPosX      :Int = 0
+	Const m_camPosY      :Int = 1
+	Const m_camPosZ      :Int = 2
+	Const m_unused0      :Int = 3
+
+	Const m_wfColorRed   :Int = 4
+	Const m_wfColorGreen :Int = 5
+	Const m_wfColorBlue  :Int = 6
+	Const m_wfColorAlpha :Int = 7
+
+	Const m_drawEdges    :Int = 8
+	Const m_wfThickness  :Int = 9
+	Const m_unused1      :Int = 10
+	Const m_unused2      :Int = 11
+
+	Field m_params       :Float[ NumVec4 * 4 ]
+	Field u_params       :Int
+End
+
+Class WireframeExample Extends App
+
+	Field bgfxCaps        := New BgfxCaps()
+
+	Field m_width         :Int ' use DeviceWidth directly
+	Field m_height        :Int ' use DeviceHeight directly
+'  	Field m_debug         :Int = BGFX_DEBUG_NONE
+	Field m_debug         :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset         :Int ' = BGFX_RESET_VSYNC
+
+	Field m_oldWidth      :Int
+	Field m_oldHeight     :Int
+	Field m_oldReset      :Int
+
+	Field m_wfProgram     :Int
+	Field m_meshProgram   :Int
+
+	Field m_camera        := New Camera()
+	Field m_mouse         := New Mouse()
+	Field m_uniforms      := New Uniforms()
+	Field m_meshes        :MeshMtx[ 3 ]
+
+	Field m_meshSelection :Int
+	Field m_drawMode      :Int ' Holds data for 'DrawMode'.
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = 0 | BGFX_RESET_VSYNC | BGFX_RESET_MSAA_X16 ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set views 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		m_wfProgram   = bgfxUtilsLoadProgram( "vs_wf_wireframe", "fs_wf_wireframe" )
+		m_meshProgram = bgfxUtilsLoadProgram( "vs_wf_mesh",      "fs_wf_mesh" )
+
+		m_uniforms.Init()
+
+		m_meshes[ 0 ] = New MeshMtx( "meshes/bunny.bin",      1.0, 0.0,  PI, 0.0, 0.0, -0.8,  0.0 )
+		m_meshes[ 1 ] = New MeshMtx( "meshes/hollowcube.bin", 1.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0 )
+		m_meshes[ 2 ] = New MeshMtx( "meshes/orb.bin",        1.2, 0.0, 0.0, 0.0, 0.0, -0.65, 0.0 )
+
+		m_oldWidth  = 0
+		m_oldHeight = 0
+		m_oldReset  = m_reset
+
+		m_meshSelection = MeshMtx.Hollowcubes
+		m_drawMode = DrawMode.WireframeShaded
+	End
+
+	Method OnUpdate:Int()
+
+		Local meshChanged:Bool = False
+
+		If KeyHit( KEY_SPACE ) Then
+			m_meshSelection += 1
+			If m_meshSelection >= 3 Then m_meshSelection = 0
+			meshChanged = True
+		Endif
+
+		If meshChanged Then
+			m_camera.Reset()
+		Endif
+
+		m_mouse.Update()
+
+		If MouseDown( MOUSE_LEFT ) Then
+			m_camera.Orbit( m_mouse.m_dx, m_mouse.m_dy )
+		Else If MouseDown( MOUSE_RIGHT ) Then
+			m_camera.Dolly( m_mouse.m_dx + m_mouse.m_dy )
+		Else If 0 <> m_mouse.m_scroll Then
+			m_camera.Dolly( Float( m_mouse.m_scroll ) * 0.1 )
+		Endif
+
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		m_meshes[ 0 ].Destroy()
+'  		m_meshes[ 1 ].Destroy()
+'  		m_meshes[ 2 ].Destroy()
+'  
+'  		bgfxDestroyProgram( m_wfProgram )
+'  		bgfxDestroyProgram( m_meshProgram )
+'  
+'  		m_uniforms.Destroy()
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  	End
+
+	Field last  :Int
+	Field state :Int[ 2 ]
+
+	Method OnRender:Int()
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+
+		bgfxGetCaps( bgfxCaps )
+
+		If m_oldWidth <> m_width Or m_oldHeight <> m_height Or m_oldReset <> m_reset Then
+			' Recreate variable size render targets when resolution changes.
+			m_oldWidth  = m_width
+			m_oldHeight = m_height
+			m_oldReset  = m_reset
+		Endif
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch( 0 )
+
+		' Time.
+		Local now          :Int = Millisecs()
+		Local frameTime    :Int = now - last
+		last = now
+		Local deltaTimeSec :Float = Float( frameTime ) * 0.001
+
+		' Setup view.
+		bgfxSetViewRectAuto( 0, 0, 0, BGFX_BACKBUFFER_RATIO_EQUAL )
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		Local view:Float[ 16 ]
+		Local proj:Float[ 16 ]
+
+		m_camera.Update( deltaTimeSec )
+
+		' bx::memCopy(m_uniforms.m_camPos, m_camera.m_pos.curr, 3*sizeof(float));
+		m_uniforms.m_params[ Uniforms.m_camPosX ] = m_camera.m_pos.curr[ 0 ]
+		m_uniforms.m_params[ Uniforms.m_camPosY ] = m_camera.m_pos.curr[ 1 ]
+		m_uniforms.m_params[ Uniforms.m_camPosZ ] = m_camera.m_pos.curr[ 2 ]
+
+		m_camera.MtxLookAt( view )
+		bxMtxProj( proj, 60.0, Float( m_width ) / Float( m_height ), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+		bgfxSetViewTransform( 0, view, proj )
+
+		If DrawMode.WireframeShaded = m_drawMode Then
+			m_uniforms.m_params[ Uniforms.m_drawEdges ] = 1.0
+		Else
+			m_uniforms.m_params[ Uniforms.m_drawEdges ] = 0.0
+		Endif
+		m_uniforms.Submit()
+
+		If DrawMode.Wireframe = m_drawMode Then
+
+'  			bgfxUtilsClear64Bit( state )
+'  			bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_RGB )
+'  			bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_A )
+'  			bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_Z )
+'  			bgfxUtilsSet64Bit( state, BGFX_STATE_CULL_CCW )
+'  			bgfxUtilsSet64Bit( state, BGFX_STATE_MSAA )
+'  			bgfxUtilsSet64Bit( state, BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) )
+
+			state[ 0 ] = $01000060
+			state[ 1 ] = $0656500f
+
+			bgfxUtilsMeshSubmit( m_meshes[ m_meshSelection ].m_mesh, 0, m_wfProgram, m_meshes[ m_meshSelection ].m_mtx, state )
+		Else
+
+			bgfxUtilsClear64Bit( state )
+			bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_RGB )
+			bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_A )
+			bgfxUtilsSet64Bit( state, BGFX_STATE_DEPTH_TEST_LESS )
+			bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_Z )
+			bgfxUtilsSet64Bit( state, BGFX_STATE_CULL_CCW )
+			bgfxUtilsSet64Bit( state, BGFX_STATE_MSAA )
+
+			bgfxUtilsMeshSubmit( m_meshes[ m_meshSelection ].m_mesh, 0, m_meshProgram, m_meshes[ m_meshSelection ].m_mtx, state )
+		Endif
+
+		DrawText( "Settings", 16, 14 * 1 )
+		DrawText( "Draw mode   :" + DrawMode.ToString( m_drawMode ), 16, 14 * 2 )
+
+		Local wfEnabled:Bool = ( DrawMode.Shaded <> m_drawMode )
+		If wfEnabled Then
+			DrawText( "Color Red   : " + m_uniforms.m_params[ Uniforms.m_wfColorRed   ], 16, 14 * 3 )
+			DrawText( "Color Green : " + m_uniforms.m_params[ Uniforms.m_wfColorGreen ], 16, 14 * 4 )
+			DrawText( "Color Blue  : " + m_uniforms.m_params[ Uniforms.m_wfColorBlue  ], 16, 14 * 5 )
+			DrawText( "Color Alpha : " + m_uniforms.m_params[ Uniforms.m_wfColorAlpha ], 16, 14 * 6 )
+			DrawText( "Thickness   : " + m_uniforms.m_params[ Uniforms.m_wfThickness  ], 16, 14 * 7 )
+		Endif
+
+		DrawText( "Mesh        : " + MeshMtx.ToString( m_meshSelection ), 16, 14 * 8 )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 28-wirefame"
+	Print "Description: Drawing wireframe mesh."
+	New WireframeExample()
+	Return 0
+End
+
+
