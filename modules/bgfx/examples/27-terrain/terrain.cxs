@@ -1,0 +1,576 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Import camera
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+Const s_terrainSize:Int = 256
+
+Class PosTexCoord0Vertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_u    :Float
+	Field m_v    :Float
+
+	Method New( _x:Float, _y:Float, _z:Float, _u:Float, _v:Float )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_u    = _u
+		Self.m_v    = _v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Class TerrainData
+
+	Field m_mode        :Int
+	Field m_dirty       :Bool
+	Field m_transform   :Float[ 16 ]
+	Field m_heightMap   :Int[]
+
+	Field m_vertices    :PosTexCoord0Vertex[]
+	Field m_vertexCount :Int
+	Field m_indices     :Int[]
+	Field m_indexCount  :Int
+
+	Field m_verticesDb  :DataBuffer
+	Field m_indicesDb   :DataBuffer
+	Field m_heightMapDb :DataBuffer
+
+	Field m_verticesMem := New BgfxMemory()
+	Field m_indicesMem  := New BgfxMemory()
+End
+
+Class BrushData
+
+	Field m_raise :Bool
+	Field m_size  :Int
+	Field m_power :Float
+End
+
+Function PosTexCoord0VertexToDataBuffer:Void( _verticesDb:DataBuffer, _vertices:PosTexCoord0Vertex[] )
+
+	Local bufferAddress  :Int = 0
+	Local verticesCount  :Int = _vertices.Length()
+
+	For Local ii:Int = 0 Until verticesCount
+
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_u ) ; bufferAddress += 4
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_v ) ; bufferAddress += 4
+	Next
+End
+
+Function Index16ToDataBuffer:Void( _indicesDb:DataBuffer, _indices:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	For Local ii:Int = 0 Until indicesCount
+		_indicesDb.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+End
+
+Function ByteToDataBuffer:Void( _bytesDb:DataBuffer, _bytes:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local bytesCount    :Int = _bytes.Length()
+
+	For Local ii:Int = 0 Until bytesCount
+		_bytesDb.PokeByte( bufferAddress, _bytes[ ii ] ) ; bufferAddress += 1
+	Next
+End
+
+Class TerrainExample Extends App
+
+	Field bgfxCaps                      := New BgfxCaps()
+
+	Field m_width                       :Int ' use DeviceWidth directly
+	Field m_height                      :Int ' use DeviceHeight directly
+'  	Field m_debug                       :Int = BGFX_DEBUG_NONE
+	Field m_debug                       :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset                       :Int ' = BGFX_RESET_VSYNC
+
+	Field m_oldWidth                    :Int
+	Field m_oldHeight                   :Int
+	Field m_oldReset                    :Int
+
+	Field m_vbh                         :Int
+	Field m_ibh                         :Int
+	Field m_dvbh                        :Int
+	Field m_dibh                        :Int
+	Field m_terrainProgram              :Int
+	Field m_terrainHeightTextureProgram :Int
+	Field s_heightTexture               :Int
+	Field m_heightTexture               :Int
+
+	Field m_viewMtx                     :Float[ 16 ]
+	Field m_projMtx                     :Float[ 16 ]
+
+	Field m_terrain                     := New TerrainData()
+	Field m_brush                       := New BrushData
+
+	Field m_timeOffset                  :Int
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+'  		m_width  = DeviceWidth()
+'  		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE ' BGFX_DEBUG_TEXT
+		m_reset  = 0 | BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		' Create vertex stream declaration.
+		PosTexCoord0Vertex.Init()
+
+		' Create program from shaders.
+		m_terrainProgram              = bgfxUtilsLoadProgram( "vs_terrain",                "fs_terrain" )
+		m_terrainHeightTextureProgram = bgfxUtilsLoadProgram( "vs_terrain_height_texture", "fs_terrain" )
+
+		m_timeOffset = Millisecs()
+
+		m_vbh           = BGFX_INVALID_HANDLE
+		m_ibh           = BGFX_INVALID_HANDLE
+		m_dvbh          = BGFX_INVALID_HANDLE
+		m_dibh          = BGFX_INVALID_HANDLE
+		m_heightTexture = BGFX_INVALID_HANDLE
+		s_heightTexture = bgfxCreateUniform( "s_heightTexture", BGFX_UNIFORM_TYPE_INT1 )
+
+		m_oldWidth  = 0
+		m_oldHeight = 0
+		m_oldReset  = m_reset
+
+		m_brush.m_power = 0.5
+		m_brush.m_size  = 10
+		m_brush.m_raise = True
+
+		Local num:Int = s_terrainSize * s_terrainSize
+
+		m_terrain.m_mode        = 0
+		m_terrain.m_dirty       = True
+
+		m_terrain.m_vertices    = New PosTexCoord0Vertex[ num ]
+		m_terrain.m_indices     = New Int[ num * 6 ]
+		m_terrain.m_heightMap   = New Int[ num ]
+
+		m_terrain.m_verticesDb  = New DataBuffer( num * 5 * 4 ) ' 5 (m_x, m_y, m_z, m_u and m_v) * 4 (float is 4 bytes)
+		m_terrain.m_indicesDb   = New DataBuffer( num * 6 * 2 ) ' one index is 2 bytes
+		m_terrain.m_heightMapDb = New DataBuffer( num )
+
+		For Local ii:Int = 0 Until num
+			m_terrain.m_vertices[ ii ] = New PosTexCoord0Vertex( 0.0, 0.0, 0.0, 0.0, 0.0 )
+		Next
+
+		bxMtxSRT( m_terrain.m_transform, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 )
+		For Local ii:Int = 0 Until num
+			m_terrain.m_heightMap[ ii ] = 0
+		Next
+
+		CameraCreate()
+
+		Local initialPos:Float[] = [ s_terrainSize / 2.0, 100.0, 0.0 ]
+		CameraSetPosition( initialPos )
+		CameraSetVerticalAngle( -PI / 4 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		CameraDestroy();
+'  
+'  		If bgfxIsValid( m_ibh ) Then
+'  			bgfxDestroyIndexBuffer( m_ibh )
+'  		Endif
+'  
+'  		If bgfxIsValid( m_vbh ) Then
+'  			bgfxDestroyVertexBuffer( m_vbh )
+'  		Endif
+'  
+'  		If bgfxIsValid( m_dibh ) Then
+'  			bgfxDestroyDynamicIndexBuffer( m_dibh )
+'  		Endif
+'  
+'  		If bgfxIsValid( m_dvbh ) Then
+'  			bgfxDestroyDynamicVertexBuffer( m_dvbh )
+'  		Endif
+'  
+'  		bgfxDestroyUniform( s_heightTexture )
+'  
+'  		If bgfxIsValid( m_heightTexture )
+'  			bgfxDestroyTexture( m_heightTexture )
+'  		Endif
+'  
+'  		bgfxDestroyProgram( m_terrainProgram )
+'  		bgfxDestroyProgram( m_terrainHeightTextureProgram )
+'  
+'  		' When data is passed to bgfx via makeRef we need to make
+'  		' sure library is done with it before freeing memory blocks.
+'  		bgfxFrame()
+'  
+'  		' bx::AllocatorI* allocator = entry::getAllocator();
+'  		' BX_FREE(allocator, m_terrain.m_vertices);
+'  		' BX_FREE(allocator, m_terrain.m_indices);
+'  		' BX_FREE(allocator, m_terrain.m_heightMap);
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Method UpdateTerrainMesh:Void()
+
+		m_terrain.m_vertexCount = 0
+
+		For Local yy:Int = 0 Until s_terrainSize
+			For Local xx:Int = 0 Until s_terrainSize
+
+				Local vert := m_terrain.m_vertices[ m_terrain.m_vertexCount ]
+
+				vert.m_x = Float( xx )
+				vert.m_y = m_terrain.m_heightMap[ ( yy * s_terrainSize ) + xx ]
+				vert.m_z = Float( yy )
+				vert.m_u = ( xx + 0.5 ) / s_terrainSize
+				vert.m_v = ( yy + 0.5 ) / s_terrainSize
+
+				m_terrain.m_vertexCount += 1
+			Next
+		Next
+
+		m_terrain.m_indexCount = 0
+
+		For Local yy:Int = 0 Until s_terrainSize -1
+
+			Local y_offset:Int = (yy * s_terrainSize )
+
+			For Local xx:Int = 0 Until s_terrainSize -1
+
+				m_terrain.m_indices[ m_terrain.m_indexCount + 0 ] = y_offset + xx + 1
+				m_terrain.m_indices[ m_terrain.m_indexCount + 1 ] = y_offset + xx + s_terrainSize
+				m_terrain.m_indices[ m_terrain.m_indexCount + 2 ] = y_offset + xx
+				m_terrain.m_indices[ m_terrain.m_indexCount + 3 ] = y_offset + xx + s_terrainSize + 1
+				m_terrain.m_indices[ m_terrain.m_indexCount + 4 ] = y_offset + xx + s_terrainSize
+				m_terrain.m_indices[ m_terrain.m_indexCount + 5 ] = y_offset + xx + 1
+
+				m_terrain.m_indexCount += 6
+			Next
+		Next
+
+	End
+
+	Field mem := New BgfxMemory()
+
+	Method UpdateTerrain:Void()
+
+		Select m_terrain.m_mode
+
+		Case 1 ' Dynamic Vertex Buffer : Utilize dynamic vertex buffer to update terrain.
+			UpdateTerrainMesh()
+
+			If Not bgfxIsValid( m_dvbh ) Then
+				m_dvbh = bgfxCreateDynamicVertexBuffer( m_terrain.m_vertexCount, PosTexCoord0Vertex.ms_decl )
+			Endif
+
+			PosTexCoord0VertexToDataBuffer( m_terrain.m_verticesDb, m_terrain.m_vertices )
+			bgfxMakeRef( mem, m_terrain.m_verticesDb )
+			bgfxUpdateDynamicVertexBuffer( m_dvbh, 0, mem )
+
+			If Not bgfxIsValid( m_dibh ) Then
+				m_dibh = bgfxCreateDynamicIndexBuffer( m_terrain.m_indexCount )
+			Endif
+
+			Index16ToDataBuffer( m_terrain.m_indicesDb, m_terrain.m_indices )
+			bgfxMakeRef( mem, m_terrain.m_indicesDb )
+			bgfxUpdateDynamicIndexBuffer( m_dibh, 0, mem )
+
+		Case 2 ' Height Texture: Update a height texture that is sampled in the terrain vertex shader.
+			If Not bgfxIsValid( m_vbh ) Or Not bgfxIsValid( m_ibh ) Then
+
+				UpdateTerrainMesh();
+
+				PosTexCoord0VertexToDataBuffer( m_terrain.m_verticesDb, m_terrain.m_vertices )
+				bgfxMakeRef( mem, m_terrain.m_verticesDb )
+				m_vbh = bgfxCreateVertexBuffer( mem, PosTexCoord0Vertex.ms_decl )
+
+				Index16ToDataBuffer( m_terrain.m_indicesDb, m_terrain.m_indices )
+				bgfxMakeRef( mem, m_terrain.m_indicesDb )
+				m_ibh = bgfxCreateIndexBuffer( mem )
+			Endif
+
+			If Not bgfxIsValid( m_heightTexture ) Then
+				m_heightTexture = bgfxCreateTexture2D( s_terrainSize, s_terrainSize, False, 1, BGFX_TEXTURE_FORMAT_R8 )
+			Endif
+
+			ByteToDataBuffer( m_terrain.m_heightMapDb, m_terrain.m_heightMap )
+			bgfxMakeRef( mem, m_terrain.m_heightMapDb )
+			bgfxUpdateTexture2D( m_heightTexture, 0, 0, 0, 0, s_terrainSize, s_terrainSize, mem )
+
+		Default ' Vertex Buffer : Destroy and recreate a regular vertex buffer to update terrain.
+			UpdateTerrainMesh()
+
+			If bgfxIsValid( m_vbh ) Then
+				bgfxDestroyVertexBuffer( m_vbh )
+			Endif
+
+			PosTexCoord0VertexToDataBuffer( m_terrain.m_verticesDb, m_terrain.m_vertices )
+			bgfxMakeRef( m_terrain.m_verticesMem, m_terrain.m_verticesDb )
+			m_vbh = bgfxCreateVertexBuffer( m_terrain.m_verticesMem, PosTexCoord0Vertex.ms_decl )
+
+			If bgfxIsValid( m_ibh ) Then
+				bgfxDestroyIndexBuffer( m_ibh )
+			Endif
+
+			Index16ToDataBuffer( m_terrain.m_indicesDb, m_terrain.m_indices )
+			bgfxMakeRef( m_terrain.m_indicesMem, m_terrain.m_indicesDb )
+			m_ibh = bgfxCreateIndexBuffer( m_terrain.m_indicesMem )
+
+		End
+	End
+
+	Method PaintTerrainHeight:Void( _x:Int, _y:Int )
+
+		For Local area_y:Int = -m_brush.m_size Until m_brush.m_size
+			For Local area_x:Int = -m_brush.m_size Until m_brush.m_size
+
+				Local brush_x:Int = _x + area_x
+
+				If brush_x < 0 Or brush_x >= Int( s_terrainSize ) Then
+					Continue
+				Endif
+
+				Local brush_y:Int = _y + area_y
+
+				If brush_y < 0 Or brush_y >= Int( s_terrainSize ) Then
+					continue
+				Endif
+
+				Local heightMapPos :Int   = ( brush_y * s_terrainSize ) + brush_x
+				Local height       :Float = Float( m_terrain.m_heightMap[ heightMapPos ] )
+
+				' Brush attenuation
+				Local a2        :Float = Float( area_x * area_x )
+				Local b2        :Float = Float( area_y * area_y )
+				Local brushAttn :Float = m_brush.m_size - Sqrt( a2 + b2 )
+
+				' Raise/Lower and scale by brush power.
+				If 0.0 < Clamp( brushAttn * m_brush.m_power, 0.0, m_brush.m_power ) And m_brush.m_raise Then
+					height += 1.0
+				Else
+					height -= 1.0
+				Endif
+
+				m_terrain.m_heightMap[ heightMapPos ] = Clamp( height, 0.0, 255.0 )
+				m_terrain.m_dirty = True
+
+			Next
+		Next
+	End
+
+	Method MousePickTerrain:Void()
+
+		Local ray_clip:Float[ 4 ]
+		ray_clip[ 0 ] = ( ( 2.0 * MouseX() ) / m_width - 1.0 ) * -1.0
+		ray_clip[ 1 ] = ( ( 1.0 - ( 2.0 * MouseY() ) / m_height ) ) * -1.0
+		ray_clip[ 2 ] = -1.0
+		ray_clip[ 3 ] =  1.0
+
+		Local invProjMtx:Float[ 16 ]
+		bxMtxInverse( invProjMtx, m_projMtx )
+
+		Local ray_eye:Float[ 4 ]
+		bxVec4MulMtx( ray_eye, ray_clip, invProjMtx )
+		ray_eye[ 2 ] = -1.0
+		ray_eye[ 3 ] = 0.0
+
+		Local invViewMtx:Float[ 16 ]
+		bxMtxInverse( invViewMtx, m_viewMtx )
+
+		Local ray_world:Float[ 4 ]
+		bxVec4MulMtx( ray_world, ray_eye, invViewMtx )
+
+		Local ray_dir:Float[ 3 ]
+		bxVec3Norm( ray_dir, ray_world )
+		ray_dir[ 0 ] *= -1.0
+		ray_dir[ 1 ] *= -1.0
+		ray_dir[ 2 ] *= -1.0
+
+		Local pos:Float[ 3 ]
+		CameraGetPosition( pos )
+
+		For Local ii:Int = 0 Until 1000
+
+			bxVec3Add( pos, pos, ray_dir )
+
+			If pos[0] < 0 Or pos[0] >= s_terrainSize Or pos[2] < 0 Or pos[2] >= s_terrainSize Then
+				Continue
+			Endif
+
+			Local heightMapPos:Int = ( Int( pos[2] ) * s_terrainSize ) + Int( pos[0] )
+			If pos[1] < m_terrain.m_heightMap[ heightMapPos ] Then
+				PaintTerrainHeight( Int( pos[ 0 ] ), Int( pos[ 2 ] ) )
+				Return
+			Endif
+
+		Next
+	End
+
+	Method OnUpdate:Int()
+
+		If MouseDown( MOUSE_LEFT ) Then
+			MousePickTerrain()
+		Endif
+
+		Return 0
+	End
+
+	Field last      :Int
+	Field state     :Int[ 2 ]
+	Field supported :Int[ 2 ]
+
+	Field img       := New DataBuffer( CUBES_DIM * CUBES_DIM * 2 )
+
+	Method OnRender:Int()
+
+		Local now       :Int = Millisecs()
+		Local frameTime :Int = now - last
+		last = now
+
+		Local deltaTime :Float = Float( frameTime ) * 0.001
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+
+		bgfxGetCaps( bgfxCaps )
+
+		' Update camera.
+		CameraUpdate( deltaTime )
+
+		' Update terrain.
+		If m_terrain.m_dirty Then
+			UpdateTerrain()
+			m_terrain.m_dirty = False
+		Endif
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect( 0, 0, 0, Int( m_width ), Int( m_height ) )
+
+		CameraGetViewMtx( m_viewMtx )
+		bxMtxProj( m_projMtx, 60.0, Float( m_width ) / Float( m_height ), 0.1, 2000.0, bgfxCaps.GetHomogeneousDepth() )
+
+		bgfxSetViewTransform( 0, m_viewMtx, m_projMtx )
+		bgfxSetTransform( m_terrain.m_transform )
+
+		Select m_terrain.m_mode
+
+		Case 1
+			bgfxSetVertexBuffer( 0, m_dvbh )
+			bgfxSetIndexBuffer( m_dibh )
+			bgfxSubmit( 0, m_terrainProgram )
+
+		Case 2
+			bgfxSetVertexBuffer( 0, m_vbh )
+			bgfxSetIndexBuffer( m_ibh )
+			bgfxSetTexture( 0, s_heightTexture, m_heightTexture )
+			bgfxSubmit( 0, m_terrainHeightTextureProgram )
+
+		Default
+			bgfxSetVertexBuffer( 0, m_vbh )
+			bgfxSetIndexBuffer( m_ibh )
+			bgfxSubmit( 0, m_terrainProgram )
+		End
+
+		DrawText( "Settings", 8, 14 * 1 )
+
+		Local modeString:String = "Mode: "
+		Select m_terrain.m_mode
+		Case 0
+			modeString += "Vertex Buffer"
+		Case 1
+			modeString += "Dynamic Vertex Buffer"
+		Case 2
+			modeString += "Height Texture"
+		End
+
+		DrawText( modeString, 8, 14 * 3 )
+
+		DrawText( "Raise Terrain: " + BoolToString( m_brush.m_raise ), 8, 14 * 5 )
+		DrawText( "Brush Size: " + m_brush.m_size, 8, 14 * 6 )
+		DrawText( "Brush Power: " + m_brush.m_power, 8, 14 * 7 )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 27-terrain"
+	Print "Description: Terrain painting example."
+	New TerrainExample()
+	Return 0
+End
+
+

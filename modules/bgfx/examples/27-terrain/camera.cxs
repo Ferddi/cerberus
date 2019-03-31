@@ -1,0 +1,341 @@
+
+Import mojo.input
+Import bgfx
+
+Const CAMERA_KEY_FORWARD  :Int = $01
+Const CAMERA_KEY_BACKWARD :Int = $02
+Const CAMERA_KEY_LEFT     :Int = $04
+Const CAMERA_KEY_RIGHT    :Int = $08
+Const CAMERA_KEY_UP       :Int = $10
+Const CAMERA_KEY_DOWN     :Int = $20
+
+'  int cmdMove(CmdContext* /*_context*/, void* /*_userData*/, int _argc, char const* const* _argv)
+'  {
+'  	if (_argc > 1)
+'  	{
+'  		if (0 == bx::strCmp(_argv[1], "forward") )
+'  		{
+'  			cameraSetKeyState(CAMERA_KEY_FORWARD, true);
+'  			return 0;
+'  		}
+'  		else if (0 == bx::strCmp(_argv[1], "left") )
+'  		{
+'  			cameraSetKeyState(CAMERA_KEY_LEFT, true);
+'  			return 0;
+'  		}
+'  		else if (0 == bx::strCmp(_argv[1], "right") )
+'  		{
+'  			cameraSetKeyState(CAMERA_KEY_RIGHT, true);
+'  			return 0;
+'  		}
+'  		else if (0 == bx::strCmp(_argv[1], "backward") )
+'  		{
+'  			cameraSetKeyState(CAMERA_KEY_BACKWARD, true);
+'  			return 0;
+'  		}
+'  		else if (0 == bx::strCmp(_argv[1], "up") )
+'  		{
+'  			cameraSetKeyState(CAMERA_KEY_UP, true);
+'  			return 0;
+'  		}
+'  		else if (0 == bx::strCmp(_argv[1], "down") )
+'  		{
+'  			cameraSetKeyState(CAMERA_KEY_DOWN, true);
+'  			return 0;
+'  		}
+'  	}
+'  
+'  	return 1;
+'  }
+'  
+'  static void cmd(const void* _userData)
+'  {
+'  	cmdExec( (const char*)_userData);
+'  }
+'  
+'  static const InputBinding s_camBindings[] =
+'  {
+'  	{ entry::Key::KeyW,             entry::Modifier::None, 0, cmd, "move forward"  },
+'  	{ entry::Key::GamepadUp,        entry::Modifier::None, 0, cmd, "move forward"  },
+'  	{ entry::Key::KeyA,             entry::Modifier::None, 0, cmd, "move left"     },
+'  	{ entry::Key::GamepadLeft,      entry::Modifier::None, 0, cmd, "move left"     },
+'  	{ entry::Key::KeyS,             entry::Modifier::None, 0, cmd, "move backward" },
+'  	{ entry::Key::GamepadDown,      entry::Modifier::None, 0, cmd, "move backward" },
+'  	{ entry::Key::KeyD,             entry::Modifier::None, 0, cmd, "move right"    },
+'  	{ entry::Key::GamepadRight,     entry::Modifier::None, 0, cmd, "move right"    },
+'  	{ entry::Key::KeyQ,             entry::Modifier::None, 0, cmd, "move down"     },
+'  	{ entry::Key::GamepadShoulderL, entry::Modifier::None, 0, cmd, "move down"     },
+'  	{ entry::Key::KeyE,             entry::Modifier::None, 0, cmd, "move up"       },
+'  	{ entry::Key::GamepadShoulderR, entry::Modifier::None, 0, cmd, "move up"       },
+'  
+'  	INPUT_BINDING_END
+'  };
+
+Class MouseCoords
+	Field m_mx:Int
+	Field m_my:Int
+End
+
+Class Camera
+
+	Method New()
+		Reset();
+'  		entry::MouseState mouseState;
+		Update( 0.0 )
+
+'  		cmdAdd("move", cmdMove);
+'  		inputAddBindings("camBindings", s_camBindings);
+	End
+
+'  	~Camera()
+'  	{
+'  		inputRemoveBindings("camBindings");
+'  	}
+
+	Method Reset:Void()
+
+		m_mouseNow.m_mx   =   0
+		m_mouseNow.m_my   =   0
+
+		m_mouseLast.m_mx  =   0
+		m_mouseLast.m_my  =   0
+
+		m_eye[0]          =   0.0
+		m_eye[1]          =   0.0
+		m_eye[2]          = -35.0
+
+		m_at[0]           =   0.0
+		m_at[1]           =   0.0
+		m_at[2]           =  -1.0
+
+		m_up[0]           =   0.0
+		m_up[1]           =   1.0
+		m_up[2]           =   0.0
+
+		m_horizontalAngle =   0.01
+		m_verticalAngle   =   0.0
+
+		m_mouseSpeed      =   0.0020
+		m_gamepadSpeed    =   0.04
+		m_moveSpeed       =  30.0
+
+		m_keys            =   0
+
+		m_mouseDown       = False
+	End
+
+	Method SetKeyState:Void( _key:Int, _down:Bool )
+		m_keys &= ~_key
+		If _down Then
+			m_keys |= _key
+		Else
+			m_keys |= 0
+		Endif
+	End
+
+	Method Update:Void( _deltaTime:Float )
+
+		If Not m_mouseDown Then
+			m_mouseLast.m_mx = MouseX() ' _mouseState.m_mx
+			m_mouseLast.m_my = MouseY() ' _mouseState.m_my
+		Endif
+
+		m_mouseDown = Not Not MouseDown( MOUSE_RIGHT )
+
+		If m_mouseDown Then
+			m_mouseNow.m_mx = MouseX() ' _mouseState.m_mx;
+			m_mouseNow.m_my = MouseY() ' _mouseState.m_my;
+		Endif
+
+		If m_mouseDown Then
+
+			Local deltaX:Int = m_mouseNow.m_mx - m_mouseLast.m_mx;
+			Local deltaY:Int = m_mouseNow.m_my - m_mouseLast.m_my;
+
+			m_horizontalAngle += m_mouseSpeed * Float(deltaX);
+			m_verticalAngle   -= m_mouseSpeed * Float(deltaY);
+
+			m_mouseLast.m_mx = m_mouseNow.m_mx;
+			m_mouseLast.m_my = m_mouseNow.m_my;
+		End
+
+'  		entry::GamepadHandle handle = { 0 };
+'  		m_horizontalAngle += m_gamepadSpeed * inputGetGamepadAxis(handle, entry::GamepadAxis::RightX)/32768.0f;
+'  		m_verticalAngle   -= m_gamepadSpeed * inputGetGamepadAxis(handle, entry::GamepadAxis::RightY)/32768.0f;
+'  		const int32_t gpx = inputGetGamepadAxis(handle, entry::GamepadAxis::LeftX);
+'  		const int32_t gpy = inputGetGamepadAxis(handle, entry::GamepadAxis::LeftY);
+'  		m_keys |= gpx < -16834 ? CAMERA_KEY_LEFT     : 0;
+'  		m_keys |= gpx >  16834 ? CAMERA_KEY_RIGHT    : 0;
+'  		m_keys |= gpy < -16834 ? CAMERA_KEY_FORWARD  : 0;
+'  		m_keys |= gpy >  16834 ? CAMERA_KEY_BACKWARD : 0;
+
+		Local direction :Float[3]
+		Local right     :Float[3]
+		Local up        :Float[3]
+
+		direction[ 0 ] = Cosr( m_verticalAngle ) * Sinr( m_horizontalAngle )
+		direction[ 1 ] = Sinr( m_verticalAngle )
+		direction[ 2 ] = Cosr( m_verticalAngle ) * Cosr( m_horizontalAngle )
+
+		right[ 0 ] = Sinr( m_horizontalAngle - HALFPI ) ' - bx::kPiHalf)
+		right[ 1 ] = 0
+		right[ 2 ] = Cosr( m_horizontalAngle - HALFPI ) ' bx::kPiHalf)
+
+		bxVec3Cross( up, right, direction )
+
+		If m_keys & CAMERA_KEY_FORWARD Then
+
+			Local pos:Float[3]
+			bxVec3Move(pos, m_eye)
+
+			Local tmp:Float[3]
+			bxVec3Mul( tmp, direction, _deltaTime * m_moveSpeed )
+
+			bxVec3Add( m_eye, pos, tmp )
+			SetKeyState(CAMERA_KEY_FORWARD, false);
+		Endif
+
+		If m_keys & CAMERA_KEY_BACKWARD Then
+
+			Local pos:Float[3]
+			bxVec3Move(pos, m_eye)
+
+			Local tmp:Float[3]
+			bxVec3Mul( tmp, direction, _deltaTime * m_moveSpeed )
+
+			bxVec3Sub( m_eye, pos, tmp )
+			SetKeyState( CAMERA_KEY_BACKWARD, False )
+		Endif
+
+		If m_keys & CAMERA_KEY_LEFT Then
+
+			Local pos:Float[3]
+			bxVec3Move( pos, m_eye )
+
+			Local tmp:Float[3]
+			bxVec3Mul( tmp, right, _deltaTime * m_moveSpeed )
+
+			bxVec3Add(m_eye, pos, tmp)
+			SetKeyState( CAMERA_KEY_LEFT, False )
+		Endif
+
+		If m_keys & CAMERA_KEY_RIGHT Then
+
+			Local pos:Float[3]
+			bxVec3Move( pos, m_eye )
+
+			Local tmp:Float[3]
+			bxVec3Mul( tmp, right, _deltaTime * m_moveSpeed )
+
+			bxVec3Sub( m_eye, pos, tmp )
+			SetKeyState( CAMERA_KEY_RIGHT, False )
+		Endif
+
+		If m_keys & CAMERA_KEY_UP Then
+
+			Local pos:Float[3]
+			bxVec3Move( pos, m_eye )
+
+			Local tmp:Float[3]
+			bxVec3Mul( tmp, up, _deltaTime * m_moveSpeed )
+
+			bxVec3Add( m_eye, pos, tmp )
+			SetKeyState( CAMERA_KEY_UP, False )
+		Endif
+
+		If m_keys & CAMERA_KEY_DOWN Then
+
+			Local pos:Float[3]
+			bxVec3Move( pos, m_eye )
+
+			Local tmp:Float[3]
+			bxVec3Mul( tmp, up, _deltaTime * m_moveSpeed )
+
+			bxVec3Sub( m_eye, pos, tmp )
+			SetKeyState( CAMERA_KEY_DOWN, False )
+		Endif
+
+		bxVec3Add( m_at, m_eye, direction )
+		bxVec3Cross( m_up, right, direction )
+	End
+
+	Method GetViewMtx:Void( _viewMtx:Float[] )
+		bxMtxLookAt( _viewMtx, m_eye, m_at, m_up )
+	End
+
+	Method SetPosition:Void( _pos:Float[] )
+		m_eye[ 0 ] = _pos[ 0 ]
+		m_eye[ 1 ] = _pos[ 1 ]
+		m_eye[ 2 ] = _pos[ 2 ]
+	End
+
+	Method SetVerticalAngle:Void( _verticalAngle:Float )
+		m_verticalAngle = _verticalAngle
+	End
+
+	Method SetHorizontalAngle:Void( _horizontalAngle:Float )
+		m_horizontalAngle = _horizontalAngle
+	End
+
+	Field m_mouseNow        := New MouseCoords()
+	Field m_mouseLast       := New MouseCoords()
+
+	Field m_eye             :Float[3]
+	Field m_at              :Float[3]
+	Field m_up              :Float[3]
+	Field m_horizontalAngle :Float
+	Field m_verticalAngle   :Float
+
+	Field m_mouseSpeed      :Float
+	Field m_gamepadSpeed    :Float
+	Field m_moveSpeed       :Float
+
+	Field m_keys            :Int
+	Field m_mouseDown       :Bool
+End
+
+Global s_camera:Camera
+
+Function CameraCreate:Void()
+	s_camera = New Camera()
+End
+
+Function CameraDestroy:Void()
+	s_camera = Null
+End
+
+Function CameraSetPosition:Void( _pos:Float[] )
+	s_camera.SetPosition( _pos )
+End
+
+Function CameraSetHorizontalAngle:Void( _horizontalAngle:Float )
+	s_camera.SetHorizontalAngle( _horizontalAngle )
+End
+
+Function CameraSetVerticalAngle:Void( _verticalAngle:Float )
+	s_camera.SetVerticalAngle( _verticalAngle )
+End
+
+'  Function CameraSetKeyState:Void( _key:Int, bool _down:Bool )
+'  	s_camera.SetKeyState( _key, _down )
+'  End
+
+Function CameraGetViewMtx:Void( _viewMtx:Float[] )
+	s_camera.GetViewMtx( _viewMtx )
+End
+
+Function CameraGetPosition:Void( _pos:Float[] )
+	_pos[ 0 ] = s_camera.m_eye[ 0 ]
+	_pos[ 1 ] = s_camera.m_eye[ 1 ]
+	_pos[ 2 ] = s_camera.m_eye[ 2 ]
+End
+
+Function CameraGetAt:Void( _at:Float[] )
+	_at[ 0 ] = s_camera.m_at[ 0 ]
+	_at[ 1 ] = s_camera.m_at[ 1 ]
+	_at[ 2 ] = s_camera.m_at[ 2 ]
+End
+
+Function CameraUpdate:Void( _deltaTime:Float )
+	s_camera.Update( _deltaTime )
+End
