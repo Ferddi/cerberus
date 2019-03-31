@@ -1,0 +1,595 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+' Import camera
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+Class PosColorVertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_abgr :Int
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_abgr:Int )
+
+		Self.m_x    = m_x
+		Self.m_y    = m_y
+		Self.m_z    = m_z
+
+		Self.m_abgr = m_abgr
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Class PosColorTexCoord0Vertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_abgr :Int
+
+	Field m_u    :Float
+	Field m_v    :Float
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_abgr:Int, m_u:Float, m_v:Float )
+
+		Self.m_x    = m_x
+		Self.m_y    = m_y
+		Self.m_z    = m_z
+
+		Self.m_abgr = m_abgr
+
+		Self.m_u    = m_u
+		Self.m_v    = m_v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global s_cubeVertices:PosColorVertex[] = [
+	New PosColorVertex( -1.0,  1.0,  1.0, $ff000000 ),
+	New PosColorVertex(  1.0,  1.0,  1.0, $ff0000ff ),
+	New PosColorVertex( -1.0, -1.0,  1.0, $ff00ff00 ),
+	New PosColorVertex(  1.0, -1.0,  1.0, $ff00ffff ),
+	New PosColorVertex( -1.0,  1.0, -1.0, $ffff0000 ),
+	New PosColorVertex(  1.0,  1.0, -1.0, $ffff00ff ),
+	New PosColorVertex( -1.0, -1.0, -1.0, $ffffff00 ),
+	New PosColorVertex(  1.0, -1.0, -1.0, $ffffffff ) ]
+
+Global s_cubeIndices:Int[] = [
+	0, 1, 2, ' 0
+	1, 3, 2,
+	4, 6, 5, ' 2
+	5, 6, 7,
+	0, 2, 4, ' 4
+	4, 2, 6,
+	1, 5, 3, ' 6
+	5, 7, 3,
+	0, 4, 1, ' 8
+	4, 5, 1,
+	2, 3, 6, ' 10
+	6, 3, 7]
+
+Function PosColorVertexToDataBuffer:DataBuffer( _vertices:PosColorVertex[] )
+
+	Local bufferAddress  :Int = 0
+	Local verticesCount  :Int = _vertices.Length()
+
+	' there are 4 fields in PosNormalTexcoordVertex (m_x, m_y, m_z, m_abgr)
+	' each field is 4 bytes in size:
+	Local verticesBuffer := New DataBuffer( verticesCount * 4 * 4 )
+
+	For Local ii:Int = 0 Until verticesCount
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+
+		verticesBuffer.PokeInt( bufferAddress, _vertices[ ii ].m_abgr ) ; bufferAddress += 4
+	Next
+
+	Return verticesBuffer
+End
+
+Function Index16ToDataBuffer:DataBuffer( _indices:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	' the size of each index is 16 bit, which is 2 bytes:
+	Local indicesBuffer := New DataBuffer( indicesCount * 2 )
+
+	For Local ii:Int = 0 Until indicesCount
+		indicesBuffer.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+
+	Return indicesBuffer
+End
+
+Global s_texelHalf :Float = 0.0
+Global s_flipV     :Bool = False
+
+Function MtxProj:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _far:Float )
+	bxMtxProj( _result, _fovy, _aspect, _near, _far, s_flipV )
+End
+
+Global _tvb := New BgfxTransientVertexBuffer()
+
+Function ScreenSpaceQuad:Void( _textureWidth:Float, _textureHeight:Float, _originBottomLeft:Bool=False, _width:Float=1.0, _height:Float=1.0 )
+
+	If 3 = bgfxGetAvailTransientVertexBuffer( 3, PosColorTexCoord0Vertex.ms_decl ) Then
+
+		bgfxAllocTransientVertexBuffer( _tvb, 3, PosColorTexCoord0Vertex.ms_decl )
+
+		Local vertex     :Int   = 0 
+
+		Local zz         :Float = 0.0
+
+		Local minx       :Float = -_width
+		Local maxx       :Float =  _width
+		Local miny       :Float = 0.0
+		Local maxy       :Float = _height * 2.0
+
+		Local texelHalfW :Float = s_texelHalf / _textureWidth
+		Local texelHalfH :Float = s_texelHalf / _textureHeight
+		Local minu       :Float = -1.0 + texelHalfW
+		Local maxu       :Float =  1.0 + texelHalfW
+
+		Local minv       :Float = texelHalfH
+		Local maxv       :Float = 2.0 + texelHalfH
+
+		If _originBottomLeft Then
+
+			Local temp:Float = minv
+			minv = maxv
+			maxv = temp
+
+			minv -= 1.0
+			maxv -= 1.0
+		Endif
+
+		_tvb.PokeFloat( vertex, minx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxy      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeInt  ( vertex, $ffffffff ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxv      ) ; vertex += 4
+
+		bgfxSetTransientVertexBuffer( 0, _tvb )
+	Endif
+End
+
+Class OrderIndependentTransparencyExample Extends App
+
+	Field bgfxCaps            := New BgfxCaps()
+
+'  	Field m_width             :Int ' use DeviceWidth directly
+'  	Field m_height            :Int ' use DeviceHeight directly
+'  	Field m_debug             :Int = BGFX_DEBUG_NONE
+	Field m_debug             :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset             :Int ' = BGFX_RESET_VSYNC
+
+	Field m_mode              :Int
+	Field m_frontToBack       :Bool
+	Field m_fadeInOut         :Bool
+	Field m_mrtSupported      :Bool
+
+	Field m_oldWidth          :Int
+	Field m_oldHeight         :Int
+	Field m_oldReset          :Int
+
+	Field m_timeOffset        :Int
+
+	Field m_vbh               :Int
+	Field m_ibh               :Int
+
+	Field s_texColor0         :Int
+	Field s_texColor1         :Int
+	Field u_color             :Int
+
+	Field m_blend             :Int
+	Field m_wbSeparatePass    :Int
+	Field m_wbSeparateBlit    :Int
+	Field m_wbPass            :Int
+	Field m_wbBlit            :Int
+
+	Field m_fbtextures        :Int[ 2 ]
+	Field m_fbtexturesDb      := New DataBuffer( 4 )
+	Field m_fbh               :Int
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+'  		m_width  = DeviceWidth()
+'  		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = 0 | BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Vertex declarations.
+		PosColorVertex.Init()
+		PosColorTexCoord0Vertex.Init()
+
+		' Get renderer capabilities info.
+		bgfxGetCaps( bgfxCaps )
+
+		' Setup root path for binary shaders. Shader binaries are different
+		' for each renderer.
+		' Select bgfxCaps.GetRendererType()
+		Select bgfxGetRendererType()
+
+		Case BGFX_RENDERER_TYPE_OPENGL, BGFX_RENDERER_TYPE_OPENGLES
+			s_flipV = True
+
+		Default
+			' do nothing
+		End
+
+		' Create static vertex buffer.
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( PosColorVertexToDataBuffer( s_cubeVertices ) ), PosColorVertex.ms_decl )
+
+		' Create static index buffer.
+		m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( Index16ToDataBuffer( s_cubeIndices ) ) )
+
+		' Create texture sampler uniforms.
+		s_texColor0 = bgfxCreateUniform( "s_texColor0", BGFX_UNIFORM_TYPE_INT1 )
+		s_texColor1 = bgfxCreateUniform( "s_texColor1", BGFX_UNIFORM_TYPE_INT1 )
+		u_color     = bgfxCreateUniform( "u_color",     BGFX_UNIFORM_TYPE_VEC4 )
+
+		m_blend          = bgfxUtilsLoadProgram( "vs_oit",      "fs_oit"                  )
+		m_wbSeparatePass = bgfxUtilsLoadProgram( "vs_oit",      "fs_oit_wb_separate"      )
+		m_wbSeparateBlit = bgfxUtilsLoadProgram( "vs_oit_blit", "fs_oit_wb_separate_blit" )
+		m_wbPass         = bgfxUtilsLoadProgram( "vs_oit",      "fs_oit_wb"               )
+		m_wbBlit         = bgfxUtilsLoadProgram( "vs_oit_blit", "fs_oit_wb_blit"          )
+
+		m_fbtextures[ 0 ] = BGFX_INVALID_HANDLE
+		m_fbtextures[ 1 ] = BGFX_INVALID_HANDLE
+		m_fbh = BGFX_INVALID_HANDLE
+
+		m_mode = 1
+		m_frontToBack = True
+		m_fadeInOut   = False
+
+		m_oldWidth  = 0
+		m_oldHeight = 0
+		m_oldReset  = m_reset
+
+		m_mrtSupported = True And
+			' 2 <= caps->limits.maxFBAttachments And
+			2 <= bgfxCaps.GetLimitsMaxFBAttachments() And
+			bgfxIsTextureValid( 0, False, 1, BGFX_TEXTURE_FORMAT_RGBA16F, BGFX_TEXTURE_RT ) And
+			bgfxIsTextureValid( 0, False, 1, BGFX_TEXTURE_FORMAT_R16F,    BGFX_TEXTURE_RT )
+
+		m_timeOffset = Millisecs()
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		If bgfxIsValid( m_fbh ) Then
+'  			bgfxDestroyFrameBuffer( m_fbh )
+'  		Endif
+'  
+'  		bgfxDestroyIndexBuffer( m_ibh )
+'  		bgfxDestroyVertexBuffer( m_vbh )
+'  
+'  		bgfxDestroyProgram( m_blend )
+'  		bgfxDestroyProgram( m_wbSeparatePass )
+'  		bgfxDestroyProgram( m_wbSeparateBlit )
+'  		bgfxDestroyProgram( m_wbPass )
+'  		bgfxDestroyProgram( m_wbBlit )
+'  
+'  		bgfxDestroyUniform( s_texColor0 )
+'  		bgfxDestroyUniform( s_texColor1 )
+'  		bgfxDestroyUniform( u_color )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field state :Int[ 2 ]
+
+	Method OnRender:Int()
+
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
+
+		If m_mrtSupported Then
+
+			If m_oldWidth <> m_width Or m_oldHeight <> m_height Or m_oldReset <> m_reset Or Not bgfxIsValid( m_fbh ) Then
+
+				' Recreate variable size render targets when resolution changes.
+				m_oldWidth  = m_width
+				m_oldHeight = m_height
+				m_oldReset  = m_reset
+
+				If bgfxIsValid( m_fbh ) Then
+					bgfxDestroyFrameBuffer( m_fbh )
+				Endif
+
+				m_fbtextures[ 0 ] = bgfxCreateTexture2D( Int( m_width ), Int( m_height ), False, 1, BGFX_TEXTURE_FORMAT_RGBA16F, BGFX_TEXTURE_RT )
+				m_fbtextures[ 1 ] = bgfxCreateTexture2D( Int( m_width ), Int( m_height ), False, 1, BGFX_TEXTURE_FORMAT_R16F,    BGFX_TEXTURE_RT )
+
+				m_fbtexturesDb.PokeShort( 0, m_fbtextures[ 0 ] )
+				m_fbtexturesDb.PokeShort( 2, m_fbtextures[ 1 ] )
+
+				m_fbh = bgfxCreateFrameBufferFromHandles( m_fbtextures.Length(), m_fbtexturesDb, True )
+			Endif
+
+			' Set view 0 default viewport.
+			bgfxSetViewRect( 0, 0, 0, Int( m_width ), Int( m_height ) )
+			bgfxSetViewRect( 1, 0, 0, Int( m_width ), Int( m_height ) )
+
+			Local now  :Int = Millisecs()
+			Local time :Float = Float( now - m_timeOffset ) * 0.001
+
+			' Reference:
+			' Weighted, Blended Order-Independent Transparency
+			' http://jcgt.org/published/0002/02/09/
+			' http://casual-effects.blogspot.com/2014/03/weighted-blended-order-independent.html
+
+			Local at   :Float[] = [ 0.0, 0.0,  0.0 ]
+			Local eye  :Float[] = [ 0.0, 0.0, -7.0 ]
+
+			Local view :Float[ 16 ]
+			Local proj :Float[ 16 ]
+
+			' Set view and projection matrix for view 0.
+			bxMtxLookAt( view, eye, at )
+			MtxProj( proj, 60.0, Float( m_width ) / Float( m_height ), 0.1, 100.0 )
+
+			bgfxSetViewTransform( 0, view, proj )
+
+			' Set palette color for index 0
+			bgfxSetPaletteColor( 0, 0.0, 0.0, 0.0, 0.0 )
+
+			' Set palette color for index 1
+			bgfxSetPaletteColor( 1, 1.0, 1.0, 1.0, 1.0 )
+
+			Local stencil:Int = 0 ; If m_mode = 1 Then stencil = 1
+			bgfxSetViewClearMrt( 0,
+				BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
+				1.0,  ' Depth
+				0,    ' Stencil
+				0,    ' FB texture 0, color palette 0
+				stencil ) ' FB texture 1, color palette 1
+
+			bgfxSetViewClearMrt( 1,
+				BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
+				1.0, ' Depth
+				0,   ' Stencil
+				0 ) ' Color palette 0
+
+			Local fbh:Int = m_fbh ; If m_mode = 0 Then fbh = BGFX_INVALID_HANDLE
+			bgfxSetViewFrameBuffer( 0, fbh )
+
+			' Set view and projection matrix for view 1.
+			bxMtxIdentity(view)
+
+			bgfxGetCaps( bgfxCaps )
+			bxMtxOrtho( proj, 0.0, 1.0, 1.0, 0.0, 0.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+			bgfxSetViewTransform( 1, view, proj )
+
+			For Local depth:Int = 0 Until 3
+
+				Local zz:Int = depth ; If m_frontToBack Then zz = 2 - depth
+
+				For Local yy:Int = 0 Until 3
+					For Local xx:Int = 0 Until 3
+
+						Local color:Float[] = [ xx * 1.0 / 3.0, zz * 1.0 / 3.0, yy * 1.0 / 3.0, 0.5 ]
+
+						If m_fadeInOut And zz = 1 Then
+							color[ 3 ] = Sinr( time * 3.0 ) * 0.49 + 0.5
+						Endif
+
+						bgfxSetUniform( u_color, color )
+
+						' BX_UNUSED(time);
+						Local mtx:Float[ 16 ]
+						bxMtxRotateXY( mtx, time * 0.023 + xx * 0.21, time * 0.03 + yy * 0.37 )
+						' mtxIdentity(mtx);
+						mtx[ 12 ] = -2.5 + Float( xx ) * 2.5
+						mtx[ 13 ] = -2.5 + Float( yy ) * 2.5
+						mtx[ 14 ] = -2.5 + Float( zz ) * 2.5
+
+						' Set transform for draw call.
+						bgfxSetTransform( mtx )
+
+						' Set vertex and index buffer.
+						bgfxSetVertexBuffer( 0, m_vbh )
+						bgfxSetIndexBuffer( m_ibh )
+
+'  						const uint64_t state = 0
+'  							| BGFX_STATE_CULL_CW
+'  							| BGFX_STATE_WRITE_RGB
+'  							| BGFX_STATE_WRITE_A
+'  							| BGFX_STATE_DEPTH_TEST_LESS
+'  							| BGFX_STATE_MSAA
+'  							;
+'  
+'  						const uint64_t stateNoDepth = 0
+'  							| BGFX_STATE_CULL_CW
+'  							| BGFX_STATE_WRITE_RGB
+'  							| BGFX_STATE_WRITE_A
+'  							| BGFX_STATE_DEPTH_TEST_ALWAYS
+'  							| BGFX_STATE_MSAA
+'  							;
+
+						Local program:Int = BGFX_INVALID_HANDLE
+
+						Select m_mode
+
+						Case 0
+							' Set vertex and fragment shaders.
+							program = m_blend
+
+							' Set render states.
+'  							bgfxSetState( state | BGFX_STATE_BLEND_ALPHA )
+							state[ 0 ] = $01000010
+							state[ 1 ] = $0656501f
+							bgfxSetState( state )
+
+						Case 1
+							' Set vertex and fragment shaders.
+							program = m_wbSeparatePass
+
+							' Set render states.
+'  							bgfxSetState( stateNoDepth | BGFX_STATE_BLEND_FUNC_SEPARATE( BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ZERO, BGFX_STATE_BLEND_INV_SRC_ALPHA ) )
+							state[ 0 ] = $01000010
+							state[ 1 ] = $0612208f
+							bgfxSetState( state )
+
+						Default
+							' Set vertex and fragment shaders.
+							program = m_wbPass
+
+							' Set render states.
+'  							bgfxSetState( stateNoDepth |
+'  								BGFX_STATE_BLEND_FUNC( BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE ) | 
+'  								BGFX_STATE_BLEND_INDEPENDENT,
+'  								0 |
+'  								BGFX_STATE_BLEND_FUNC_RT_1(BGFX_STATE_BLEND_ZERO, BGFX_STATE_BLEND_SRC_COLOR) )
+							state[ 0 ] = $01000014
+							state[ 1 ] = $0222208f
+							bgfxSetState( state, $00000031 )
+
+						End
+
+						' Submit primitive for rendering to view 0.
+						bgfxSubmit( 0, program )
+
+					Next
+				Next
+
+			Next
+
+			If 0 <> m_mode Then
+
+				bgfxSetTexture( 0, s_texColor0, m_fbtextures[ 0 ] )
+				bgfxSetTexture( 1, s_texColor1, m_fbtextures[ 1 ] )
+
+'  				bgfxSetState( 0 | BGFX_STATE_WRITE_RGB | BGFX_STATE_BLEND_FUNC( BGFX_STATE_BLEND_INV_SRC_ALPHA, BGFX_STATE_BLEND_SRC_ALPHA ) )
+				state[ 0 ] = $00000000
+				state[ 1 ] = $05656007
+				bgfxSetState( state )
+
+				ScreenSpaceQuad( Float( m_width ), Float( m_height ), s_flipV )
+
+				If m_mode = 1 Then
+					bgfxSubmit( 1, m_wbSeparateBlit )
+				Else
+					bgfxSubmit( 1, m_wbBlit )
+				Endif
+			Endif
+
+			Local modeStr:String = "Blend Mode: "
+
+			Select m_mode
+			Case 0
+				modeStr += "None"
+			Case 1
+				modeStr += "Separate"
+			Default
+				modeStr += "MRT Independent"
+			End
+
+			DrawText( "Settings", 8, 14 * 1 )
+			DrawText( modeStr, 8, 14 * 2 )
+			DrawText( "Front to back: " + BoolToString( m_frontToBack ), 8, 14 * 3 )
+			DrawText( "Fade in/out: " + BoolToString( m_fadeInOut ), 8, 14 * 4 )
+
+		Else ' If Not m_mrtSupported Then
+
+			DrawText( "MRT or frame buffer texture format are not supported.", 8, 14 * 1 )
+
+		Endif
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 19-OIT (Order Independent Transparency)"
+	Print "Description: Weighted, Blended Order Independent Transparency."
+	New OrderIndependentTransparencyExample()
+	Return 0
+End
