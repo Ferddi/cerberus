@@ -1677,9 +1677,9 @@ void _bgfx_dbg_text_printf( int _x, int _y, int _attr, String _format )
 
 // Function bgfxDbgTextImage:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:DataBuffer, _pitch:Int )="_bgfx_dbg_text_image"
 // BGFX_C_API void bgfx_dbg_text_image(uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height, const void* _data, uint16_t _pitch);
-void _bgfx_dbg_text_image( int _x, int _y, int _width, int _height, BBDataBuffer * _data, int _pitch)
+void _bgfx_dbg_text_image( int _x, int _y, int _width, int _height, BBDataBuffer * _data, int _pitch, int _startIndex )
 {
-	bgfx_dbg_text_image( _x, _y, _width, _height, _data->ReadPointer(0), _pitch);
+	bgfx_dbg_text_image( _x, _y, _width, _height, _data->ReadPointer( _startIndex ), _pitch);
 }
 
 // Function bgfxCreateIndexBuffer:Void( _handle:BgfxIndexBufferHandle, _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )="_bgfx_create_index_buffer"

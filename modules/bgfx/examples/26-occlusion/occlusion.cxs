@@ -1,0 +1,350 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Import camera
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+Const CUBES_DIM:Int = 10
+
+Class PosColorVertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_abgr :Int
+
+	Method New( _x:Float, _y:Float, _z:Float, _abgr:Int )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_abgr = _abgr
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,   4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global s_cubeVertices:PosColorVertex[] = [
+	New PosColorVertex( -1.0,  1.0,  1.0, $ff000000 ),
+	New PosColorVertex(  1.0,  1.0,  1.0, $ff0000ff ),
+	New PosColorVertex( -1.0, -1.0,  1.0, $ff00ff00 ),
+	New PosColorVertex(  1.0, -1.0,  1.0, $ff00ffff ),
+	New PosColorVertex( -1.0,  1.0, -1.0, $ffff0000 ),
+	New PosColorVertex(  1.0,  1.0, -1.0, $ffff00ff ),
+	New PosColorVertex( -1.0, -1.0, -1.0, $ffffff00 ),
+	New PosColorVertex(  1.0, -1.0, -1.0, $ffffffff ) ]
+
+Global s_cubeIndices:Int[] = [
+	0, 1, 2, ' 0
+	1, 3, 2,
+	4, 6, 5, ' 2
+	5, 6, 7,
+	0, 2, 4, ' 4
+	4, 2, 6,
+	1, 5, 3, ' 6
+	5, 7, 3,
+	0, 4, 1, ' 8
+	4, 5, 1,
+	2, 3, 6, ' 10
+	6, 3, 7 ]
+
+Function PosColorVertexToDataBuffer:DataBuffer( _vertices:PosColorVertex[] )
+
+	Local bufferAddress  :Int = 0
+	Local verticesCount  :Int = _vertices.Length()
+
+	' there are 4 fields in PosColorVertex (m_x, m_y, m_z and m_abgr) are 4 bytes in size
+	Local verticesBuffer := New DataBuffer( verticesCount * 4 * 4 )
+
+	For Local ii:Int = 0 Until verticesCount
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+
+		verticesBuffer.PokeInt( bufferAddress, _vertices[ ii ].m_abgr ) ; bufferAddress += 4
+	Next
+
+	Return verticesBuffer
+End
+
+Function Index16ToDataBuffer:DataBuffer( _indices:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	' the size of each index is 16 bit, which is 2 bytes:
+	Local indicesBuffer := New DataBuffer( indicesCount * 2 )
+
+	For Local ii:Int = 0 Until indicesCount
+		indicesBuffer.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+
+	Return indicesBuffer
+End
+
+Class OcclusionExample Extends App
+
+	Field bgfxCaps                  := New BgfxCaps()
+
+'  	Field m_width                   :Int ' use DeviceWidth directly
+'  	Field m_height                  :Int ' use DeviceHeight directly
+'  	Field m_debug                   :Int = BGFX_DEBUG_NONE
+	Field m_debug                   :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset                   :Int ' = BGFX_RESET_VSYNC
+
+	Field m_vbh                     :Int
+	Field m_ibh                     :Int
+	Field m_program                 :Int
+	Field m_timeOffset              :Int
+	Field m_occlusionQuerySupported :Bool
+	Field m_occlusionQueries        :Int[ CUBES_DIM * CUBES_DIM ]
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+'  		m_width  = DeviceWidth()
+'  		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_TEXT
+		m_reset  = 0 | BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		bgfxSetViewClear( 2, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $202020ff, 1.0, 0 )
+
+		' Create vertex stream declaration.
+		PosColorVertex.Init()
+
+		' Create static vertex buffer.
+		m_vbh = bgfxCreateVertexBuffer(
+				' Static data can be passed with bgfx::makeRef
+				bgfxUtilsMakeRef( PosColorVertexToDataBuffer( s_cubeVertices ) ),
+				PosColorVertex.ms_decl )
+
+		' Create static index buffer.
+		m_ibh = bgfxCreateIndexBuffer(
+				' Static data can be passed with bgfx::makeRef
+				bgfxUtilsMakeRef( Index16ToDataBuffer( s_cubeIndices ) ) )
+
+		' Create program from shaders.
+		m_program = bgfxUtilsLoadProgram( "vs_cubes", "fs_cubes" )
+
+		bgfxGetCaps( bgfxCaps )
+		bgfxCaps.GetSupported( supported )
+		m_occlusionQuerySupported = bgfxCapsIsOcclusionQuerySupported( supported )
+
+		If m_occlusionQuerySupported Then
+			For Local ii:Int = 0 Until m_occlusionQueries.Length()
+				m_occlusionQueries[ ii ] = bgfxCreateOcclusionQuery()
+			Next
+		Endif
+
+		CameraCreate()
+
+		Local initialPos:Float[] = [ 15.5, 0.0, -15.5 ]
+		CameraSetPosition( initialPos )
+		CameraSetHorizontalAngle( -PI / 4 ) ' 45 degrees
+
+		m_timeOffset = Millisecs()
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		CameraDestroy();
+'  
+'  		If m_occlusionQuerySupported Then
+'  
+'  			For Local ii:Int = 0 Until m_occlusionQueries.Length()
+'  				bgfxDestroyOcclusionQuery( m_occlusionQueries[ ii ] )
+'  			Next
+'  		Endif
+'  
+'  		bgfxDestroyIndexBuffer( m_ibh )
+'  		bgfxDestroyVertexBuffer( m_vbh )
+'  		bgfxDestroyProgram( m_program )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field last      :Int
+	Field state     :Int[ 2 ]
+	Field supported :Int[ 2 ]
+
+	Field img       := New DataBuffer( CUBES_DIM * CUBES_DIM * 2 )
+
+	Method OnRender:Int()
+
+		If m_occlusionQuerySupported Then
+
+			Local m_width   :Int = DeviceWidth()
+			Local m_height  :Int = DeviceHeight()
+
+			Local now       :Int = Millisecs()
+			Local frameTime :Int = now - last
+			last = now
+
+			Local time      :Float = Float(now - m_timeOffset) * 0.001
+			Local deltaTime :Float = Float( frameTime ) * 0.001
+
+			bgfxGetCaps( bgfxCaps )
+
+			' DebugStop()
+
+			' Update camera.
+			Local view:Float[ 16 ]
+			CameraUpdate( deltaTime )
+			CameraGetViewMtx( view )
+
+			' Set view and projection matrix for view 0.
+			' {
+				Local proj:Float[ 16 ]
+				bxMtxProj( proj, 90.0, Float( m_width ) / Float( m_height ), 0.1, 10000.0, bgfxCaps.GetHomogeneousDepth() )
+
+				bgfxSetViewTransform( 0, view, proj )
+				bgfxSetViewRect( 0, 0, 0, Int( m_width ), Int( m_height ) )
+
+				bgfxSetViewTransform( 1, view, proj )
+				bgfxSetViewRect( 1, 0, 0, Int( m_width ), Int( m_height ) )
+
+				Local at  :Float[] = [  0.0,  0.0,   0.0 ]
+				Local eye :Float[] = [ 17.5, 10.0, -17.5 ]
+				bxMtxLookAt( view, eye, at )
+
+				bgfxSetViewTransform( 2, view, proj )
+				bgfxSetViewRect( 2, 10, Int( m_height - m_height / 4 - 10 ), Int( m_width / 4 ), Int( m_height / 4 ) )
+			' }
+
+			bgfxTouch( 0 )
+			bgfxTouch( 2 )
+
+			For Local yy:Int = 0 Until CUBES_DIM
+				For Local xx:Int = 0 Until CUBES_DIM
+
+					Local mtx:Float[ 16 ]
+					bxMtxRotateXY( mtx, time + xx * 0.21, time + yy * 0.37 )
+					mtx[ 12 ] = -( CUBES_DIM - 1 ) * 3.0 / 2.0 + Float( xx ) * 3.0
+					mtx[ 13 ] = 0.0
+					mtx[ 14 ] = -( CUBES_DIM - 1 ) * 3.0 / 2.0 + Float( yy ) * 3.0
+
+					Local occlusionQuery:Int = m_occlusionQueries[ yy * CUBES_DIM + xx ]
+
+					bgfxSetTransform( mtx )
+					bgfxSetVertexBuffer( 0, m_vbh )
+					bgfxSetIndexBuffer( m_ibh )
+					bgfxSetCondition( occlusionQuery, True )
+					bgfxSetState( BGFX_STATE_DEFAULT )
+					bgfxSubmit( 0, m_program )
+
+					bgfxSetTransform(mtx);
+					bgfxSetVertexBuffer(0, m_vbh);
+					bgfxSetIndexBuffer(m_ibh);
+
+					bgfxUtilsClear64Bit( state )
+					bgfxUtilsSet64Bit( state, BGFX_STATE_DEPTH_TEST_LEQUAL )
+					bgfxUtilsSet64Bit( state, BGFX_STATE_CULL_CW )
+					bgfxSetState( state )
+
+					bgfxSubmitOcclusionQuery( 1, m_program, occlusionQuery )
+
+					bgfxSetTransform( mtx )
+					bgfxSetVertexBuffer( 0, m_vbh )
+					bgfxSetIndexBuffer( m_ibh )
+					bgfxSetCondition( occlusionQuery, True )
+					bgfxSetState( BGFX_STATE_DEFAULT )
+					bgfxSubmit( 2, m_program )
+
+					Local imgIndex:Int = ( yy * CUBES_DIM + xx ) * 2
+
+					Select bgfxGetResult( occlusionQuery )
+					Case 1
+						img.PokeByte( imgIndex + 0, $fe )
+					Default
+						img.PokeByte( imgIndex + 0, $20 )
+					End
+					img.PokeByte( imgIndex + 1, $f )
+				Next
+			Next
+
+			For Local xx:Int = 0 Until CUBES_DIM
+				bgfxDbgTextImage( 5 + xx * 2, 20, 1, CUBES_DIM, img, CUBES_DIM * 2, xx * 2 )
+			Next
+
+			Local numPixels:Int[ 1 ] 
+			bgfxGetResult( m_occlusionQueries[ 0 ], numPixels )
+			bgfxDbgTextPrintf( 5, 20 + CUBES_DIM + 1, $f, "Passing pixels count: " + numPixels[ 0 ] )
+
+		Else ' If Not m_occlusionQuerySupported Then
+
+			DrawText( "Occlusion query is not supported.", 8, 14 * 1 )
+		Endif
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		' bgfxFrame() 
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 26-occlusion"
+	Print "Description: Using occlusion query for conditional rendering."
+	New OcclusionExample()
+	Return 0
+End
+
+

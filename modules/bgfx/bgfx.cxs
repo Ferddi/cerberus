@@ -712,7 +712,7 @@ Function bgfxDbgTextPrintf:Void( _x:Int, _y:Int, _attr:Int, _format:String )="_b
 '  void bgfx_dbg_text_image(int _x, int _y, int _width, int _height, const void* _data, int _pitch);
 '  Function bgfxDbgTextImage:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:Int[], _pitch:Int )="_bgfx_dbg_text_image"
 '  Function bgfxDbgTextImageDB:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:DataBuffer, _pitch:Int )="_bgfx_dbg_text_image_db"
-Function bgfxDbgTextImage:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:DataBuffer, _pitch:Int )="_bgfx_dbg_text_image"
+Function bgfxDbgTextImage:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:DataBuffer, _pitch:Int, _startIndex:Int=0 )="_bgfx_dbg_text_image"
 
 '  bgfx_index_buffer_handle_object bgfx_create_index_buffer(const bgfx_memory_object* _mem, int _flags);
 Function bgfxCreateIndexBuffer:Int( _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )="_bgfx_create_index_buffer"
