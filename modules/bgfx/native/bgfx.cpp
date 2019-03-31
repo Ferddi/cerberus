@@ -839,6 +839,11 @@ public:
 	{
 		return _caps->originBottomLeft;
 	}
+
+	virtual int GetLimitsMaxFBAttachments()
+	{
+		return _caps->limits.maxFBAttachments;
+	}
 };
 
 // used by bgfx_init_t
@@ -1476,7 +1481,7 @@ void _bgfx_vertex_pack( Array<float> _input, bool _inputNormalized, int _attr, b
 
 // Function bgfxVertexUnpack:Void( _output:Float[], _attr:Int, _decl:BgfxVertexDecl, _data:DataBuffer, _index:Int=0 )="_bgfx_vertex_unpack"
 // BGFX_C_API void bgfx_vertex_unpack(float _output[4], bgfx_attrib_t _attr, const bgfx_vertex_decl_t* _decl, const void* _data, uint32_t _index);
-void _bgfx_vertex_unpack( float _output[4], int _attr, bgfx_vertex_decl_object * _decl, BBDataBuffer * _data, int _index )
+void _bgfx_vertex_unpack( Array<float> _output, int _attr, bgfx_vertex_decl_object * _decl, BBDataBuffer * _data, int _index )
 {
 	bgfx_vertex_unpack( &_output[0], (bgfx_attrib_t)_attr, &_decl->_decl, _data->ReadPointer(0), _index );
 }
@@ -2143,6 +2148,10 @@ void _bgfx_destroy_occlusion_query( uint16_t _handle )
 // Function bgfxSetPaletteColor:Void( _index:Int, _r:Float, _g:Float, _b:Float, _a:Float )="_bgfx_set_palette_color"
 // Function bgfxSetPaletteColor:Void( _index:Int, _rgba:Float[] )="_bgfx_set_palette_color"
 // BGFX_C_API void bgfx_set_palette_color(uint8_t _index, const float _rgba[4]);
+void _bgfx_set_palette_color( int _index, int _rgba )
+{
+	bgfx::setPaletteColor( _index, _rgba );
+}
 void _bgfx_set_palette_color( int _index, Array<float> _rgba )
 {
 	bgfx_set_palette_color( _index, &_rgba[0] );
@@ -2334,17 +2343,21 @@ void _bgfx_set_uniform( uint16_t _handle, int _value, int _num )
 {
 	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, &_value, _num );
 }
-void _bgfx_set_uniform( uint16_t _handle, Array<int> _value, int _num )
+void _bgfx_set_uniform( uint16_t _handle, Array<int> _values, int _num )
 {
-	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, &_value[0], _num );
+	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, &_values[0], _num );
 }
 void _bgfx_set_uniform( uint16_t _handle, float _value, int _num )
 {
 	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, &_value, _num );
 }
-void _bgfx_set_uniform( uint16_t _handle, Array<float> _value, int _num )
+void _bgfx_set_uniform( uint16_t _handle, Array<float> _values, int _num )
 {
-	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, &_value[0], _num );
+	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, &_values[0], _num );
+}
+void _bgfx_set_uniform( uint16_t _handle, BBDataBuffer * _values, int _num )
+{
+	bgfx_set_uniform( *(bgfx_uniform_handle_t *)&_handle, _values->ReadPointer(0), _num );
 }
 
 // Function bgfxSetIndexBuffer:Void( _handle:BgfxIndexBufferHandle )="_bgfx_set_index_buffer"

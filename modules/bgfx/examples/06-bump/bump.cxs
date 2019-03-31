@@ -152,7 +152,7 @@ Class BumpExample Extends App
 		address = 0
 		length  = s_cubeVertices.Length()
 
-		sCubeVerticesBuffer = New DataBuffer( length * 7 * 4 )
+		sCubeVerticesBuffer = New DataBuffer( length * 6 * 4 )
 		For Local i:Int = 0 Until length
 
 			sCubeVerticesBuffer.PokeFloat( address, s_cubeVertices[i].m_x ); address += 4
@@ -359,10 +359,10 @@ Class BumpExample Extends App
 
 					' Set render states.
 					bgfxUtilsClear64Bit(state)
-'  					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_RGB)
-					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_R)
-					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_G)
-					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_B)
+					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_RGB)
+'					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_R)
+'					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_G)
+'					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_B)
 					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_A)
 					bgfxUtilsSet64Bit(state, BGFX_STATE_WRITE_Z)
 					bgfxUtilsSet64Bit(state, BGFX_STATE_DEPTH_TEST_LESS)

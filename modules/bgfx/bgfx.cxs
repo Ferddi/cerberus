@@ -19,6 +19,7 @@ Import defines
 ' constants
 '-------------------------------------------------------------------------------
 
+Const UINT8_MAX  :Int = $FF
 Const UINT16_MAX :Int = $FFFF
 Const INT32_MAX  :Int = 2147483647
 
@@ -528,10 +529,11 @@ End
 '  End
 
 Class BgfxCaps="bgfx_caps_object"
-	Method GetSupported:Void(supported:Int[])
+	Method GetSupported:Void(supported:Int[]) ' Field supported :Int[2]
 	Method GetHomogeneousDepth:Bool()
 	Method GetFormats:Void(formats:Int[])
 	Method GetOriginBottomLeft:Bool()
+	Method GetLimitsMaxFBAttachments:Int()
 End
 
 '  Class BgfxCallbackInterface="bgfx_callback_interface_object"
@@ -902,7 +904,7 @@ Function bgfxGetResult:Int( _handle:Int, _result:Int[] )="_bgfx_get_result"
 Function bgfxDestroyOcclusionQuery:Void( _handle:Int )="_bgfx_destroy_occlusion_query"
 
 '  void bgfx_set_palette_color(int _index, const float _rgba[4]);
-Function bgfxSetPaletteColor:Void( _index:Int, _rgba:Int )="bgfx::setPaletteColor"
+Function bgfxSetPaletteColor:Void( _index:Int, _rgba:Int )="_bgfx_set_palette_color"
 Function bgfxSetPaletteColor:Void( _index:Int, _r:Float, _g:Float, _b:Float, _a:Float )="bgfx::setPaletteColor"
 Function bgfxSetPaletteColor:Void( _index:Int, _rgba:Float[] )="_bgfx_set_palette_color"
 
@@ -979,9 +981,10 @@ Function bgfxSetTransformCached:Void( _cache:Int, _num:Int=1 )="bgfx_set_transfo
 
 '  void bgfx_set_uniform(bgfx_uniform_handle_object _handle, const void* _value, int _num);
 Function bgfxSetUniform:Void( _handle:Int, _value:Int, _num:Int=1 )="_bgfx_set_uniform"
-Function bgfxSetUniform:Void( _handle:Int, _value:Int[], _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _values:Int[], _num:Int=1 )="_bgfx_set_uniform"
 Function bgfxSetUniform:Void( _handle:Int, _value:Float, _num:Int=1 )="_bgfx_set_uniform"
-Function bgfxSetUniform:Void( _handle:Int, _value:Float[], _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _values:Float[], _num:Int=1 )="_bgfx_set_uniform"
+Function bgfxSetUniform:Void( _handle:Int, _values:DataBuffer, _num:Int=1 )="_bgfx_set_uniform"
 
 '  void bgfx_set_index_buffer(bgfx_index_buffer_handle_object _handle, int _firstIndex, int _numIndices);
 Function bgfxSetIndexBuffer:Void( _handle:Int )="_bgfx_set_index_buffer"

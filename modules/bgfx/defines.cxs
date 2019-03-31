@@ -464,6 +464,21 @@ Global BGFX_CAPS_VERTEX_ATTRIB_HALF       :Int[] = [ $00000000, $00800000 ]  '!<
 Global BGFX_CAPS_VERTEX_ATTRIB_UINT10     :Int[] = [ $00000000, $01000000 ]  '!< Vertex attribute 10_10_10_2 is supported.
 Global BGFX_CAPS_VERTEX_ID                :Int[] = [ $00000000, $02000000 ]  '!< Rendering with VertexID only is supported.
 
+Function bgfxCapsIsComputeSupported:Bool( supported:Int[] )
+	Return ( supported[ 0 ] & BGFX_CAPS_COMPUTE[ 0 ] ) = BGFX_CAPS_COMPUTE[ 0 ] And 
+	        ( supported[ 1 ] & BGFX_CAPS_COMPUTE[ 1 ] ) = BGFX_CAPS_COMPUTE[ 1 ]
+End
+
+Function bgfxCapsIsDrawIndirectSupported:Bool( supported:Int[] )
+	Return ( supported[ 0 ] & BGFX_CAPS_DRAW_INDIRECT[ 0 ] ) = BGFX_CAPS_DRAW_INDIRECT[ 0 ] And 
+	        ( supported[ 1 ] & BGFX_CAPS_DRAW_INDIRECT[ 1 ] ) = BGFX_CAPS_DRAW_INDIRECT[ 1 ]
+End
+
+Function bgfxCapsIsOcclusionQuerySupported:Bool( supported:Int[] )
+	Return ( supported[ 0 ] & BGFX_CAPS_OCCLUSION_QUERY[ 0 ] ) = BGFX_CAPS_OCCLUSION_QUERY[ 0 ] And 
+	        ( supported[ 1 ] & BGFX_CAPS_OCCLUSION_QUERY[ 1 ] ) = BGFX_CAPS_OCCLUSION_QUERY[ 1 ]
+End
+
 '/
 Const BGFX_CAPS_FORMAT_TEXTURE_NONE             :Int = $0000  '!< Texture format is not supported.
 Const BGFX_CAPS_FORMAT_TEXTURE_2D               :Int = $0001  '!< Texture format is supported.
