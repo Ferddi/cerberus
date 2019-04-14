@@ -1140,6 +1140,11 @@ void _bx_mtx_rotate_y( Array<float> _result, float _ay )
 	bx::mtxRotateY( &_result[0], _ay );
 }
 
+void _bx_mtx_rotate_z( Array<float> _result, float _az )
+{
+	bx::mtxRotateZ( &_result[0], _az );
+}
+
 
 
 

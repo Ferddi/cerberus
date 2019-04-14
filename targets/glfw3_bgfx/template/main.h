@@ -82,3 +82,26 @@
 //
 #define STB_VORBIS_HEADER_ONLY
 #include <stb_vorbis.c>
+
+// freetype
+#if BX_COMPILER_MSVC
+#	define generic GenericFromFreeType // WinRT language extensions see "generic" as a keyword... this is stupid
+#endif // BX_COMPILER_MSVC
+
+BX_PRAGMA_DIAGNOSTIC_PUSH();
+BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4245) // error C4245: '=' : conversion from 'int' to 'FT_UInt', signed/unsigned mismatch
+BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4611) // warning C4611 : interaction between '_setjmp' and C++ object destruction is non - portable
+#if BX_COMPILER_MSVC || BX_COMPILER_GCC >= 40300
+#pragma push_macro("interface")
+#endif
+#undef interface
+#include <freetype.h>
+#if BX_COMPILER_MSVC || BX_COMPILER_GCC >= 40300
+#pragma pop_macro("interface")
+#endif
+BX_PRAGMA_DIAGNOSTIC_POP();
+
+// sdf
+#define SDF_IMPLEMENTATION
+#include <sdf.h>
+

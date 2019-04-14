@@ -1,0 +1,187 @@
+
+Import brl.databuffer
+
+Import "native/freetype.cpp"
+
+Const FT_Err_Unknown_File_Format:Int = $02 ' FT_ERRORDEF_( Unknown_File_Format,                         0x02, "unknown file format" )
+
+Const FT_ENCODING_UNICODE:Int = $756e6963 ' FT_ENC_TAG( FT_ENCODING_UNICODE,   'u', 'n', 'i', 'c' )
+
+Const FT_FACE_FLAG_SCALABLE:Int = 1 Shl 0 ' #define FT_FACE_FLAG_SCALABLE          ( 1L <<  0 )
+
+Const FT_LOAD_DEFAULT                      :Int = $0
+Const FT_LOAD_NO_SCALE                     :Int = 1 Shl 0
+Const FT_LOAD_NO_HINTING                   :Int = 1 Shl 1
+Const FT_LOAD_RENDER                       :Int = 1 Shl 2
+Const FT_LOAD_NO_BITMAP                    :Int = 1 Shl 3
+Const FT_LOAD_VERTICAL_LAYOUT              :Int = 1 Shl 4
+Const FT_LOAD_FORCE_AUTOHINT               :Int = 1 Shl 5
+Const FT_LOAD_CROP_BITMAP                  :Int = 1 Shl 6
+Const FT_LOAD_PEDANTIC                     :Int = 1 Shl 7
+Const FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH  :Int = 1 Shl 9
+Const FT_LOAD_NO_RECURSE                   :Int = 1 Shl 10
+Const FT_LOAD_IGNORE_TRANSFORM             :Int = 1 Shl 11
+Const FT_LOAD_MONOCHROME                   :Int = 1 Shl 12
+Const FT_LOAD_LINEAR_DESIGN                :Int = 1 Shl 13
+Const FT_LOAD_NO_AUTOHINT                  :Int = 1 Shl 15
+' used internally only by certain font drivers!
+Const FT_LOAD_ADVANCE_ONLY                 :Int = 1 Shl 8
+Const FT_LOAD_SBITS_ONLY                   :Int = 1 Shl 14
+
+'    typedef enum  FT_Render_Mode_
+'    {
+Const FT_RENDER_MODE_NORMAL :Int = 0
+Const FT_RENDER_MODE_LIGHT  :Int = 1
+Const FT_RENDER_MODE_MONO   :Int = 2
+Const FT_RENDER_MODE_LCD    :Int = 3
+Const FT_RENDER_MODE_LCD_V  :Int = 4
+Const FT_RENDER_MODE_MAX    :Int = 5
+'    } FT_Render_Mode;
+
+
+'  #define FT_IS_SCALABLE( face ) \
+'            ( face->face_flags & FT_FACE_FLAG_SCALABLE )
+Function FT_IS_SCALABLE:Bool( face:FT_Face )
+	Return ( face.FaceFlags() & FT_FACE_FLAG_SCALABLE ) <> 0
+End
+
+
+Extern
+
+Class FT_Library="ft_library_object"
+
+'  	Method Length  :Int() Property
+'  
+'  	Method PokeByte  :Void( addr:Int, value:Int )
+'  	Method PokeShort :Void( addr:Int, value:Int )
+'  	Method PokeInt   :Void( addr:Int, value:Int )
+'  	Method PokeFloat :Void( addr:Int, value:Float )
+'  
+'  	Method PeekByte  :Int( addr:Int )
+'  	Method PeekShort :Int( addr:Int )
+'  	Method PeekInt   :Int( addr:Int )
+'  	Method PeekFloat :Float( addr:Int )
+'  
+'  	Method PokeS8  :Void( addr:Int,value:Int )
+'  	Method PokeS16 :Void( addr:Int,value:Int )
+'  	Method PokeS32 :Void( addr:Int,value:Int )
+'  	Method PokeF16 :Void( addr:Int,value:Float )
+'  	Method PokeF32 :Void( addr:Int,value:Float )
+
+'	Method PeekS8  :Int( addr:Int )
+'	Method PeekS16 :Int( addr:Int )
+'	Method PeekS32 :Int( addr:Int )
+'	Method PeekF16 :Float( addr:Int )
+'	Method PeekF32 :Float( addr:Int )
+End
+
+Class FT_Face="ft_face_object"
+	Method FaceFlags:Int()
+	Method UnderlinePosition:Int()
+	Method UnderlineThickness:Int()
+	Method Size:Void( size:FT_Size )
+	Method GlyphSlot:Void( glyphSlot:FT_GlyphSlot )
+End
+
+Class FT_Size="ft_size_object"
+	Method Metrics:Void( metrics:FT_Size_Metrics )
+End
+
+Class FT_Size_Metrics="ft_size_metrics_object"
+	Method XPpem      :Int()
+	Method YPpem      :Int()
+	Method XScale     :Int()
+	Method YScale     :Int()
+	Method Ascender   :Int()
+	Method Descender  :Int()
+	Method Height     :Int()
+	Method MaxAdvance :Int()
+End
+
+Class FT_GlyphSlot="ft_glyphslot_object"
+	Method AdvanceX :Int()
+	Method AdvanceY :Int()
+End
+
+Class FT_Glyph="ft_glyph_object"
+	Method BitmapGlyph:Void( bitmapGlyph:FT_BitmapGlyph )
+End
+
+Class FT_Vector="ft_vector_object"
+End
+
+Class FT_BitmapGlyph="ft_bitmapglyph_object"
+
+'    typedef struct  FT_BitmapGlyphRec_
+'    {
+'      FT_GlyphRec  root;
+'      FT_Int       left;
+'      FT_Int       top;
+'      FT_Bitmap    bitmap;
+'    } FT_BitmapGlyphRec;
+
+	Method Glyph  :Void( glyph:FT_Glyph )
+	Method Left   :Int()
+	Method Top    :Int()
+	Method Bitmap :Void( bitmap:FT_Bitmap )
+End
+
+Class FT_Bitmap="ft_bitmap_object"
+
+'    typedef struct  FT_Bitmap_
+'    {
+'      int             rows;
+'      int             width;
+'      int             pitch;
+'      unsigned char*  buffer;
+'      short           num_grays;
+'      char            pixel_mode;
+'      char            palette_mode;
+'      void*           palette;
+'    } FT_Bitmap;
+
+	Method Rows      :Int()
+	Method Width     :Int()
+	Method Pitch     :Int()
+
+	Method PokeByte  :Void( addr:Int, value:Int )
+	Method PokeShort :Void( addr:Int, value:Int )
+	Method PokeInt   :Void( addr:Int, value:Int )
+	Method PokeFloat :Void( addr:Int, value:Float )
+
+	Method PeekByte  :Int( addr:Int )
+	Method PeekShort :Int( addr:Int )
+	Method PeekInt   :Int( addr:Int )
+	Method PeekFloat :Float( addr:Int )
+
+	Method NumGrays  :Int()
+	Method PixelMode :Int()
+'  	Method PaletteMode:Int()
+'  	Method PokePalette:Void( addr:Int, rgba:Int )
+'  	Method PeekPalette:Int( addr:Int )
+End
+
+'  '  const bgfx_memory_object* bgfx_make_ref(const void* _data, int _size);
+'  Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:DataBuffer )="_bgfx_make_ref"
+'  Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:DataBuffer, _size:Int )="_bgfx_make_ref"
+'  Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:DataBuffer, _index:Int, _size:Int )="_bgfx_make_ref"
+
+Function FT_Init_FreeType:Int( _library:FT_Library )="_ft_init_freetype"
+Function FT_New_Memory_Face:Int( _library:FT_Library, _fileBase:DataBuffer, _fileSize:Int, _faceIndex:Int, _face:FT_Face )="_ft_new_memory_face"
+Function FT_Select_Charmap:Int( _face:FT_Face, _encoding:Int )="_ft_select_charmap"
+Function FT_Set_Pixel_Sizes:Int( _face:FT_Face, _pixelWidth:Int, _pixelHeight:Int )="_ft_set_pixel_sizes"
+Function FT_Done_Face:Int( _face:FT_Face )="_ft_done_face"
+Function FT_Done_FreeType:Int( _library:FT_Library )="_ft_done_freetype"
+Function FT_MulFix:Int( _a:Int, _b:Int )="_ft_mulfix"
+Function FT_Get_Char_Index:Int( _face:FT_Face, _charcode:Int )="_ft_get_char_index"
+Function FT_Load_Glyph:Int( _face:FT_Face, _glyphIndex:Int, _loadFlags:Int )="_ft_load_glyph"
+Function FT_Get_Glyph:Int( _glyphSlot:FT_GlyphSlot, _glyph:FT_Glyph )="_ft_get_glyph"
+Function FT_Glyph_To_Bitmap:Int( _glyph:FT_Glyph, _renderMode:Int, _destroy:Int )="_ft_glyph_to_bitmap"
+Function FT_Glyph_To_Bitmap:Int( _glyph:FT_Glyph, _renderMode:Int, _origin:FT_Vector, _destroy:Int )="_ft_glyph_to_bitmap"
+Function FT_Done_Glyph:Void( _glyph:FT_Glyph )="_ft_done_glyph"
+
+' sdfBuild is defined in sdf.h, not freetype.h
+Function sdfBuild:Int( out:DataBuffer, outstride:Int, maxdist:Float, img:DataBuffer, width:Int, height:Int, stride:Int )="_sdf_build"
+
+
+

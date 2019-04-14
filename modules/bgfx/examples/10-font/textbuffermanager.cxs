@@ -1,0 +1,990 @@
+
+Import fontmanager
+Import utf8
+
+' BGFX_HANDLE(TextBufferHandle);
+
+Const MAX_TEXT_BUFFER_COUNT:Int = 64
+
+' type of vertex and index buffer to use with a TextBuffer
+Class BufferType
+	Const StaticBuffer    :Int = 0
+	Const DynamicBuffer   :Int = 1
+	Const TransientBuffer :Int = 2
+End
+
+' special style effect (can be combined)
+'  Class TextStyleFlags
+	Const STYLE_NORMAL         :Int = 0
+	Const STYLE_OVERLINE       :Int = 1
+	Const STYLE_UNDERLINE      :Int = 1 Shl 1
+	Const STYLE_STRIKE_THROUGH :Int = 1 Shl 2
+	Const STYLE_BACKGROUND     :Int = 1 Shl 3
+'  End
+
+Class TextRectangle
+	Field width  :Float
+	Field height :Float
+End
+
+Const MAX_BUFFERED_CHARACTERS:Int = (8192 - 5)
+
+Class TextVertex
+
+	Const x:Int = 0
+	Const y:Int = 4
+
+	Const u:Int = 8
+	Const v:Int = 10
+	Const w:Int = 12
+	Const t:Int = 14
+
+	Const rgba:Int = 16
+
+	Const size:Int = 20
+End
+
+Class TextBuffer
+
+	Field m_styleFlags         :Int
+
+	' color states
+	Field m_textColor          :Int
+
+	Field m_backgroundColor    :Int
+	Field m_overlineColor      :Int
+	Field m_underlineColor     :Int
+	Field m_strikeThroughColor :Int
+
+	'position states
+	Field m_penX               :Float
+	Field m_penY               :Float
+
+	Field m_originX            :Float
+	Field m_originY            :Float
+
+	Field m_lineAscender       :Float
+	Field m_lineDescender      :Float
+	Field m_lineGap            :Float
+
+	Field m_rectangle          := New TextRectangle()
+	Field m_fontManager        :FontManager
+
+'  	Field m_vertexBuffer       :TextVertex[]
+	Field m_vertexBuffer       :DataBuffer ' TextVertex* m_vertexBuffer;
+	Field m_indexBuffer        :DataBuffer ' uint16_t* m_indexBuffer;
+	Field m_styleBuffer        :DataBuffer ' uint8_t* m_styleBuffer;
+
+	Field m_indexCount         :Int
+	Field m_lineStartIndex     :Int
+	Field m_vertexCount        :Int
+
+	Method SetVertex:Void( _i:Int, _x:Float, _y:Float, _rgba:Int, _style:Int=STYLE_NORMAL )
+
+		Local address:Int = _i * TextVertex.size
+
+		m_vertexBuffer.PokeFloat( address + TextVertex.x, _x )
+		m_vertexBuffer.PokeFloat( address + TextVertex.y, _y )
+		m_vertexBuffer.PokeInt( address + TextVertex.rgba, _rgba )
+		m_styleBuffer.PokeByte( _i, _style )
+	End
+
+	' TextBuffer is bound to a fontManager for glyph retrieval
+	' @remark the ownership of the manager is not taken
+	Method New()
+		Init( Null )
+	End
+
+'  	Method New( _fontManager:FontManager )
+'  		Init( _fontManager )
+'  	End
+
+	Method Init:Void( _fontManager:FontManager )
+		Self.m_styleFlags         = STYLE_NORMAL
+		Self.m_textColor          = $ffffffff
+		Self.m_backgroundColor    = $ffffffff
+		Self.m_overlineColor      = $ffffffff
+		Self.m_underlineColor     = $ffffffff
+		Self.m_strikeThroughColor = $ffffffff
+		Self.m_penX               = 0
+		Self.m_penY               = 0
+		Self.m_originX            = 0
+		Self.m_originY            = 0
+		Self.m_lineAscender       = 0
+		Self.m_lineDescender      = 0
+		Self.m_lineGap            = 0
+		Self.m_fontManager        = _fontManager
+'  		Self.m_vertexBuffer       = New TextVertex[ MAX_BUFFERED_CHARACTERS * 4 ]
+		Self.m_vertexBuffer       = New DataBuffer( TextVertex.size * MAX_BUFFERED_CHARACTERS * 4 ) ' TextVertex
+		Self.m_indexBuffer        = New DataBuffer( 2 * MAX_BUFFERED_CHARACTERS * 6 ) ' uint16_t
+		Self.m_styleBuffer        = New DataBuffer( 1 * MAX_BUFFERED_CHARACTERS * 4 ) ' uint8_t
+		Self.m_indexCount         = 0
+		Self.m_lineStartIndex     = 0
+		Self.m_vertexCount        = 0
+		Self.m_rectangle.width    = 0
+		Self.m_rectangle.height   = 0
+	End
+
+	Method Destroy:Void()
+		' delete [] m_vertexBuffer;
+		' delete [] m_indexBuffer;
+		' delete [] m_styleBuffer;
+	End
+
+	Method SetStyle:Void( _flags:Int=STYLE_NORMAL )
+		m_styleFlags = _flags
+	End
+
+	Method SetTextColor:Void( _rgba:Int=$000000FF )
+		m_textColor = ToABGR( _rgba )
+	End
+
+	Method SetBackgroundColor:Void( _rgba:Int = $000000FF )
+		m_backgroundColor = ToABGR( _rgba )
+	End
+
+	Method SetOverlineColor:Void( _rgba:Int = $000000FF )
+		m_overlineColor = ToABGR( _rgba )
+	End
+
+	Method SetUnderlineColor:Void( _rgba:Int = $000000FF )
+		m_underlineColor = ToABGR( _rgba )
+	End
+
+	Method SetStrikeThroughColor:Void( _rgba:Int = $000000FF )
+		m_strikeThroughColor = ToABGR(_rgba)
+	End
+
+	Method SetPenPosition( _x:Float, _y:Float )
+		m_penX = _x
+		m_penY = _y
+	End
+
+	' Append an ASCII/utf-8 string to the buffer using current pen
+	' position and color.
+	Method AppendText:Void( _fontHandle:Int, _string:String )
+
+		If m_vertexCount = 0 Then
+			m_originX       = m_penX
+			m_originY       = m_penY
+			m_lineDescender = 0
+			m_lineAscender  = 0
+			m_lineGap       = 0
+		Endif
+
+'		Local codepoint :Int = 0
+'		Local state     :Int = 0
+
+		' DebugStop()
+
+		Local s:String
+
+		For Local ii:Int = 0 Until _string.Length()
+
+'  			If ii = 46178 Then ' codepoint = 0 Then
+'  				DebugStop()
+'  			Endif
+
+'			Local ch:Int = _string[ ii ]
+'  			Print "ch=" + ch + " " + String.FromChar( ch )
+
+'			If ch = 233 Then ch = 195
+
+'			Utf8Decode( state, codepoint, ch ) ' _string[ ii ] )
+'
+'			state     = _utf8DecodeState
+'			codepoint = _utf8DecodeCodepoint
+
+'  			If ii < 1000 Then
+'  				Print 
+'  			Endif
+
+			' s += "ii=" + ii + " _string[ii]=" + ch + " " + String.FromChar(ch) + " state=" + state + " codepoint=" + codepoint + "~n"
+
+'			If state = UTF8_ACCEPT  Then
+				AppendGlyph( _fontHandle, _string[ ii ] )
+'			Endif
+		Next
+
+		' Print s
+
+'		If Not (state = UTF8_ACCEPT) Then Print "The string is not well-formed"
+	End
+
+	' Append a wide char unicode string to the buffer using current pen
+	' position and color.
+'  	Method AppendText:Void( _fontHandle:FontHandle, striconst wchar_t* _string, const wchar_t* _end = NULL);
+'  void TextBuffer::appendText(FontHandle _fontHandle, const wchar_t* _string, const wchar_t* _end)
+'  {
+'  		if (m_vertexCount == 0)
+'  		{
+'  			m_originX = m_penX;
+'  			m_originY = m_penY;
+'  			m_lineDescender = 0;
+'  			m_lineAscender = 0;
+'  			m_lineGap = 0;
+'  		}
+'  
+'  		if (_end == NULL)
+'  		{
+'  			_end = _string + wcslen(_string);
+'  		}
+'  		BX_CHECK(_end >= _string);
+'  
+'  		for (const wchar_t* _current = _string; _current < _end; ++_current)
+'  		{
+'  			uint32_t _codePoint = *_current;
+'  			appendGlyph(_fontHandle, _codePoint);
+'  		}
+'  }
+
+	' Append a whole face of the atlas cube, mostly used for debugging
+	' and visualizing atlas.
+	Method AppendAtlasFace:Void( _faceIndex:Int )
+
+		If m_vertexCount / 4 >= MAX_BUFFERED_CHARACTERS Then
+			Return
+		Endif
+
+		Local x0:Float = m_penX
+		Local y0:Float = m_penY
+		Local x1:Float = x0 + Float( m_fontManager.GetAtlas().GetTextureSize() )
+		Local y1:Float = y0 + Float( m_fontManager.GetAtlas().GetTextureSize() )
+
+		m_fontManager.GetAtlas().PackFaceLayerUV( _faceIndex, m_vertexBuffer, 
+			TextVertex.size * m_vertexCount + TextVertex.u, TextVertex.size )
+
+		SetVertex( m_vertexCount + 0, x0, y0, m_backgroundColor )
+		SetVertex( m_vertexCount + 1, x0, y1, m_backgroundColor )
+		SetVertex( m_vertexCount + 2, x1, y1, m_backgroundColor )
+		SetVertex( m_vertexCount + 3, x1, y0, m_backgroundColor )
+
+		Local ibAddr:Int = m_indexCount * 2
+
+		m_indexBuffer.PokeShort( ibAddr, vertexCount + 0 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, vertexCount + 1 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, vertexCount + 2 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, vertexCount + 0 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, vertexCount + 2 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, vertexCount + 3 ) ; ibAddr += 2
+
+'		m_indexBuffer[ m_indexCount + 0 ] = m_vertexCount + 0
+'		m_indexBuffer[ m_indexCount + 1 ] = m_vertexCount + 1
+'		m_indexBuffer[ m_indexCount + 2 ] = m_vertexCount + 2
+'		m_indexBuffer[ m_indexCount + 3 ] = m_vertexCount + 0
+'		m_indexBuffer[ m_indexCount + 4 ] = m_vertexCount + 2
+'		m_indexBuffer[ m_indexCount + 5 ] = m_vertexCount + 3
+
+		m_vertexCount += 4
+		m_indexCount  += 6
+	End
+
+	' Clear the text buffer and reset its state (pen/color)
+	Method ClearTextBuffer:Void()
+		m_penX             = 0
+		m_penY             = 0
+		m_originX          = 0
+		m_originY          = 0
+		m_vertexCount      = 0
+		m_indexCount       = 0
+		m_lineStartIndex   = 0
+		m_lineAscender     = 0
+		m_lineDescender    = 0
+		m_lineGap          = 0
+		m_rectangle.width  = 0
+		m_rectangle.height = 0
+	End
+
+	' Get pointer to the vertex buffer to submit it to the graphic card.
+	Method GetVertexBuffer:DataBuffer()
+		Return m_vertexBuffer
+	End
+
+	' Number of vertex in the vertex buffer.
+	Method GetVertexCount:Int()
+		Return m_vertexCount
+	End
+
+	' Size in bytes of a vertex.
+	Method GetVertexSize:Int()
+		Return TextVertex.size
+	End
+
+	' get a pointer to the index buffer to submit it to the graphic
+	Method GetIndexBuffer:DataBuffer()
+		Return m_indexBuffer
+	End
+
+	' number of index in the index buffer
+	Method GetIndexCount:Int()
+		Return m_indexCount
+	End
+
+	' Size in bytes of an index.
+	Method GetIndexSize:Int()
+		Return 2 ' sizeof(uint16_t);
+	End
+
+	Method GetTextColor:Int()
+		Return ToABGR( m_textColor )
+	End
+
+	Method GetRectangle:TextRectangle()
+		Return m_rectangle
+	End
+
+' Private
+	Const CHAR_TAB      :Int =  9 ' ~t
+	Const CHAR_NEW_LINE :Int = 10 ' ~n
+	Const CHAR_SPACE    :Int = 32
+
+	Method AppendGlyph:Void( _handle:Int, _codePoint:Int )
+	' void TextBuffer::appendGlyph(FontHandle _handle, CodePoint _codePoint)
+
+		If _codePoint = CHAR_TAB Then
+			For Local ii:Int = 0 Until 4
+				AppendGlyph( _handle, CHAR_SPACE ) ' 32 = ascii space
+			Next
+			Return
+		Endif
+
+		Local glyph:GlyphInfo = m_fontManager.GetGlyphInfo( _handle, _codePoint )
+		If Not glyph Then
+			Print "Glyph not found (font handle " + _handle + ", code point " + _codePoint + ")"
+			Return
+		Endif
+
+		If m_vertexCount / 4 >= MAX_BUFFERED_CHARACTERS Then
+			Return
+		Endif
+
+		Local font:FontInfo = m_fontManager.GetFontInfo( _handle )
+
+		If _codePoint = CHAR_NEW_LINE Then
+			m_penX            = m_originX
+			m_penY           += m_lineGap + m_lineAscender - m_lineDescender
+			m_lineGap         = font.lineGap
+			m_lineDescender   = font.descender
+			m_lineAscender    = font.ascender
+			m_lineStartIndex  = m_vertexCount
+			Return
+		Endif
+
+		'is there a change of font size that require the text on the left to be centered again ?
+		If font.ascender > m_lineAscender Or font.descender < m_lineDescender Then
+
+			If font.descender < m_lineDescender Then
+				m_lineDescender = font.descender
+				m_lineGap       = font.lineGap
+			Endif
+
+			Local txtDecals:Float = ( font.ascender - m_lineAscender )
+
+			m_lineAscender = font.ascender
+			m_lineGap      = font.lineGap
+
+			VerticalCenterLastLine( txtDecals, (m_penY - m_lineAscender), (m_penY + m_lineAscender - m_lineDescender + m_lineGap) )
+		Endif
+
+		Local kerning:Float = 0 * font.scale
+		m_penX += kerning
+
+		Local blackGlyph := m_fontManager.GetBlackGlyph()
+		Local atlas      := m_fontManager.GetCubeAtlas()
+
+		If m_styleFlags & STYLE_BACKGROUND And m_backgroundColor & $ff000000 Then
+
+			Local x0:Float = m_penX - kerning
+			Local y0:Float = m_penY
+			Local x1:Float = Float( x0 ) + glyph.advance_x
+			Local y1:Float = m_penY + m_lineAscender - m_lineDescender + m_lineGap
+
+			atlas.PackUV( blackGlyph.regionIndex, m_vertexBuffer, TextVertex.size * m_vertexCount + TextVertex.u, TextVertex.size )
+
+			Local vertexCount:Int = m_vertexCount;
+			SetVertex( vertexCount + 0, x0, y0, m_backgroundColor, STYLE_BACKGROUND )
+			SetVertex( vertexCount + 1, x0, y1, m_backgroundColor, STYLE_BACKGROUND )
+			SetVertex( vertexCount + 2, x1, y1, m_backgroundColor, STYLE_BACKGROUND )
+			SetVertex( vertexCount + 3, x1, y0, m_backgroundColor, STYLE_BACKGROUND )
+
+			Local ibAddr:Int = m_indexCount * 2
+
+			m_indexBuffer.PokeShort( ibAddr, vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, vertexCount + 1 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, vertexCount + 3 ) ; ibAddr += 2
+
+			m_vertexCount += 4
+			m_indexCount  += 6
+		Endif
+
+		If m_styleFlags & STYLE_UNDERLINE And m_underlineColor & $ff000000 Then
+
+			Local x0:Float = m_penX - kerning
+			Local y0:Float = m_penY + m_lineAscender - m_lineDescender * 0.5
+			Local x1:Float = Float( x0 ) + glyph.advance_x
+			Local y1:Float = y0 + font.underlineThickness
+
+			atlas.PackUV( blackGlyph.regionIndex, m_vertexBuffer, TextVertex.size * m_vertexCount + TextVertex.u, TextVertex.size )
+
+			SetVertex( m_vertexCount + 0, x0, y0, m_underlineColor, STYLE_UNDERLINE )
+			SetVertex( m_vertexCount + 1, x0, y1, m_underlineColor, STYLE_UNDERLINE )
+			SetVertex( m_vertexCount + 2, x1, y1, m_underlineColor, STYLE_UNDERLINE )
+			SetVertex( m_vertexCount + 3, x1, y0, m_underlineColor, STYLE_UNDERLINE )
+
+			Local ibAddr:Int = m_indexCount * 2
+
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 1 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 3 ) ; ibAddr += 2
+
+			m_vertexCount += 4
+			m_indexCount  += 6
+		Endif
+
+		If m_styleFlags & STYLE_OVERLINE And m_overlineColor & $ff000000 Then
+
+			Local x0:Float = m_penX - kerning
+			Local y0:Float = m_penY
+			Local x1:Float = Float( x0 ) + glyph.advance_x
+			Local y1:Float = y0 + font.underlineThickness
+
+			m_fontManager.GetCubeAtlas().PackUV( blackGlyph.regionIndex, m_vertexBuffer, 
+				TextVertex.size * m_vertexCount + TextVertex.u, TextVertex.size )
+
+			SetVertex( m_vertexCount + 0, x0, y0, m_overlineColor, STYLE_OVERLINE )
+			SetVertex( m_vertexCount + 1, x0, y1, m_overlineColor, STYLE_OVERLINE )
+			SetVertex( m_vertexCount + 2, x1, y1, m_overlineColor, STYLE_OVERLINE )
+			SetVertex( m_vertexCount + 3, x1, y0, m_overlineColor, STYLE_OVERLINE )
+
+			Local ibAddr:Int = m_indexCount * 2
+
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 1 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 3 ) ; ibAddr += 2
+
+			m_vertexCount += 4
+			m_indexCount  += 6
+		End
+
+		If m_styleFlags & STYLE_STRIKE_THROUGH And m_strikeThroughColor & $ff000000
+
+			Local x0:Float = m_penX - kerning
+			Local y0:Float = m_penY + 0.666667 * font.ascender
+			Local x1:Float = Float( x0 ) + glyph.advance_x
+			Local y1:Float = y0 + font.underlineThickness
+
+			atlas.PackUV( blackGlyph.regionIndex, m_vertexBuffer,
+				TextVertex.size * m_vertexCount + TextVertex.u, TextVertex.size )
+
+			SetVertex( m_vertexCount + 0, x0, y0, m_strikeThroughColor, STYLE_STRIKE_THROUGH )
+			SetVertex( m_vertexCount + 1, x0, y1, m_strikeThroughColor, STYLE_STRIKE_THROUGH )
+			SetVertex( m_vertexCount + 2, x1, y1, m_strikeThroughColor, STYLE_STRIKE_THROUGH )
+			SetVertex( m_vertexCount + 3, x1, y0, m_strikeThroughColor, STYLE_STRIKE_THROUGH )
+
+			Local ibAddr:Int = m_indexCount * 2
+
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 1 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+			m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 3 ) ; ibAddr += 2
+
+			m_vertexCount += 4
+			m_indexCount  += 6
+		Endif
+
+		Local x0:Float = m_penX + glyph.offset_x
+		Local y0:Float = m_penY + m_lineAscender + glyph.offset_y
+		Local x1:Float = x0 + glyph.width
+		Local y1:Float = y0 + glyph.height
+
+		atlas.PackUV( glyph.regionIndex, m_vertexBuffer, TextVertex.size * m_vertexCount + TextVertex.u, TextVertex.size )
+
+		SetVertex( m_vertexCount + 0, x0, y0, m_textColor )
+		SetVertex( m_vertexCount + 1, x0, y1, m_textColor )
+		SetVertex( m_vertexCount + 2, x1, y1, m_textColor )
+		SetVertex( m_vertexCount + 3, x1, y0, m_textColor )
+
+		Local ibAddr:Int = m_indexCount * 2
+
+		m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 1 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 0 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 2 ) ; ibAddr += 2
+		m_indexBuffer.PokeShort( ibAddr, m_vertexCount + 3 ) ; ibAddr += 2
+
+		m_vertexCount += 4
+		m_indexCount  += 6
+
+		m_penX += glyph.advance_x
+		If m_penX > m_rectangle.width Then
+			m_rectangle.width = m_penX
+		Endif
+
+		If (m_penY +m_lineAscender - m_lineDescender+m_lineGap) > m_rectangle.height Then
+			m_rectangle.height = m_penY + m_lineAscender - m_lineDescender + m_lineGap
+		Endif
+	End
+
+	Method VerticalCenterLastLine:Void( _txtDecalY:Float, _top:Float, _bottom:Float )
+	' void TextBuffer::verticalCenterLastLine(float _dy, float _top, float _bottom)
+
+		For Local ii:Int = m_lineStartIndex Until m_vertexCount Step 4
+
+			Local vbAddr:Int = ii * TextVertex.size
+
+			If m_styleBuffer.PeekByte( ii ) = STYLE_BACKGROUND Then
+
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, _top    ) ; vbAddr += TextVertex.size
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, _bottom ) ; vbAddr += TextVertex.size
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, _bottom ) ; vbAddr += TextVertex.size
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, _top    ) ; vbAddr += TextVertex.size
+			Else
+
+				Local temp:Float
+
+				temp = m_vertexBuffer.PeekFloat( vbAddr + TextVertex.y )
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, temp + _txtDecalY )
+				vbAddr += TextVertex.size
+
+				temp = m_vertexBuffer.PeekFloat( vbAddr + TextVertex.y )
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, temp + _txtDecalY )
+				vbAddr += TextVertex.size
+
+				temp = m_vertexBuffer.PeekFloat( vbAddr + TextVertex.y )
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, temp + _txtDecalY )
+				vbAddr += TextVertex.size
+
+				temp = m_vertexBuffer.PeekFloat( vbAddr + TextVertex.y )
+				m_vertexBuffer.PokeFloat( vbAddr + TextVertex.y, temp + _txtDecalY )
+				vbAddr += TextVertex.size
+			Endif
+		Next
+	End
+
+	Method ToABGR:Int( _rgba:Int )
+		Return ( ( (_rgba Shr  0) & $ff) Shl 24) |
+		        ( ( (_rgba Shr  8) & $ff) Shl 16) |
+		        ( ( (_rgba Shr 16) & $ff) Shl  8) |
+		        ( ( (_rgba Shr 24) & $ff) Shl  0)
+	End
+
+End
+
+Global BufferCachePool := New Pool<BufferCache>()
+
+Class BufferCache
+
+	Method Free:Void()
+		BufferCachePool.Free( Self )
+	End
+
+	Field indexBufferHandleIdx  :Int
+	Field vertexBufferHandleIdx :Int
+	Field textBuffer            := New TextBuffer()
+	Field bufferType            :Int
+	Field fontType              :Int
+End
+
+Class TextBufferManager
+
+	Field m_textBuffers             := New Stack<BufferCache>()
+	' bx::HandleAllocT<MAX_TEXT_BUFFER_COUNT> m_textBufferHandles;
+	' Field m_textBufferHandles       := New IntStack()
+	Field m_fontManager             :FontManager
+	Field m_vertexDecl              := New BgfxVertexDecl()
+	Field s_texColor                :Int ' bgfx::UniformHandle
+	Field m_basicProgram            :Int ' bgfx::ProgramHandle
+	Field m_distanceProgram         :Int ' bgfx::ProgramHandle
+	Field m_distanceSubpixelProgram :Int ' bgfx::ProgramHandle
+
+	Method New( _fontManager:FontManager )
+
+		m_fontManager = _fontManager
+
+'  		m_textBuffers = New BufferCache[ MAX_TEXT_BUFFER_COUNT ]
+'  		For Local ii:Int = MAX_TEXT_BUFFER_COUNT -1 To 0 Step -1
+'  			m_textBuffers[ ii ] = New BufferCache()
+'  			m_textBuffers.Push( ii )
+'  		Next
+
+		Local type:Int = bgfxGetRendererType()
+
+'  		m_basicProgram = bgfxCreateProgram(
+'  			  bgfx::createEmbeddedShader(s_embeddedShaders, type, "vs_font_basic")
+'  			, bgfx::createEmbeddedShader(s_embeddedShaders, type, "fs_font_basic")
+'  			, True );
+'  
+'  		m_distanceProgram = bgfxCreateProgram(
+'  			  bgfx::createEmbeddedShader(s_embeddedShaders, type, "vs_font_distance_field")
+'  			, bgfx::createEmbeddedShader(s_embeddedShaders, type, "fs_font_distance_field")
+'  			, True );
+'  
+'  		m_distanceSubpixelProgram = bgfxCreateProgram(
+'  			  bgfx::createEmbeddedShader(s_embeddedShaders, type, "vs_font_distance_field_subpixel")
+'  			, bgfx::createEmbeddedShader(s_embeddedShaders, type, "fs_font_distance_field_subpixel")
+'  			, True );
+
+		m_basicProgram            = bgfxUtilsLoadProgram( "vs_font_basic", "fs_font_basic" )
+		m_distanceProgram         = bgfxUtilsLoadProgram( "vs_font_distance_field", "fs_font_distance_field" )
+		m_distanceSubpixelProgram = bgfxUtilsLoadProgram( "vs_font_distance_field_subpixel", "fs_font_distance_field_subpixel" )
+
+		bgfxVertexDeclBegin( m_vertexDecl )
+		bgfxVertexDeclAdd( m_vertexDecl, BGFX_ATTRIB_POSITION,  2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( m_vertexDecl, BGFX_ATTRIB_TEXCOORD0, 4, BGFX_ATTRIB_TYPE_INT16, True )
+		bgfxVertexDeclAdd( m_vertexDecl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( m_vertexDecl )
+
+		s_texColor = bgfxCreateUniform( "s_texColor", BGFX_UNIFORM_TYPE_INT1 )
+	End
+
+	Method Destroy:Void()
+
+		If m_textBuffers.Length() > 0 Then
+			Print "All the text buffers must be destroyed before destroying the manager"
+		Endif
+
+		' delete [] m_textBuffers;
+
+		bgfxDestroyUniform( s_texColor )
+
+		bgfxDestroyProgram( m_basicProgram )
+		bgfxDestroyProgram( m_distanceProgram )
+		bgfxDestroyProgram( m_distanceSubpixelProgram )
+	End
+
+	Method CreateTextBuffer:Int( _type:Int, _bufferType:Int )
+	' TextBufferHandle TextBufferManager::createTextBuffer(uint32_t _type, BufferType::Enum _bufferType)
+
+		' uint16_t textIdx = m_textBufferHandles.alloc();
+		' Local textIdx :Int = m_textBufferHandles.Pop()
+		Local bc := BufferCachePool.Allocate()
+		m_textBuffers.Push( bc )
+
+		bc.textBuffer.Init( m_fontManager )
+
+		bc.fontType              = _type
+		bc.bufferType            = _bufferType
+		bc.indexBufferHandleIdx  = BGFX_INVALID_HANDLE
+		bc.vertexBufferHandleIdx = BGFX_INVALID_HANDLE
+
+		Return m_textBuffers.Length() -1
+	End
+
+	Method DestroyTextBuffer:Void( _handle:Int )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		' BufferCache& bc = m_textBuffers[_handle.idx];
+		' m_textBufferHandles.free(_handle.idx);
+		' delete bc.textBuffer;
+		' bc.textBuffer = NULL;
+
+		Local bc := m_textBuffers.Get( _handle )
+		m_textBuffers.Remove( _handle )
+		bc.Free()
+
+		If bc.vertexBufferHandleIdx = BGFX_INVALID_HANDLE Then
+			Return
+		Endif
+
+		Select bc.bufferType
+
+		Case BufferType.StaticBuffer
+			bgfxDestroyIndexBuffer( bc.indexBufferHandleIdx )
+			bgfxDestroyVertexBuffer( bc.vertexBufferHandleIdx )
+
+		Case BufferType.DynamicBuffer
+			bgfxDestroyDynamicIndexBuffer( bc.indexBufferHandleIdx )
+			bgfxDestroyDynamicVertexBuffer( bc.vertexBufferHandleIdx )
+
+		Case BufferType.TransientBuffer ' destroyed every frame
+
+		End
+
+	End
+
+	Method SubmitTextBuffer:Void( _handle:Int, _id:Int, _depth:Int=0 )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc := m_textBuffers.Get( _handle )
+
+		Local indexCount :Int = bc.textBuffer.GetIndexCount()
+		Local indexSize2 :Int = bc.textBuffer.GetIndexSize()
+
+		Local vertexCount :Int = bc.textBuffer.GetVertexCount()
+		Local vertexSize2 :Int = bc.textBuffer.GetVertexSize()
+
+		Local indexSize  :Int = indexCount  * indexSize2
+		Local vertexSize :Int = vertexCount * vertexSize2
+
+		If 0 = indexSize Or 0 = vertexSize Then
+			Return 
+		Endif
+
+		bgfxSetTexture( 0, s_texColor, m_fontManager.GetCubeAtlas().GetTextureHandle() )
+
+		Local program :Int = BGFX_INVALID_HANDLE
+		Local state   :Int[ 2 ]
+
+		Select bc.fontType
+
+		Case FONT_TYPE_ALPHA
+			program = m_basicProgram
+			state[ 0 ] = $00000000
+			state[ 1 ] = $06565007
+			bgfxSetState( state )
+'  			bgfxSetState(0
+'  				| BGFX_STATE_WRITE_RGB
+'  				| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) )
+
+		Case FONT_TYPE_DISTANCE
+			program = m_distanceProgram
+			state[ 0 ] = $00000000
+			state[ 1 ] = $06565007
+			bgfxSetState( state )
+'  			bgfx::setState(0
+'  				| BGFX_STATE_WRITE_RGB
+'  				| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) )
+
+		Case FONT_TYPE_DISTANCE_SUBPIXEL
+			program = m_distanceSubpixelProgram
+			state[ 0 ] = $00000000
+			state[ 1 ] = $04c4c007
+			bgfxSetState( state, bc.textBuffer.GetTextColor() )
+'  			bgfx::setState(0
+'  				| BGFX_STATE_WRITE_RGB
+'  				| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_FACTOR, BGFX_STATE_BLEND_INV_SRC_COLOR)
+'  				, bc.textBuffer.GetTextColor() )
+		End
+
+		Select bc.bufferType
+
+		Case BufferType.StaticBuffer
+	
+			Local ibh:Int ' bgfx::IndexBufferHandle
+			Local vbh:Int ' bgfx::VertexBufferHandle
+
+			If BGFX_INVALID_HANDLE = bc.vertexBufferHandleIdx Then
+
+				ibh = bgfxCreateIndexBuffer( bgfxUtilsCopy( bc.textBuffer.GetIndexBuffer(), indexSize ) )
+				vbh = bgfxCreateVertexBuffer( bgfxUtilsCopy( bc.textBuffer.GetVertexBuffer(), vertexSize ), m_vertexDecl )
+
+				bc.vertexBufferHandleIdx = vbh
+				bc.indexBufferHandleIdx  = ibh
+			Else
+
+				vbh = bc.vertexBufferHandleIdx
+				ibh = bc.indexBufferHandleIdx
+			Endif
+
+			bgfxSetVertexBuffer( 0, vbh, 0, bc.textBuffer.GetVertexCount() )
+			bgfxSetIndexBuffer( ibh, 0, bc.textBuffer.GetIndexCount() )
+
+		Case BufferType.DynamicBuffer
+
+			Local ibh:Int ' bgfx::DynamicIndexBufferHandle
+			Local vbh:Int ' bgfx::DynamicVertexBufferHandle
+
+			If BGFX_INVALID_HANDLE = bc.vertexBufferHandleIdx Then
+
+				ibh = bgfxCreateDynamicIndexBufferMem( bgfxUtilsCopy(bc.textBuffer.GetIndexBuffer(), indexSize ) )
+				vbh = bgfxCreateDynamicVertexBufferMem( bgfxUtilsCopy(bc.textBuffer.GetVertexBuffer(), vertexSize ), m_vertexDecl )
+
+				bc.indexBufferHandleIdx  = ibh
+				bc.vertexBufferHandleIdx = vbh
+			Else
+
+				ibh = bc.indexBufferHandleIdx
+				vbh = bc.vertexBufferHandleIdx
+
+				bgfxUpdateDynamicIndexBuffer( ibh, 0, bgfxUtilsCopy( bc.textBuffer.GetIndexBuffer(),  indexSize  ) )
+				bgfxUpdateDynamicVertexBuffer( vbh, 0, bgfxUtilsCopy( bc.textBuffer.GetVertexBuffer(), vertexSize ) )
+			Endif
+
+			bgfxSetDynamicVertexBuffer(0, vbh, 0, bc.textBuffer.GetVertexCount() )
+			bgfxSetDynamicIndexBuffer(ibh, 0, bc.textBuffer.GetIndexCount() )
+
+		Case BufferType.TransientBuffer
+
+			Local tib := New BgfxTransientIndexBuffer()
+			Local tvb := New BgfxTransientVertexBuffer()
+
+			bgfxAllocTransientIndexBuffer( tib, bc.textBuffer.GetIndexCount() )
+			bgfxAllocTransientVertexBuffer( tvb, bc.textBuffer.GetVertexCount(), m_vertexDecl )
+
+			'
+			' @Cleanup: add CopyBytes into TransientIndexBuffer
+			'
+			' bx::memCopy( tib.data, bc.textBuffer.GetIndexBuffer(), indexSize )
+			'
+			' @Cleanup: add CopyBytes into TransientVertexBuffer
+			'
+			' bx::memCopy( tvb.data, bc.textBuffer.GetVertexBuffer(), vertexSize )
+			Local byte:Int = 0
+
+			Local indexBuffer := bc.textBuffer.GetIndexBuffer()
+			For Local ii:Int = 0 Until indexSize
+				byte = indexBuffer.PeekByte( ii )
+				tib.PokeByte( ii, byte ) 
+			Next
+
+			Local vertexBuffer := bc.textBuffer.GetVertexBuffer()
+			For Local ii:Int = 0 Until vertexSize
+				byte = vertexBuffer.PeekByte( ii )
+				tvb.PokeByte( ii, byte ) 
+			Next
+
+			bgfxSetTransientVertexBuffer( 0, tvb, 0, bc.textBuffer.GetVertexCount() )
+			bgfxSetTransientIndexBuffer( tib, 0, bc.textBuffer.GetIndexCount() )
+		End
+
+		bgfxSubmit( _id, program, _depth )
+	End
+
+	Method SetStyle:Void( _handle:Int, _flags:Int=STYLE_NORMAL ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetStyle( _flags )
+	End
+
+	Method SetTextColor:Void( _handle:Int, _rgba:Int=$000000FF ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetTextColor( _rgba )
+	End
+
+	Method SetBackgroundColor:Void( _handle:Int, _rgba:Int=$000000FF ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetBackgroundColor( _rgba )
+	End
+
+	Method SetOverlineColor:Void( _handle:Int, _rgba:Int=$000000FF ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetOverlineColor( _rgba )
+	End
+
+	Method SetUnderlineColor:Void( _handle:Int, _rgba:Int=$000000FF ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetUnderlineColor( _rgba )
+	End
+
+	Method SetStrikeThroughColor:Void( _handle:Int, _rgba:Int=$000000FF ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetStrikeThroughColor( _rgba )
+	End
+
+	Method SetPenPosition:Void( _handle:Int, _x:Int, _y:Int ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.SetPenPosition( _x, _y )
+	End
+
+	' Append an ASCII/utf-8 string to the buffer using current pen position and color.
+	Method AppendText:Void( _handle:Int, _fontHandle:Int, _string:String ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.AppendText( _fontHandle, _string )
+	End
+
+	' Append a wide char unicode string to the buffer using current pen position and color.
+'  	Method AppendText:Void( _handle:Int, _fontHandle:Int, _string:String ) 
+'  
+'  		If Not bgfxIsValid( _handle ) Then
+'  			Print "Invalid handle used"
+'  		Endif
+'  	void (TextBufferHandle _handle, FontHandle , const wchar_t* , const wchar_t* _end = NULL);
+'  void TextBufferManager::appendText(TextBufferHandle _handle, FontHandle _fontHandle, const wchar_t* _string, const wchar_t* _end)
+'  {
+'  	BX_CHECK(bgfx::isValid(_handle), "Invalid handle used");
+'  	BufferCache& bc = m_textBuffers[_handle.idx];
+'  	bc.textBuffer->appendText(_fontHandle, _string, _end);
+'  }
+
+	' Append a whole face of the atlas cube, mostly used for debugging and visualizing atlas.
+	Method AppendAtlasFace:Void( _handle:Int, _faceIndex:Int ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.AppendAtlasFace( _faceIndex )
+	End
+
+	' Clear the text buffer and reset its state (pen/color).
+	Method ClearTextBuffer:Void( _handle:Int ) 
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		bc.textBuffer.ClearTextBuffer()
+	End
+
+	' Return the rectangular size of the current text buffer (including all its content).
+	Method GetRectangle:TextRectangle( _handle:Int )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+			Return Null
+		Endif
+
+		Local bc:BufferCache = m_textBuffers.Get( _handle )
+		Return bc.textBuffer.GetRectangle()
+	End
+
+End

@@ -1,0 +1,713 @@
+
+Import brl.databuffer
+Import brl.pool
+
+Import bgfx
+
+Const UINT16_MAX :Int = $ffff
+Const INT16_MIN  :Int = $8000
+Const INT16_MAX  :Int = $7fff
+Const INT_MAX    :Int = $7fffffff
+
+Class AtlasRegion
+
+	Const TYPE_GRAY  :Int = 1 ' 1 component
+	Const TYPE_BGRA8 :Int = 4 ' 4 components
+
+	Field x      :Int
+	Field y      :Int
+'  	Field left   :Int
+'  	Field top    :Int
+
+	Field width  :Int
+	Field height :Int
+
+	Field mask   :Int ' encode the region type, the face index and the component index in case of a gray region
+
+	Method GetType:Int()
+		Return ( mask Shr 0 ) & $0000000F
+	End
+
+	Method GetFaceIndex:Int()
+		Return ( mask Shr 4 ) & $0000000F
+	End
+
+	Method GetComponentIndex:Int()
+		Return ( mask Shr 8 ) & $0000000F
+	End
+
+	Method SetMask:Void( _type:Int, _faceIndex:Int, _componentIndex:Int )
+		mask = ( _componentIndex Shl 8 ) + ( _faceIndex Shl 4 ) + _type
+	End
+End
+
+' create a singleton class called RectanglePackerNodePool
+Global RectanglePackerNodePool := New Pool< RectanglePackerNode >()
+
+Class RectanglePackerNode
+
+	Method Free:Void()
+		RectanglePackerNodePool.Free( Self )
+	End
+
+	Field x     :Int ' The starting x-coordinate (leftmost).
+	Field y     :Int ' The y-coordinate of the skyline level line.
+	Field width :Int ' The line _width. The ending coordinate (inclusive) will be x+width-1.
+
+	Method New( _x:Int, _y:Int, _width:Int )
+		Self.x     = _x
+		Self.y     = _y
+		Self.width = _width
+	End
+
+	Method Init:Void( _x:Int, _y:Int, _width:Int )
+		Self.x     = _x
+		Self.y     = _y
+		Self.width = _width
+	End
+End
+
+Class RectanglePacker
+
+	Field m_width     :Int ' width (in pixels) of the underlying texture
+	Field m_height    :Int ' height (in pixels) of the underlying texture
+	Field m_usedSpace :Int ' Surface used in squared pixel
+	Field m_skyline   := New Stack<RectanglePackerNode>() ' node of the skyline algorithm
+
+	Method New()
+		Self.m_width     = 0
+		Self.m_height    = 0
+		Self.m_usedSpace = 0
+	End
+
+	Method New( _width:Int, _height:Int )
+		m_width     = _width
+		m_height    = _height
+		m_usedSpace = 0
+		' We want a one pixel border around the whole atlas to avoid any artefact when
+		' sampling texture
+		Local newNode := RectanglePackerNodePool.Allocate()
+		newNode.Init( 1, 1, _width - 2 )
+		m_skyline.Push( newNode )
+	End
+
+	' non constructor initialization
+	Method Init:Void( _width:Int, _height:Int )
+
+		If Not ( _width  > 2 ) Then Print "_width must be > 2"
+		If Not ( _height > 2 ) Then Print "_height must be > 2"
+
+		m_width     = _width
+		m_height    = _height
+		m_usedSpace = 0
+
+		' m_skyline.Clear()
+		While Not m_skyline.IsEmpty()
+			m_skyline.Pop().Free()
+		Wend
+
+		' We want a one pixel border around the whole atlas to avoid any artifact when
+		' sampling texture
+		Local newNode := RectanglePackerNodePool.Allocate()
+		newNode.Init( 1, 1, _width - 2 )
+		m_skyline.Push( newNode )
+	End
+
+	Field m_outX:Int ' for AddRectangle method
+	Field m_outY:Int ' for AddRectangle method
+
+	' find a suitable position for the given rectangle
+	' @return true if the rectangle can be added, false otherwise
+	Method AddRectangle:Bool( _width:Int, _height:Int )
+
+		Local best_width  :Int = INT_MAX
+		Local best_height :Int = INT_MAX
+		Local best_index  :Int = -1
+
+		Local currNode    :RectanglePackerNode
+		Local prevNode    :RectanglePackerNode
+
+		m_outX = 0
+		m_outY = 0
+
+		Local num:Int = m_skyline.Length()
+
+		For Local ii:Int = 0 Until num
+
+			Local yy:Int = Fit( ii, _width, _height )
+
+			If yy >= 0 Then
+
+				currNode = m_skyline.Get( ii )
+
+				If (yy + _height) < best_height Or ( (yy + _height) = best_height And currNode.width < best_width ) Then
+
+					best_width  = currNode.width
+					best_height = yy + _height
+					best_index  = ii
+
+					m_outX = currNode.x
+					m_outY = yy
+				Endif
+
+			Endif
+		Next
+
+		If best_index = -1 Then
+			Return False
+		Endif
+
+		Local newNode := RectanglePackerNodePool.Allocate()
+		newNode.Init( m_outX, m_outY + _height, _width )
+		m_skyline.Insert( best_index, newNode )
+
+		num = m_skyline.Length()
+
+		For Local ii:Int = best_index + 1 Until num
+
+			currNode = m_skyline.Get( ii )
+			prevNode = m_skyline.Get( ii - 1 )
+
+			If currNode.x < (prevNode.x + prevNode.width) Then
+
+				Local shrink:Int = prevNode.x + prevNode.width - currNode.x
+
+				currNode.x     += shrink
+				currNode.width -= shrink
+
+				if currNode.width <= 0 Then
+
+					m_skyline.Get( ii ).Free()
+					m_skyline.Remove( ii )
+
+					ii  -= 1
+					num -= 1
+
+				Else
+					Exit
+				Endif
+
+			Else
+
+				Exit
+			Endif
+		Next
+
+		Merge()
+		m_usedSpace += _width * _height
+
+		Return True
+	End
+
+	' return the used surface in squared unit
+	Method GetUsedSurface:Int()
+		Return m_usedSpace
+	End
+
+	' return the total available surface in squared unit
+	Method GetTotalSurface:Int()
+		Return m_width * m_height
+	End
+
+	' return the usage ratio of the available surface [0:1]
+	Method GetUsageRatio:Float()
+
+		Local total:Int = m_width * m_height
+
+		If total > 0 Then
+			return Float( m_usedSpace ) / Float( total )
+		Endif
+
+		Return 0.0
+	End
+
+	' reset to initial state
+	Method Clear:Void()
+
+		' m_skyline.Clear()
+		While Not m_skyline.IsEmpty()
+			m_skyline.Pop().Free()
+		Wend
+
+		m_usedSpace = 0
+
+		' We want a one pixel border around the whole atlas to avoid any artefact when
+		' sampling texture
+		m_skyline.Push( New RectanglePackerNode( 1, 1, Int( m_width - 2 ) ) )
+	End
+
+' Private
+	Method Fit:Int( _skylineNodeIndex:Int, _width:Int, _height:Int )
+
+		Local width     :Int = _width
+		Local height    :Int = _height
+
+		Local baseNode  := m_skyline.Get( _skylineNodeIndex )
+
+		Local xx        :Int = baseNode.x
+		Local yy        :Int = baseNode.y
+		Local widthLeft :Int = width
+		Local ii        :Int = _skylineNodeIndex
+
+		If ( xx + width ) > Int( m_width - 1 ) Then
+			Return -1
+		Endif
+
+		While widthLeft > 0
+
+			Local currNode := m_skyline.Get( ii )
+
+			If currNode.y > yy Then
+				yy = currNode.y
+			Endif
+
+			If ( yy + height ) > Int( m_height - 1 ) Then
+				Return -1
+			Endif
+
+			widthLeft -= currNode.width
+			ii += 1
+		Wend
+
+		Return yy
+	End
+
+	' Merges all skyline nodes that are at the same level.
+	Method Merge:Void()
+
+		For Local ii:Int = 0 Until m_skyline.Length() - 1
+
+			Local currNode := m_skyline.Get( ii )
+			Local nextNode := m_skyline.Get( ii + 1 )
+
+			If currNode.y = nextNode.y Then
+				currNode.width += nextNode.width
+
+				' m_skyline.Erase( m_skyline.begin() + ii + 1 )
+				m_skyline.Get( ii + 1 ).Free()
+				m_skyline.Remove( ii + 1 )
+
+				ii -= 1
+			Endif
+		Next
+	End
+
+End
+
+Class CubeAtlasPackedLayer
+	Field packer     := New RectanglePacker()
+	Field faceRegion := New AtlasRegion()
+End
+
+Function WriteUV:Void( _address:Int, _vertexBuffer:DataBuffer, _x:Int, _y:Int, _z:Int, _w:Int )
+	_vertexBuffer.PokeShort( _address + 0, _x )
+	_vertexBuffer.PokeShort( _address + 2, _y )
+	_vertexBuffer.PokeShort( _address + 4, _z )
+	_vertexBuffer.PokeShort( _address + 6, _w )
+End
+
+Class CubeAtlas
+
+	Field m_layers         :CubeAtlasPackedLayer[]
+	Field m_regions        :AtlasRegion[]
+	Field m_textureBuffer  :DataBuffer
+
+	Field m_usedLayers     :Int
+	Field m_usedFaces      :Int
+
+	Field m_textureHandle  :Int ' bgfx::TextureHandle
+	Field m_textureSize    :Int
+	Field m_texelSize      :Float
+	Field m_texelOffset    :Float[ 2 ]
+
+	Field m_regionCount    :Int
+	Field m_maxRegionCount :Int
+
+	' create an empty dynamic atlas (region can be updated and added)
+	' @param textureSize an atlas creates a texture cube of 6 faces with size equal to (textureSize*textureSize * sizeof(RGBA) )
+	' @param maxRegionCount maximum number of region allowed in the atlas
+	Method New( _textureSize:Int, _maxRegionsCount:Int = 4096 )
+
+		m_usedLayers     = 0
+		m_usedFaces      = 0
+		m_textureSize    = _textureSize
+		m_regionCount    = 0
+		m_maxRegionCount = _maxRegionsCount
+
+		If Not ( _textureSize >= 64 And _textureSize <= 4096 ) Then Print "Invalid _textureSize " + _textureSize + "."
+		If Not ( _maxRegionsCount >= 64 And _maxRegionsCount <= 32000 ) Then Print "Invalid _maxRegionsCount " + _maxRegionsCount + "."
+
+		Init()
+
+		m_layers = New CubeAtlasPackedLayer[ 24 ]
+		For Local ii:Int = 0 Until m_layers.Length()
+			m_layers[ ii ] = New CubeAtlasPackedLayer()
+			m_layers[ ii ].packer.Init( _textureSize, _textureSize )
+		Next
+
+		m_regions = New AtlasRegion[ _maxRegionsCount ]
+		For Local ii:Int = 0 Until m_regions.Length()
+			m_regions[ ii ] = New AtlasRegion()
+		Next
+
+		m_textureBuffer = New DataBuffer( _textureSize * _textureSize * 6 * 4 )
+		For Local ii:Int = 0 Until m_textureBuffer.Length() Step 4
+			m_textureBuffer.PokeInt( ii, 0 )
+		Next
+
+		m_textureHandle = bgfxCreateTextureCube( _textureSize, False, 1, BGFX_TEXTURE_FORMAT_BGRA8 )
+	End
+
+	' initialize a static atlas with serialized data	(region can be updated but not added)
+	' @param textureSize an atlas creates a texture cube of 6 faces with size equal to (textureSize*textureSize * sizeof(RGBA) )
+	' @param textureBuffer buffer of size 6*textureSize*textureSize*sizeof(uint32_t) (will be copied)
+	' @param regionCount number of region in the Atlas
+	' @param regionBuffer buffer containing the region (will be copied)
+	' @param maxRegionCount maximum number of region allowed in the atlas
+'  	Method New( _textureSize:Int, _textureBuffer:DataBuffer, _regionCount:Int, const uint8_t* _regionBuffer, uint16_t _maxRegionsCount = 4096);
+'  Atlas::Atlas(uint16_t _textureSize, const uint8_t* _textureBuffer, uint16_t _regionCount, const uint8_t* _regionBuffer, uint16_t _maxRegionsCount)
+'  	: m_usedLayers(24)
+'  	, m_usedFaces(6)
+'  	, m_textureSize(_textureSize)
+'  	, m_regionCount(_regionCount)
+'  	, m_maxRegionCount(_regionCount < _maxRegionsCount ? _regionCount : _maxRegionsCount)
+'  {
+'  	BX_CHECK(_regionCount <= 64 && _maxRegionsCount <= 4096, "_regionCount %d, _maxRegionsCount %d", _regionCount, _maxRegionsCount);
+'  
+'  	init();
+'  
+'  	m_regions = new AtlasRegion[_regionCount];
+'  	m_textureBuffer = new uint8_t[getTextureBufferSize()];
+'  
+'  	bx::memCopy(m_regions, _regionBuffer, _regionCount * sizeof(AtlasRegion) );
+'  	bx::memCopy(m_textureBuffer, _textureBuffer, getTextureBufferSize() );
+'  
+'  	m_textureHandle = bgfx::createTextureCube(_textureSize
+'  		, false
+'  		, 1
+'  		, bgfx::TextureFormat::BGRA8
+'  		, BGFX_SAMPLER_NONE
+'  		, bgfx::makeRef(m_textureBuffer, getTextureBufferSize() )
+'  		);
+'  }
+
+	Method Destroy:Void()
+		bgfxDestroy( m_textureHandle )
+
+		' delete [] m_layers;
+		m_layers = Null
+
+		' delete [] m_regions;
+		m_regions = Null
+
+		' delete [] m_textureBuffer;
+		m_textureBuffer.Discard()
+		m_textureBuffer = Null
+	End
+
+	' add a region to the atlas, and copy the content of mem to the underlying texture
+	Method AddRegion:Int( _width:Int, _height:Int, _bitmapBuffer:DataBuffer, _type:Int=AtlasRegion.TYPE_BGRA8, outline:Int=0 )
+
+		If m_regionCount >= m_maxRegionCount Then
+			Return UINT16_MAX
+		Endif
+
+		Local xx  :Int = 0
+		Local yy  :Int = 0
+		Local idx :Int = 0
+
+		While idx < m_usedLayers
+
+			Local layer      := m_layers[ idx ]
+			Local faceRegion := layer.faceRegion
+			Local packer     := layer.packer
+
+			If faceRegion.GetType() = _type And packer.AddRectangle( _width + 1, _height + 1 ) Then
+
+				xx = packer.m_outX
+				yy = packer.m_outY
+
+				Exit
+			Endif
+
+			idx += 1
+		Wend
+
+		If idx >= m_usedLayers Then
+
+			If (idx + _type) > 24 Or m_usedFaces >= 6 Then
+				Return UINT16_MAX
+			Endif
+
+			For Local ii:Int = 0 Until _type
+				Local region := m_layers[ idx + ii ].faceRegion
+				region.x      = 0
+				region.y      = 0
+				region.width  = m_textureSize
+				region.height = m_textureSize
+				region.SetMask( _type, m_usedFaces, ii )
+			Next
+
+			m_usedLayers += _type
+			m_usedFaces  += 1
+
+			Local packer := m_layers[ idx ].packer
+
+			If Not packer.AddRectangle( _width + 1, _height + 1 ) Then
+
+				xx = packer.m_outX
+				yy = packer.m_outY
+
+				Return UINT16_MAX
+			Endif
+
+		Endif
+
+		Local region := m_regions[ m_regionCount ]
+		region.x      = xx
+		region.y      = yy
+		region.width  = _width
+		region.height = _height
+		region.mask   = m_layers[ idx ].faceRegion.mask
+
+		UpdateRegion( region, _bitmapBuffer )
+
+		region.x      += outline
+		region.y      += outline
+		region.width  -= (outline * 2)
+		region.height -= (outline * 2)
+
+		' Return m_regionCount++;
+		Local result:Int = m_regionCount
+		m_regionCount += 1
+		Return result
+	End
+
+	' update a preallocated region
+	Method UpdateRegion:Void( _region:AtlasRegion, _bitmapBuffer:DataBuffer )
+
+		Local size:Int = _region.width * _region.height * 4
+
+		If 0 < size Then
+
+			' const bgfx::Memory* mem = bgfx::alloc(size);
+			' bx::memSet(mem->data, 0, mem->size);
+			'
+			' @Cleanup: not sure if it requires to create mem every frame
+			'
+			Local mem := New BgfxMemory()
+			bgfxAlloc( mem, size )
+			For Local ii:Int = 0 Until size
+				mem.PokeByte( ii, 0 )
+			Next
+
+			If _region.GetType() = AtlasRegion.TYPE_BGRA8 Then
+
+				' const uint8_t* inLineBuffer = _bitmapBuffer;
+				' uint8_t* outLineBuffer = m_textureBuffer + _region.getFaceIndex() * (m_textureSize * m_textureSize * 4) + ( ( (_region.y * m_textureSize) + _region.x) * 4);
+				Local inLineIndex  :Int = 0
+				Local outLineIndex :Int = _region.GetFaceIndex() * (m_textureSize * m_textureSize * 4) + ( ( (_region.y * m_textureSize) + _region.x) * 4)
+
+				For Local yy:Int = 0 Until _region.height
+					
+					' bx::memCopy( outLineBuffer, inLineBuffer, _region.width * 4 )
+					_bitmapBuffer.CopyBytes( inLineIndex, m_textureBuffer, outLineIndex, _region.width * 4 )
+
+					' inLineBuffer  += _region.width * 4
+					' outLineBuffer += m_textureSize * 4
+					inLineIndex  += _region.width * 4
+					outLineIndex += m_textureSize * 4
+				Next
+
+				'
+				' @Cleanup: add CopyBytes into BgfxMemory!
+				'
+				' bx::memCopy(mem->data, _bitmapBuffer, mem->size);
+				For Local ii:Int = 0 Until size
+					mem.PokeByte( ii, _bitmapBuffer.PeekByte( ii ) )
+				Next
+
+			Else
+
+				Local layer:Int = _region.GetComponentIndex()
+				' const uint8_t* inLineBuffer = _bitmapBuffer;
+				' uint8_t* outLineBuffer = (m_textureBuffer + _region.getFaceIndex() * (m_textureSize * m_textureSize * 4) + ( ( (_region.y * m_textureSize) + _region.x) * 4) );
+				Local inLineIndex  :Int = 0
+				Local outLineIndex :Int = _region.GetFaceIndex() * (m_textureSize * m_textureSize * 4) + ( ( (_region.y * m_textureSize) + _region.x) * 4)
+
+				For Local yy:Int = 0 Until _region.height
+
+					For Local xx:Int = 0 Until _region.width
+						' outLineBuffer[ (xx * 4) + layer ] = inLineBuffer[ xx ]
+						m_textureBuffer.PokeByte( outLineIndex + (xx * 4) + layer, _bitmapBuffer.PeekByte( inLineIndex + xx ) )
+					Next
+
+					'
+					' @Cleanup: add CopyBytes into BgfxMemory!
+					'
+					' bx::memCopy(mem->data + yy * _region.width * 4, outLineBuffer, _region.width * 4);
+					For Local ii:Int = 0 Until _region.width * 4
+						mem.PokeByte( yy * _region.width * 4 + ii, m_textureBuffer.PeekByte( outLineIndex + ii ) )
+					Next
+
+					' inLineBuffer  += _region.width
+					' outLineBuffer += m_textureSize * 4
+					inLineIndex  += _region.width
+					outLineIndex += m_textureSize * 4
+				Next
+
+			Endif
+
+			bgfxUpdateTextureCube( m_textureHandle, 0, _region.GetFaceIndex(), 0, _region.x, _region.y, _region.width, _region.height, mem )
+		Endif
+	End
+
+	' Same as packUV but pack a whole face of the atlas cube, mostly used for debugging and visualizing atlas
+	Method PackFaceLayerUV:Void( _idx:Int, _vertexBuffer:DataBuffer, _offset:Int, _stride:Int )
+		PackUV( m_layers[ _idx ].faceRegion, _vertexBuffer, _offset, _stride )
+	End
+
+	' Pack the UV coordinates of the four corners of a region to a vertex buffer using the supplied vertex format.
+	' v0 -- v3
+	' |     |     encoded in that order:  v0,v1,v2,v3
+	' v1 -- v2
+	' @remark the UV are four signed short normalized components.
+	' @remark the x,y,z components encode cube uv coordinates. The w component encode the color channel if any.
+	' @param handle handle to the region we are interested in
+	' @param vertexBuffer address of the first vertex we want to update. Must be valid up to vertexBuffer + offset + 3*stride + 4*sizeof(int16_t), which means the buffer must contains at least 4 vertex includind the first.
+	' @param offset byte offset to the first uv coordinate of the vertex in the buffer
+	' @param stride stride between tho UV coordinates, usually size of a Vertex.
+	Method PackUV:Void( _regionHandle:Int, _vertexBuffer:DataBuffer, _offset:Int, _stride:Int )
+		Local region := m_regions[ _regionHandle ]
+		PackUV( region, _vertexBuffer, _offset, _stride )
+	End
+
+	Method PackUV:Void( _region:AtlasRegion, _vertexBuffer:DataBuffer, _offset:Int, _stride:Int )
+
+		Local x0:Int = ( ( Float(_region.x) * m_texelSize + m_texelOffset[ 0 ] ) - Float(INT16_MAX) )
+		Local y0:Int = ( ( Float(_region.y) * m_texelSize + m_texelOffset[ 1 ] ) - Float(INT16_MAX) )
+		Local x1:Int = ( ( ( Float(_region.x) + _region.width  ) * m_texelSize + m_texelOffset[ 0 ] ) - Float(INT16_MAX) )
+		Local y1:Int = ( ( ( Float(_region.y) + _region.height ) * m_texelSize + m_texelOffset[ 1 ] ) - Float(INT16_MAX) )
+		Local ww:Int = ( ( Float(INT16_MAX) / 4.0 ) * Float(_region.GetComponentIndex()) )
+
+		Local address:Int = _offset
+
+		' _vertexBuffer += _offset
+		Select _region.GetFaceIndex()
+
+		Case 0 ' +X
+			x0 = -x0
+			x1 = -x1
+			y0 = -y0
+			y1 = -y1
+			WriteUV( address, _vertexBuffer, INT16_MAX, y0, x0, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, INT16_MAX, y1, x0, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, INT16_MAX, y1, x1, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, INT16_MAX, y0, x1, ww ) ; address += _stride
+
+		Case 1 ' -X
+			y0 = -y0
+			y1 = -y1
+			WriteUV( address, _vertexBuffer, INT16_MIN, y0, x0, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, INT16_MIN, y1, x0, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, INT16_MIN, y1, x1, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, INT16_MIN, y0, x1, ww ) ; address += _stride
+
+		Case 2 ' +Y
+			WriteUV( address, _vertexBuffer, x0, INT16_MAX, y0, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x0, INT16_MAX, y1, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, INT16_MAX, y1, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, INT16_MAX, y0, ww ) ; address += _stride
+
+		Case 3 ' -Y
+			y0 = -y0
+			y1 = -y1
+			WriteUV( address, _vertexBuffer, x0, INT16_MIN, y0, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x0, INT16_MIN, y1, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, INT16_MIN, y1, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, INT16_MIN, y0, ww ) ; address += _stride
+
+		Case 4 ' +Z
+			y0 = -y0
+			y1 = -y1
+			WriteUV( address, _vertexBuffer, x0, y0, INT16_MAX, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x0, y1, INT16_MAX, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, y1, INT16_MAX, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, y0, INT16_MAX, ww ) ; address += _stride
+
+		Case 5 ' -Z
+			x0 = -x0
+			x1 = -x1
+			y0 = -y0
+			y1 = -y1
+			WriteUV( address, _vertexBuffer, x0, y0, INT16_MIN, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x0, y1, INT16_MIN, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, y1, INT16_MIN, ww ) ; address += _stride
+			WriteUV( address, _vertexBuffer, x1, y0, INT16_MIN, ww ) ; address += _stride
+		End
+	End
+
+
+	' return the TextureHandle (cube) of the atlas
+	' bgfx::TextureHandle getTextureHandle() const
+	Method GetTextureHandle:Int()
+		Return m_textureHandle
+	End
+
+	'retrieve a region info
+	Method GetRegion:AtlasRegion( _handle:Int )
+		Return m_regions[ _handle ]
+	End
+
+	' retrieve the size of side of a texture in pixels
+	Method GetTextureSize:Int()
+		Return m_textureSize
+	End
+
+	' retrieve the usage ratio of the atlas
+	'float getUsageRatio() const { return 0.0f; }
+
+	' retrieve the numbers of region in the atlas
+	Method GetRegionCount:Int()
+		Return m_regionCount
+	End
+
+	' retrieve a pointer to the region buffer (in order to serialize it)
+	Method GetRegionBuffer:AtlasRegion()
+		Return m_regions
+	End
+
+	' retrieve the byte size of the texture
+	Method GetTextureBufferSize:Int()
+		Return 6 * m_textureSize * m_textureSize * 4
+	End
+
+	' retrieve the mirrored texture buffer (to serialize it)
+	Method GetTextureBuffer:DataBuffer()
+		Return m_textureBuffer
+	End
+
+' Private
+	Method Init:Void()
+
+		m_texelSize = Float(UINT16_MAX) / Float(m_textureSize)
+
+		Local texelHalf:Float = m_texelSize / 2.0
+
+		Select bgfxGetRendererType()
+
+		Case BGFX_RENDERER_TYPE_DIRECT3D9
+			m_texelOffset[ 0 ] = 0.0
+			m_texelOffset[ 1 ] = 0.0
+
+		Case BGFX_RENDERER_TYPE_DIRECT3D11, BGFX_RENDERER_TYPE_DIRECT3D12
+			m_texelOffset[0] = texelHalf
+			m_texelOffset[1] = texelHalf
+
+		Default
+			m_texelOffset[0] = texelHalf
+			m_texelOffset[1] = -texelHalf
+		End
+	End
+
+End

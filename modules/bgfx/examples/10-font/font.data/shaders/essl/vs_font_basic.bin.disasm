@@ -1,0 +1,16 @@
+attribute highp vec4 a_color0;
+attribute highp vec2 a_position;
+attribute highp vec4 a_texcoord0;
+varying highp vec4 v_color0;
+varying highp vec4 v_texcoord0;
+uniform highp mat4 u_modelViewProj;
+void main ()
+{
+  highp vec4 tmpvar_1;
+  tmpvar_1.zw = vec2(0.0, 1.0);
+  tmpvar_1.xy = a_position;
+  gl_Position = (u_modelViewProj * tmpvar_1);
+  v_texcoord0 = a_texcoord0;
+  v_color0 = a_color0;
+}
+

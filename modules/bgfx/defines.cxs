@@ -479,6 +479,11 @@ Function bgfxCapsIsOcclusionQuerySupported:Bool( supported:Int[] )
 	        ( supported[ 1 ] & BGFX_CAPS_OCCLUSION_QUERY[ 1 ] ) = BGFX_CAPS_OCCLUSION_QUERY[ 1 ]
 End
 
+Function bgfxCapsIsTextureBlitSupported:Bool( supported:Int[] )
+	Return ( supported[ 0 ] & BGFX_CAPS_TEXTURE_BLIT[ 0 ] ) <> 0 And 
+	        ( supported[ 1 ] & BGFX_CAPS_TEXTURE_BLIT[ 1 ] ) <> 0
+End
+
 '/
 Const BGFX_CAPS_FORMAT_TEXTURE_NONE             :Int = $0000  '!< Texture format is not supported.
 Const BGFX_CAPS_FORMAT_TEXTURE_2D               :Int = $0001  '!< Texture format is supported.

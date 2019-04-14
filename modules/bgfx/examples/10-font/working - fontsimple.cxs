@@ -1,0 +1,208 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+Import mojo.app
+Import bgfx
+
+Import fontmanager
+Import textbuffermanager
+
+' Function LoadTtf:TrueTypeHandle( _fm:FontManager, _filePath:String )
+Function LoadTtf:Int( _fm:FontManager, _filename:String )
+
+	Local handle   :Int = BGFX_INVALID_HANDLE
+	Local filePath :String = "cerberus://data/font/" + _filename ' shaders/dx11/vs_font_basic.bin"
+	Local dataBuf  := DataBuffer.Load( filePath )
+
+	If dataBuf Then
+		handle = _fm.CreateTtf( dataBuf )
+	Endif
+
+	Return handle
+End
+
+Global s_fontFilePath:String[] = [ "droidsans.ttf" ]
+
+Class FontExample Extends App
+
+	Field bgfxCaps            := New BgfxCaps()
+
+	Field m_width             :Int
+	Field m_height            :Int
+	' Field m_debug             :Int = BGFX_DEBUG_NONE
+	Field m_debug             :Int = BGFX_DEBUG_TEXT
+	Field m_reset             :Int
+
+	Field m_fontManager       :FontManager
+	Field m_textBufferManager :TextBufferManager
+
+	Field m_staticText        :Int ' TextBufferHandle
+
+	Field numFonts            :Int
+
+	Field m_fontFiles         :Int[] ' TrueTypeHandle
+	Field m_fonts             :Int[] ' FontHandle
+
+	Method OnCreate:Int()
+
+		numFonts    = s_fontFilePath.Length()
+		m_fontFiles = New Int[ numFonts ]
+		m_fonts     = New Int[ numFonts ]
+
+		SetUpdateRate( 60 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = BGFX_RESET_VSYNC
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		' DebugStop()
+
+		' Init the text rendering system.
+		m_fontManager       = New FontManager( 512 )
+		m_textBufferManager = New TextBufferManager( m_fontManager )
+
+		Local ii:Int = 0
+
+		' Load some TTF files.
+		' For Local ii:Int = 0 Until numFonts
+
+			' Instantiate a usable font.
+			m_fontFiles[ ii ] = LoadTtf( m_fontManager, s_fontFilePath[ ii ] )
+			m_fonts[ ii ]     = m_fontManager.CreateFontByPixelSize( m_fontFiles[ ii ], 0, 32 )
+
+			' Preload glyphs and blit them to atlas.
+			m_fontManager.PreloadGlyph( m_fonts[ ii ], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ. ~n" )
+
+			' You can unload the truetype files at this stage, but in that
+			' case, the set of glyph's will be limited to the set of preloaded
+			' glyph.
+			m_fontManager.DestroyTtf( m_fontFiles[ ii ] )
+		' Next
+
+		'create a static text buffer compatible with alpha font
+		'a static text buffer content cannot be modified after its first submit.
+		m_staticText     = m_textBufferManager.CreateTextBuffer( FONT_TYPE_ALPHA, BufferType.StaticBuffer )
+
+		' The pen position represent the top left of the box of the first line
+		' of text.
+		m_textBufferManager.SetPenPosition( m_staticText, 24.0, 100.0 )
+
+		' For Local ii:Int = 0 Until numFonts
+			' Add some text to the buffer.
+			' The position of the pen is adjusted when there is an endline.
+			m_textBufferManager.AppendText( m_staticText, m_fonts[ ii ], "The quick brown fox jumps over the lazy dog~n" )
+		' Next
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		m_fontManager.DestroyTtf( m_fontKenneyTtf )
+'  		m_fontManager.DestroyTtf( m_fontAwesomeTtf )
+'  		m_fontManager.DestroyTtf( m_visitorTtf )
+'  
+'  		' Destroy the fonts.
+'  		m_fontManager.DestroyFont( m_fontKenney64 )
+'  		m_fontManager.DestroyFont( m_fontAwesome72 )
+'  		m_fontManager.DestroyFont( m_visitor10 )
+'  
+'  		For Local ii:Int = 0 Until numFonts
+'  			m_fontManager.DestroyFont( m_fonts[ ii ] )
+'  		Next
+'  
+'  		m_textBufferManager.DestroyTextBuffer( m_staticText )
+'  		m_textBufferManager.DestroyTextBuffer( m_transientText )
+'  
+'  		' delete m_textBufferManager
+'  		' delete m_fontManager
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field last:Int
+
+	Method OnRender:Int()
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch( 0 )
+
+		' Update frame timer
+		Local now       :Int = Millisecs()
+		Local frameTime :Int = now - last
+		last = now
+
+		Local at   :Float[] = [ 0.0, 0.0,  0.0 ]
+		Local eye  :Float[] = [ 0.0, 0.0, -1.0 ]
+		Local view :Float[ 16 ]
+
+		bxMtxLookAt( view, eye, at )
+
+		Const centering:Float = 0.5
+
+		' Setup a top-left ortho matrix for screen space drawing.
+		bgfxGetCaps( bgfxCaps )
+		' {
+			Local ortho:Float[ 16 ]
+			bxMtxOrtho( ortho, centering, m_width + centering, m_height + centering, centering, 0.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+			bgfxSetViewTransform( 0, view, ortho )
+			bgfxSetViewRect( 0, 0, 0, Int( m_width ), Int( m_height ) )
+		' }
+
+		' Submit the static text.
+		m_textBufferManager.SubmitTextBuffer( m_staticText, 0 )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame(False)
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 10-font"
+	Print "Description: Use the font system to display text and styled text."
+	New FontExample()
+	Return 0
+End
+
+

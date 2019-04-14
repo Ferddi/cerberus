@@ -23,7 +23,8 @@ Const UINT8_MAX  :Int = $FF
 Const UINT16_MAX :Int = $FFFF
 Const INT32_MAX  :Int = 2147483647
 
-Const BGFX_INVALID_HANDLE:Int = UINT16_MAX
+Const BGFX_INVALID_HANDLE :Int = UINT16_MAX
+Const BX_INVALID_HANDLE   :Int = UINT16_MAX
 
 Function bgfxIsValid:Bool( _handle:Int )
 	Return _handle <> BGFX_INVALID_HANDLE
@@ -600,6 +601,7 @@ Function bxVec3MulMtxH:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_
 Function bxVec3Length:Float( _a:Float[] )="_bx_vec3_length"
 Function bxLerp:Float( _a:Float, _b:Float, _t:Float )="_bx_lerp"
 Function bxMtxRotateY:Float( _result:Float[], _ay:Float )="_bx_mtx_rotate_y"
+Function bxMtxRotateZ:Float( _result:Float[], _az:Float )="_bx_mtx_rotate_z"
 
 
 Function bgfxReadPixels:Void( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )="_bgfx_read_pixels"
@@ -1227,6 +1229,18 @@ Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer, _size:Int )
 	Return _mem
 End
 
+Function bgfxUtilsCopy:BgfxMemory( _data:DataBuffer )
+	Local _mem := New BgfxMemory()
+	bgfxCopy( _mem, _data )
+	Return _mem
+End
+
+Function bgfxUtilsCopy:BgfxMemory( _data:DataBuffer, _size:Int )
+	Local _mem := New BgfxMemory()
+	bgfxCopy( _mem, _data, _size )
+	Return _mem
+End
+
 Function bgfxUtilsLoadShader:Int( _name:String )
 
 	Local filePath:String = "cerberus://data/"
@@ -1533,13 +1547,19 @@ End
 
 Function bgfxUtilsMeshLoad:BgfxUtilsMesh(_filePath:String)
 
-	Local buffer  := DataBuffer.Load("cerberus://data/" + _filePath)
+	Local fileName := "cerberus://data/" + _filePath
+	Local buffer   := DataBuffer.Load( fileName )
 
-	Local address :Int = 0
-	Local length  :Int = buffer.Length()
+	If Not buffer Then
+		Print "file is missing file=" + fileName
+		Return Null
+	Endif
 
-	Local mesh    := New BgfxUtilsMesh()
-	Local group   := New BgfxUtilsGroup()
+	Local address  :Int = 0
+	Local length   :Int = buffer.Length()
+
+	Local mesh     := New BgfxUtilsMesh()
+	Local group    := New BgfxUtilsGroup()
 
 '  	mesh.m_groups.Push(group)
 

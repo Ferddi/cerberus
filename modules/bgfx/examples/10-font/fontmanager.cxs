@@ -1,0 +1,844 @@
+
+#BINARY_FILES+="*.ttf"
+#BINARY_FILES+="*.otf"
+
+Import freetype
+Import cubeatlas
+
+Const MAX_OPENED_FILES            :Int = 64
+Const MAX_OPENED_FONT             :Int = 64
+
+Const FONT_TYPE_ALPHA             :Int = $00000100 ' L8
+Const FONT_TYPE_LCD               :Int = $00000200 ' BGRA8
+Const FONT_TYPE_RGBA              :Int = $00000300 ' BGRA8
+Const FONT_TYPE_DISTANCE          :Int = $00000400 ' L8
+Const FONT_TYPE_DISTANCE_SUBPIXEL :Int = $00000500 ' L8
+
+Class FontInfo
+
+	' The font height in pixel.
+	Field pixelSize          :Int
+	' Rendering type used for the font.
+	Field fontType           :Int
+
+	' The pixel extents above the baseline in pixels (typically positive).
+	Field ascender           :Float
+	' The extents below the baseline in pixels (typically negative).
+	Field descender          :Float
+	' The spacing in pixels between one row's descent and the next row's ascent.
+	Field lineGap            :Float
+	' This field gives the maximum horizontal cursor advance for all glyphs in the font.
+	Field maxAdvanceWidth    :Float
+	' The thickness of the under/hover/strike-trough line in pixels.
+	Field underlineThickness :Float
+	' The position of the underline relatively to the baseline.
+	Field underlinePosition  :Float
+
+	' Scale to apply to glyph data.
+	Field scale              :Float
+End
+
+' Glyph metrics:
+' --------------
+'
+'                       xmin                     xmax
+'                        |                         |
+'                        |<-------- width -------->|
+'                        |                         |
+'              |         +-------------------------+----------------- ymax
+'              |         |    ggggggggg   ggggg    |     ^        ^
+'              |         |   g:::::::::ggg::::g    |     |        |
+'              |         |  g:::::::::::::::::g    |     |        |
+'              |         | g::::::ggggg::::::gg    |     |        |
+'              |         | g:::::g     g:::::g     |     |        |
+'    offset_x -|-------->| g:::::g     g:::::g     |  offset_y    |
+'              |         | g:::::g     g:::::g     |     |        |
+'              |         | g::::::g    g:::::g     |     |        |
+'              |         | g:::::::ggggg:::::g     |     |        |
+'              |         |  g::::::::::::::::g     |     |      height
+'              |         |   gg::::::::::::::g     |     |        |
+'  baseline ---*---------|---- gggggggg::::::g-----*--------      |
+'            / |         |             g:::::g     |              |
+'     origin   |         | gggggg      g:::::g     |              |
+'              |         | g:::::gg   gg:::::g     |              |
+'              |         |  g::::::ggg:::::::g     |              |
+'              |         |   gg:::::::::::::g      |              |
+'              |         |     ggg::::::ggg        |              |
+'              |         |         gggggg          |              v
+'              |         +-------------------------+----------------- ymin
+'              |                                   |
+'              |------------- advance_x ---------->|
+
+' Unicode value of a character
+'  typedef int32_t CodePoint;
+
+Global GlyphInfoPool := New Pool<GlyphInfo>()
+
+' A structure that describe a glyph.
+Class GlyphInfo
+
+	Method Free:Void()
+		GlyphInfoPool.Free( Self )
+	End
+
+	' Index for faster retrieval.
+	Field glyphIndex  :Int
+
+	' Glyph's width in pixels.
+	Field width       :Float
+
+	' Glyph's height in pixels.
+	Field height      :Float
+
+	' Glyph's left offset in pixels
+	Field offset_x    :Float
+
+	' Glyph's top offset in pixels.
+	'
+	' @remark This is the distance from the baseline to the top-most glyph
+	'   scan line, upwards y coordinates being positive.
+	Field offset_y    :Float
+
+	' For horizontal text layouts, this is the unscaled horizontal
+	' distance in pixels used to increment the pen position when the
+	' glyph is drawn as part of a string of text.
+	Field advance_x   :Float
+
+	' For vertical text layouts, this is the unscaled vertical distance
+	' in pixels used to increment the pen position when the glyph is
+	' drawn as part of a string of text.
+	Field advance_y   :Float
+
+	' Region index in the atlas storing textures.
+	Field regionIndex :Int
+End
+
+'  BGFX_HANDLE(TrueTypeHandle);
+'  BGFX_HANDLE(FontHandle);
+
+Class FTHolder
+	Field library := New FT_Library()
+	Field face    := New FT_Face()
+End
+
+' this global variable is used by GlyphInfoInit function
+Global _glyphInfoInitBitmap := New FT_Bitmap()
+
+'  Function GlyphInfoInit:Void( GlyphInfo& _glyphInfo, FT_BitmapGlyph _bitmap, FT_GlyphSlot _slot, uint8_t* _dst, uint32_t _bpp )
+Function GlyphInfoInit:Void( _glyphInfo:GlyphInfo, _bitmapGlyph:FT_BitmapGlyph, _slot:FT_GlyphSlot, _dst:DataBuffer, _bpp:Int )
+
+	Local xx:Int =   _bitmapGlyph.Left()
+	Local yy:Int = - _bitmapGlyph.Top()
+
+	_bitmapGlyph.Bitmap( _glyphInfoInitBitmap )
+
+	Local ww:Int =   _glyphInfoInitBitmap.Width()
+	Local hh:Int =   _glyphInfoInitBitmap.Rows()
+
+	_glyphInfo.offset_x  = Float( xx )
+	_glyphInfo.offset_y  = Float( yy )
+	_glyphInfo.width     = Float( ww )
+	_glyphInfo.height    = Float( hh )
+	_glyphInfo.advance_x = Float( _slot.AdvanceX() / 64.0 )
+	_glyphInfo.advance_y = Float( _slot.AdvanceY() / 64.0 )
+
+	Local dstPitch   :Int = ww * _bpp
+
+	' Local src        :DataBuffer = _bitmap.bitmap.buffer
+	Local srcPitch   :Int = _glyphInfoInitBitmap.Pitch()
+
+	Local dstAddress :Int = 0
+	Local srcAddress :Int = 0
+
+	For Local jj:Int = 0 Until hh
+
+		' src.CopyBytes( srcAddress, _dst, dstAddress, dstPitch )
+		' dstAddress += dstPitch
+		' srcAddress += srcPitch
+
+		For Local ii:Int = 0 Until dstPitch
+			_dst.PokeByte( dstAddress, _glyphInfoInitBitmap.PeekByte( srcAddress ) )
+			dstAddress += 1
+			srcAddress += 1
+		Next
+	Next
+
+End
+
+Class TrueTypeFont
+
+	Field m_font:FTHolder
+
+	Method New()
+		m_font = Null
+	End
+
+	Method Destroy:Void()
+		If m_font Then
+			FT_Done_Face( m_font.face )
+			FT_Done_FreeType( m_font.library )
+			' delete m_font
+			m_font = Null
+		Endif
+	End
+
+	' Initialize from  an external buffer
+	' @remark The ownership of the buffer is external, and you must ensure it stays valid up to this object lifetime
+	' @return true if the initialization succeed
+	Method Init:Bool( _buffer:DataBuffer, _fontIndex:Int, _pixelHeight:Int )
+
+		Local _bufferSize:Int = _buffer.Length()
+
+		If Not ( m_font = Null ) Then Print "TrueTypeFont already initialized"
+		If Not ( _bufferSize > 256 And _bufferSize < 100000000 ) Then Print "TrueType buffer size is suspicious"
+		If Not ( _pixelHeight > 4 And _pixelHeight < 128 ) Then Print "TrueType buffer size is suspicious"
+
+		Local holder := New FTHolder()
+
+		Local err  :Int ' FT_Error
+
+		err = FT_Init_FreeType( holder.library )
+
+		If Not err Then
+			err = FT_New_Memory_Face( holder.library, _buffer, _bufferSize, _fontIndex, holder.face )
+
+			If Not err Then
+				err = FT_Select_Charmap( holder.face, FT_ENCODING_UNICODE )
+
+				If Not err Then
+					err = FT_Set_Pixel_Sizes( holder.face, 0, _pixelHeight )
+
+					If Not err Then
+						m_font = holder
+						Return True
+					Endif
+
+				Endif
+
+				FT_Done_Face( holder.face )
+			Endif
+
+			If FT_Err_Unknown_File_Format = err Then
+				' no need to destroy library in this case
+			Else
+				FT_Done_FreeType( holder.library )
+			Endif
+
+		Endif
+
+		Print "FT_Init_FreeType failed."
+		holder = Null
+
+		Return False
+	End
+
+	Field size    := New FT_Size()
+	Field metrics := New FT_Size_Metrics()
+
+	' return the font descriptor of the current font
+	Method GetFontInfo:Void( outFontInfo:FontInfo )
+
+		If Not m_font Then Print "TrueTypeFont not initialized"
+		If Not FT_IS_SCALABLE( m_font.face ) Then Print "Font is unscalable"
+
+		' Local metrics:FT_Size_Metrics = m_font.face.size.metrics
+
+		m_font.face.Size( size )
+		size.Metrics( metrics )
+
+		outFontInfo.scale              = 1.0
+		outFontInfo.ascender           = metrics.Ascender()   / 64.0
+		outFontInfo.descender          = metrics.Descender()  / 64.0
+		outFontInfo.lineGap            = ( metrics.Height() - metrics.Ascender() + metrics.Descender() ) / 64.0
+		outFontInfo.maxAdvanceWidth    = metrics.MaxAdvance() / 64.0
+
+		outFontInfo.underlinePosition  = FT_MulFix( m_font.face.UnderlinePosition(),  metrics.YScale() ) / 64.0
+		outFontInfo.underlineThickness = FT_MulFix( m_font.face.UnderlineThickness(), metrics.YScale() ) / 64.0
+	End
+
+	Field glyph       := New FT_Glyph()
+	Field glyphSlot   := New FT_GlyphSlot()
+	Field bitmapGlyph := New FT_BitmapGlyph()
+	Field bitmapGlyphBitmap := New FT_Bitmap()
+
+	' raster a glyph as 8bit alpha to a memory buffer
+	' update the GlyphInfo according to the raster strategy
+	' @ remark buffer min size: glyphInfo.m_width * glyphInfo * height * sizeof(char)
+'  	bool TrueTypeFont::bakeGlyphAlpha(CodePoint _codePoint, GlyphInfo& _glyphInfo, uint8_t* _outBuffer)
+'  	Method BakeGlyphAlpha:Bool( _codePoint:Int, _outGlyphInfo:GlyphInfo, _outBuffer:DataBuffer )
+	Method BakeGlyphAlpha:Bool( _codePoint:Int, _glyphInfo:GlyphInfo, _outBuffer:DataBuffer )
+
+		If Not m_font Then Print "TrueTypeFont not initialized"
+
+		_glyphInfo.glyphIndex = FT_Get_Char_Index( m_font.face, _codePoint )
+
+'  		Local slot:FT_GlyphSlot = m_font.face.glyph
+		m_font.face.GlyphSlot( glyphSlot )
+
+		Local err:Int ' FT_Error
+
+		err = FT_Load_Glyph( m_font.face, _glyphInfo.glyphIndex, FT_LOAD_DEFAULT )
+
+		If err Then
+			Return False
+		Endif
+
+		' Local glyph:FT_Glyph
+
+		err = FT_Get_Glyph( glyphSlot, glyph )
+
+		If err Then
+			Return False
+		Endif
+
+		err = FT_Glyph_To_Bitmap( glyph, FT_RENDER_MODE_NORMAL, 1 )
+
+		If err Then
+			Return False
+		Endif
+
+'  		Local bitmap:FT_BitmapGlyph = FT_BitmapGlyph( glyph )
+		glyph.BitmapGlyph( bitmapGlyph )
+
+		GlyphInfoInit( _glyphInfo, bitmapGlyph, glyphSlot, _outBuffer, 1 )
+
+		FT_Done_Glyph( glyph )
+
+		Return True
+	End
+
+	' raster a glyph as 32bit subpixel rgba to a memory buffer
+	' update the GlyphInfo according to the raster strategy
+	' @ remark buffer min size: glyphInfo.m_width * glyphInfo * height * sizeof(uint32_t)
+'  	bool bakeGlyphSubpixel(CodePoint _codePoint, GlyphInfo& _outGlyphInfo, uint8_t* _outBuffer);
+'  	Method BakeGlyphSubpixel:Bool( _codePoint:Int, _outGlyphInfo:GlyphInfo, _outBuffer:DataBuffer )
+	Method BakeGlyphSubpixel:Bool( _codePoint:Int, _glyphInfo:GlyphInfo, _outBuffer:DataBuffer )
+
+		If Not m_font Then Print "TrueTypeFont not initialized"
+
+		_glyphInfo.glyphIndex = FT_Get_Char_Index( m_font.face, _codePoint )
+
+'  		Local slot:FT_GlyphSlot = m_font.face.glyph
+		m_font.face.GlyphSlot( glyphSlot )
+
+'  		Local err:FT_Error
+		Local err:Int
+
+		err = FT_Load_Glyph( m_font.face, _glyphInfo.glyphIndex, FT_LOAD_DEFAULT )
+		If err Then
+			Return False
+		Endif
+
+		Local glyph := New FT_Glyph()
+
+		err = FT_Get_Glyph( glyphSlot, glyph )
+		If err Then
+			Return False
+		Endif
+
+		err = FT_Glyph_To_Bitmap( glyph, FT_RENDER_MODE_LCD, 1 )
+		If err Then
+			Return False
+		Endif
+
+'  		Local bitmap:FT_BitmapGlyph = FT_BitmapGlyph( glyph )
+		glyph.BitmapGlyph( bitmapGlyph )
+
+		GlyphInfoInit( _glyphInfo, bitmapGlyph, glyphSlot, _outBuffer, 3 )
+		FT_Done_Glyph( glyph )
+
+		Return True
+	End
+
+	' raster a glyph as 8bit signed distance to a memory buffer
+	' update the GlyphInfo according to the raster strategy
+	' @ remark buffer min size: glyphInfo.m_width * glyphInfo * height * sizeof(char)
+'  	bool bakeGlyphDistance(CodePoint _codePoint, GlyphInfo& _outGlyphInfo, uint8_t* _outBuffer);
+'  	Method BakeGlyphDistance:Bool( _codePoint:Int, _outGlyphInfo:GlyphInfo, _outBuffer:DataBuffer )
+	Method BakeGlyphDistance:Bool( _codePoint:Int, _glyphInfo:GlyphInfo, _outBuffer:DataBuffer )
+
+		If Not m_font Then Print "TrueTypeFont not initialized"
+
+		_glyphInfo.glyphIndex = FT_Get_Char_Index( m_font.face, _codePoint )
+
+		Local loadMode   :Int = FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING
+		Local renderMode :Int = FT_RENDER_MODE_NORMAL
+
+'  		Local slot:FT_GlyphSlot = m_font.face.glyph
+		m_font.face.GlyphSlot( glyphSlot )
+
+'  		Local err:FT_Error
+		Local err:Int
+
+		err = FT_Load_Glyph( m_font.face, _glyphInfo.glyphIndex, loadMode )
+		If err Then
+			Return False
+		Endif
+
+		Local glyph := New FT_Glyph()
+
+		err = FT_Get_Glyph( glyphSlot, glyph )
+
+		If err Then
+			Return False
+		Endif
+
+		err = FT_Glyph_To_Bitmap( glyph, renderMode, 1 )
+
+		If err Then
+			Return False
+		Endif
+
+'  		Local bitmap:FT_BitmapGlyph = FT_BitmapGlyph( glyph )
+		glyph.BitmapGlyph( bitmapGlyph )
+		bitmapGlyph.Bitmap( bitmapGlyphBitmap )
+
+		Local ww:Int = bitmapGlyphBitmap.Width()
+		Local hh:Int = bitmapGlyphBitmap.Rows()
+
+		GlyphInfoInit( _glyphInfo, bitmapGlyph, glyphSlot, _outBuffer, 1 )
+
+		FT_Done_Glyph( glyph )
+
+		If ww * hh > 0 Then
+
+			Local dw:Int = 6
+			Local dh:Int = 6
+
+			Local nw:Int = ww + dw * 2
+			Local nh:Int = hh + dh * 2
+
+			If Not ( nw * nh < 128 * 128 ) Then Print "Buffer overflow (size %d)" + (nw * nh)
+
+			Local buffSize:Int = nw * nh
+
+			' uint8_t* alphaImg = (uint8_t*)malloc(buffSize);
+			' bx::memSet(alphaImg, 0, nw * nh * sizeof(uint8_t) );
+			Local alphaImg := New DataBuffer( buffSize )
+			For Local ii:Int = 0 Until nw * nh
+				alphaImg.PokeByte( ii, 0 )
+			Next
+
+			' copy the original buffer to the temp one
+			For Local ii:Int = dh Until nh - dh
+				' alphaImg.CopyBytes( ii * nw + dw, _outBuffer, (ii - dh) * ww, ww )
+				_outBuffer.CopyBytes( (ii - dh) * ww, alphaImg, ii * nw + dw, ww )
+			Next
+
+			sdfBuild( _outBuffer, nw, 8.0, alphaImg, nw, nh, nw )
+
+			alphaImg.Discard() ' free( alphaImg )
+
+			_glyphInfo.offset_x -= Float( dw )
+			_glyphInfo.offset_y -= Float( dh )
+			_glyphInfo.width     = Float( nw )
+			_glyphInfo.height    = Float( nh )
+		Endif
+
+		Return True
+	End
+
+End
+
+Global CachedFontPool := New Pool<CachedFont>()
+
+Class CachedFont ' cache font data
+
+	Method Free:Void()
+		CachedFontPool.Free( Self )
+	End
+
+	' Method New()
+	'	trueTypeFont     = Null
+	'	masterFontHandle = BGFX_INVALID_HANDLE
+	' End
+
+	Field fontInfo         := New FontInfo()
+	Field cachedGlyphs     := New IntMap<GlyphInfo>()
+	Field trueTypeFont     := New TrueTypeFont()
+	' an handle to a master font in case of sub distance field font
+	Field masterFontHandle :Int = BGFX_INVALID_HANDLE ' :FontHandle
+	Field padding          :Int
+End
+
+Global CachedFilePool := New Pool<CachedFile>()
+
+Class CachedFile
+
+	Method Free:Void()
+		CachedFilePool.Free( Self )
+	End
+
+	Field buffer:DataBuffer
+	' Field bufferSize:Int
+End
+
+Const MAX_FONT_BUFFER_SIZE:Int = (512 * 512 * 4)
+
+Class FontManager
+
+	Field m_ownAtlas    :Bool
+	Field m_cubeAtlas       :CubeAtlas
+
+	' bx::HandleAllocT<MAX_OPENED_FONT> m_fontHandles;
+	' CachedFont* m_cachedFonts;
+	Field m_cachedFonts :Stack<CachedFont>
+
+	' bx::HandleAllocT<MAX_OPENED_FILES> m_filesHandles;
+	' CachedFile* m_cachedFiles;
+	Field m_cachedFiles :Stack<CachedFile>
+
+	Field m_blackGlyph  :GlyphInfo
+
+	'temporary buffer to raster glyph
+	Field m_buffer      :DataBuffer
+
+	' Create the font manager using an external cube atlas (doesn't take
+	' ownership of the atlas).
+	Method New( _cubeAtlas:CubeAtlas )
+		m_ownAtlas  = False
+		m_cubeAtlas = _cubeAtlas
+		Init()
+	End
+
+	' Create the font manager and create the texture cube as BGRA8 with
+	' linear filtering.
+	Method New( _textureSideWidth:Int = 512 )
+		m_ownAtlas  = True
+		m_cubeAtlas = New CubeAtlas( _textureSideWidth )
+		Init()
+	End
+
+	Method Init:Void()
+
+		m_cachedFiles = New Stack<CachedFile>() ' CachedFile[ MAX_OPENED_FILES ]
+		m_cachedFonts = New Stack<CachedFont>() ' CachedFont[ MAX_OPENED_FONT ]
+		m_buffer      = New DataBuffer( MAX_FONT_BUFFER_SIZE ) ' Int[ MAX_FONT_BUFFER_SIZE ]
+
+		Const W:Int = 3
+
+		' Create filler rectangle
+		Local buffer := New DataBuffer( W * W * 4 )
+
+		'
+		' @Cleanup: create memset for DataBuffer?
+		'
+		' bx::memSet(buffer, 255, W * W * 4);
+		For Local ii:Int = 0 Until buffer.Length()
+			buffer.PokeByte( ii, 255 )
+		Next
+
+		m_blackGlyph = New GlyphInfo()
+
+		m_blackGlyph.width  = W
+		m_blackGlyph.height = W
+
+		' make sure the black glyph doesn't bleed by using a one pixel inner outline
+		m_blackGlyph.regionIndex = m_cubeAtlas.AddRegion( W, W, buffer, AtlasRegion.TYPE_GRAY, 1 )
+	End
+
+	Method Destroy:Void()
+
+		If m_cachedFonts.Length() > 0 Then
+			Print "All the fonts must be destroyed before destroying the manager"
+			' delete [] m_cachedFonts;
+			m_cachedFonts = Null
+		Endif
+
+		If m_cachedFiles.Length() > 0 Then
+			Print "All the font files must be destroyed before destroying the manager"
+			' delete [] m_cachedFiles;
+			m_cachedFiles = Null
+		Endif
+
+		' delete [] m_buffer;
+		m_buffer = Null
+
+		If m_ownAtlas Then
+			' delete m_cubeAtlas;
+			m_cubeAtlas = Null
+		Endif
+	End
+
+	' Retrieve the atlas used by the font manager (e.g. to add stuff to it)
+	Method GetCubeAtlas:CubeAtlas()
+		Return m_cubeAtlas
+	End
+
+	' Load a TrueType font from a given buffer. The buffer is copied and
+	' thus can be freed or reused after this call.
+	'
+	' @return invalid handle if the loading fail
+	Method CreateTtf:Int( buffer:DataBuffer )
+
+		Local id:Int = m_cachedFiles.Length()
+
+		If id = BGFX_INVALID_HANDLE Then
+			Print "Invalid handle used"
+		Endif
+
+		Local cachedFile := CachedFilePool.Allocate()
+
+		cachedFile.buffer = buffer
+		m_cachedFiles.Push( cachedFile )
+		' bx::memCopy(m_cachedFiles[id].buffer, _buffer, _size);
+
+		Return id
+	End
+
+	' Unload a TrueType font (free font memory) but keep loaded glyphs.
+	Method DestroyTtf:Void( _handle:Int )
+	
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		' delete m_cachedFiles[ _handle.idx].buffer;
+		' m_cachedFiles[_handle.idx].buffer = NULL;
+		' m_filesHandles.free(_handle.idx);
+
+		Local cachedFile := m_cachedFiles.Get( _handle )
+
+		cachedFile.buffer = Null
+		cachedFile.Free()
+
+		m_cachedFiles.Remove( _handle )
+	End
+
+	' Return a font whose height is a fixed pixel size.
+	Method CreateFontByPixelSize:Int( _ttfHandle:Int, _typefaceIndex:Int, _pixelSize:Int, _fontType:Int=FONT_TYPE_ALPHA )
+
+		If Not bgfxIsValid( _ttfHandle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local cachedFile := m_cachedFiles.Get( _ttfHandle )
+
+		Local font := CachedFontPool.Allocate()
+		Local ttf  := font.trueTypeFont
+
+		If Not ttf.Init( cachedFile.buffer, _typefaceIndex, _pixelSize ) Then
+			font.Free()
+			Return BGFX_INVALID_HANDLE
+		Endif
+
+		Local fontIdx:Int = m_cachedFonts.Length()
+
+		If fontIdx = BGFX_INVALID_HANDLE Then
+			Print "Invalid handle used"
+		Endif
+
+		font.trueTypeFont       = ttf
+		ttf.GetFontInfo( font.fontInfo )
+		font.fontInfo.fontType  = Int( _fontType )
+		font.fontInfo.pixelSize = Int( _pixelSize )
+		font.cachedGlyphs.Clear()
+		font.masterFontHandle   = BGFX_INVALID_HANDLE
+
+		m_cachedFonts.Push( font )
+
+		' FontHandle handle = { fontIdx };
+		' return handle;
+		Return fontIdx
+	End
+
+	' Return a scaled child font whose height is a fixed pixel size.
+	Method CreateScaledFontToPixelSize:Int( _baseFontHandle:Int, _pixelSize:Int )
+
+		If Not bgfxIsValid( _baseFontHandle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local baseFont     := m_cachedFonts.Get( _baseFontHandle )
+		Local baseFontInfo := baseFont.fontInfo;
+
+		Local font         := CachedFontPool.Allocate()
+		Local newFontInfo  := font.fontInfo
+
+		newFontInfo.fontType           = baseFontInfo.fontType
+		newFontInfo.pixelSize          = Int( _pixelSize )
+		newFontInfo.scale              = Float( _pixelSize ) / Float( baseFontInfo.pixelSize )
+		newFontInfo.ascender           = ( baseFontInfo.ascender           * newFontInfo.scale )
+		newFontInfo.descender          = ( baseFontInfo.descender          * newFontInfo.scale )
+		newFontInfo.lineGap            = ( baseFontInfo.lineGap            * newFontInfo.scale )
+		newFontInfo.maxAdvanceWidth    = ( baseFontInfo.maxAdvanceWidth    * newFontInfo.scale )
+		newFontInfo.underlineThickness = ( baseFontInfo.underlineThickness * newFontInfo.scale )
+		newFontInfo.underlinePosition  = ( baseFontInfo.underlinePosition  * newFontInfo.scale )
+
+		Local fontIdx:Int = m_cachedFonts.Length()
+
+		If fontIdx = BGFX_INVALID_HANDLE Then
+			Print "Invalid handle used"
+		Endif
+
+		font.cachedGlyphs.Clear()
+		' font.fontInfo         = newFontInfo ' <-- look at Local newFontInfo := font.fontInfo, so newFontInfo is font.fontInfo
+		' font.trueTypeFont     = Null        ' <-- don't Null this we will check using masterFontHandle instead
+		font.masterFontHandle = _baseFontHandle
+
+		m_cachedFonts.Push( font )
+
+		' FontHandle handle = { fontIdx };
+		' return handle;
+		Return fontIdx
+	End
+
+	' destroy a font (truetype or baked)
+	Method DestroyFont:Void( _handle:Int )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local font := m_cachedFonts.Get( _handle )
+
+		' If font.trueTypeFont <> Null Then
+		'	delete font.trueTypeFont;
+		'	font.trueTypeFont = Null
+		' Endif
+
+		font.cachedGlyphs.Clear()
+
+		font.Free()
+		m_cachedFonts.Remove( _handle )
+	End
+
+	' Preload a set of glyphs from a TrueType file.
+	'
+	' @return True if every glyph could be preloaded, false otherwise if
+	'   the Font is a baked font, this only do validation on the characters.
+	Method PreloadGlyph:Bool( _handle:Int, _string:String )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local font := m_cachedFonts.Get( _handle )
+
+		If Null = font.trueTypeFont Then
+			Return False
+		Endif
+
+		For Local ii:Int = 0 Until _string.Length()
+
+			Local codePoint:Int = _string[ ii ]
+
+			If Not PreloadGlyph( _handle, codePoint ) Then
+				Return False
+			Endif
+		Next
+
+		Return True
+	End
+
+	' Preload a single glyph, return true on success.
+	Method PreloadGlyph:Bool( _handle:Int, _codePoint:Int )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Local font     := m_cachedFonts.Get( _handle )
+		Local fontInfo := font.fontInfo
+
+		If font.cachedGlyphs.Contains( _codePoint ) Then
+			Return True
+		Endif
+
+		' If font.trueTypeFont Then <-- this is always true
+		If font.masterFontHandle = BGFX_INVALID_HANDLE Then
+
+			Local glyphInfo := GlyphInfoPool.Allocate()
+
+			Select (font.fontInfo.fontType)
+
+			Case FONT_TYPE_ALPHA
+				font.trueTypeFont.BakeGlyphAlpha( _codePoint, glyphInfo, m_buffer )
+
+			Case FONT_TYPE_DISTANCE
+				font.trueTypeFont.BakeGlyphDistance( _codePoint, glyphInfo, m_buffer )
+
+			Case FONT_TYPE_DISTANCE_SUBPIXEL
+				font.trueTypeFont.BakeGlyphDistance( _codePoint, glyphInfo, m_buffer )
+
+			Default
+				Print "TextureType not supported yet"
+			End
+
+			If Not AddBitmap( glyphInfo, m_buffer ) Then
+				glyphInfo.Free()
+				Return False
+			Endif
+
+			glyphInfo.advance_x = glyphInfo.advance_x * fontInfo.scale
+			glyphInfo.advance_y = glyphInfo.advance_y * fontInfo.scale
+			glyphInfo.offset_x  = glyphInfo.offset_x  * fontInfo.scale
+			glyphInfo.offset_y  = glyphInfo.offset_y  * fontInfo.scale
+			glyphInfo.height    = glyphInfo.height    * fontInfo.scale
+			glyphInfo.width     = glyphInfo.width     * fontInfo.scale
+
+			' Print "font=" + _handle + " _codePoint=" + _codePoint
+
+			font.cachedGlyphs.Set( _codePoint, glyphInfo )
+			Return True
+		Endif
+
+		If bgfxIsValid( font.masterFontHandle ) And PreloadGlyph( font.masterFontHandle, _codePoint ) Then
+
+			Local glyphInfo := GetGlyphInfo( font.masterFontHandle, _codePoint )
+
+			glyphInfo.advance_x = glyphInfo.advance_x * fontInfo.scale
+			glyphInfo.advance_y = glyphInfo.advance_y * fontInfo.scale
+			glyphInfo.offset_x  = glyphInfo.offset_x  * fontInfo.scale
+			glyphInfo.offset_y  = glyphInfo.offset_y  * fontInfo.scale
+			glyphInfo.height    = glyphInfo.height    * fontInfo.scale
+			glyphInfo.width     = glyphInfo.width     * fontInfo.scale
+
+			font.cachedGlyphs.Set( _codePoint, glyphInfo )
+			Return True
+		Endif
+
+		Return False
+	End
+
+	' Return the font descriptor of a font.
+	'
+	' @remark the handle is required to be valid
+	Method GetFontInfo:FontInfo( _handle:Int )
+
+		If Not bgfxIsValid( _handle ) Then
+			Print "Invalid handle used"
+		Endif
+
+		Return m_cachedFonts.Get( _handle ).fontInfo
+	End
+
+	' Return the rendering informations about the glyph region. Load the
+	' glyph from a TrueType font if possible
+	'
+	Method GetGlyphInfo:GlyphInfo( _handle:Int, _codePoint:Int )
+
+		Local glyphInfo := m_cachedFonts.Get( _handle ).cachedGlyphs.Get( _codePoint )
+
+		If Not glyphInfo Then
+			PreloadGlyph( _handle, _codePoint )
+			glyphInfo = m_cachedFonts.Get( _handle ).cachedGlyphs.Get( _codePoint )
+		Endif
+
+		If Not glyphInfo Then
+			Print "Failed to preload glyph."
+		Endif
+
+		Return glyphInfo
+	End
+
+	Method GetBlackGlyph:GlyphInfo()
+		Return m_blackGlyph
+	End
+
+	Method AddBitmap:Bool( _glyphInfo:GlyphInfo, _data:DataBuffer )
+		_glyphInfo.regionIndex = m_cubeAtlas.AddRegion( Ceil( _glyphInfo.width ), Ceil( _glyphInfo.height ), _data, AtlasRegion.TYPE_GRAY )
+		Return True
+	End
+
+End

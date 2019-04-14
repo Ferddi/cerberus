@@ -1,0 +1,30 @@
+using namespace metal;
+struct xlatMtlShaderInput {
+  float4 v_color0;
+  float4 v_texcoord0;
+};
+struct xlatMtlShaderOutput {
+  float4 gl_FragColor;
+};
+struct xlatMtlShaderUniform {
+};
+fragment xlatMtlShaderOutput xlatMtlMain (xlatMtlShaderInput _mtl_i [[stage_in]], constant xlatMtlShaderUniform& _mtl_u [[buffer(0)]]
+  ,   texturecube<float> s_texColor [[texture(0)]], sampler _mtlsmp_s_texColor [[sampler(0)]])
+{
+  xlatMtlShaderOutput _mtl_o;
+  float rgba_1[4];
+  float4 tmpvar_2 = 0;
+  tmpvar_2 = s_texColor.sample(_mtlsmp_s_texColor, (float3)(_mtl_i.v_texcoord0.xyz));
+  int tmpvar_3 = 0;
+  tmpvar_3 = int(((_mtl_i.v_texcoord0.w * 4.0) + 0.5));
+  rgba_1[0] = tmpvar_2.z;
+  rgba_1[1] = tmpvar_2.y;
+  rgba_1[2] = tmpvar_2.x;
+  rgba_1[3] = tmpvar_2.w;
+  float4 tmpvar_4 = 0;
+  tmpvar_4.xyz = _mtl_i.v_color0.xyz;
+  tmpvar_4.w = (_mtl_i.v_color0.w * rgba_1[tmpvar_3]);
+  _mtl_o.gl_FragColor = tmpvar_4;
+  return _mtl_o;
+}
+

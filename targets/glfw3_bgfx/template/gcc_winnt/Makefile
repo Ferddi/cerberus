@@ -15,6 +15,8 @@ CPPFLAGS=$(CCOPTS) \
 -I../bimg/include \
 -I../bgfx/include \
 -I../bgfx/examples/common \
+-I../freetype \
+-I../sdf \
 -Wall -Wextra -fomit-frame-pointer -g -O3 -m64 \
 -Wshadow -fdata-sections -ffunction-sections \
 -msse2 -m64 -w \

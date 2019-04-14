@@ -1,0 +1,38 @@
+varying vec4 v_color0;
+varying vec4 v_texcoord0;
+uniform samplerCube s_texColor;
+void main ()
+{
+  float rgba_1[4];
+  vec4 tmpvar_2;
+  tmpvar_2 = textureCube (s_texColor, v_texcoord0.xyz);
+  int tmpvar_3;
+  tmpvar_3 = int(((v_texcoord0.w * 4.0) + 0.5));
+  rgba_1[0] = tmpvar_2.z;
+  rgba_1[1] = tmpvar_2.y;
+  rgba_1[2] = tmpvar_2.x;
+  rgba_1[3] = tmpvar_2.w;
+  vec3 tmpvar_4;
+  tmpvar_4 = dFdx(v_texcoord0.xyz);
+  vec3 tmpvar_5;
+  tmpvar_5 = dFdy(v_texcoord0.xyz);
+  float tmpvar_6;
+  tmpvar_6 = (8.0 * (sqrt(
+    dot (tmpvar_4, tmpvar_4)
+  ) + sqrt(
+    dot (tmpvar_5, tmpvar_5)
+  )));
+  float edge0_7;
+  edge0_7 = (0.5 - tmpvar_6);
+  float tmpvar_8;
+  tmpvar_8 = clamp (((rgba_1[tmpvar_3] - edge0_7) / (
+    (0.5 + tmpvar_6)
+   - edge0_7)), 0.0, 1.0);
+  vec4 tmpvar_9;
+  tmpvar_9.xyz = v_color0.xyz;
+  tmpvar_9.w = (v_color0.w * (tmpvar_8 * (tmpvar_8 * 
+    (3.0 - (2.0 * tmpvar_8))
+  )));
+  gl_FragColor = tmpvar_9;
+}
+

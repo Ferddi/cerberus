@@ -1,0 +1,283 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+Import mojo.app
+Import mojo.input
+Import bgfx
+
+Import fontmanager
+Import textbuffermanager
+
+Import icons_font_awesome
+Import icons_kenney
+
+' Function LoadTtf:TrueTypeHandle( _fm:FontManager, _filePath:String )
+Function LoadTtf:Int( _fm:FontManager, _filename:String )
+
+	Local handle   :Int = BGFX_INVALID_HANDLE
+	Local filePath :String = "cerberus://data/font/" + _filename ' shaders/dx11/vs_font_basic.bin"
+	Local dataBuf  := DataBuffer.Load( filePath )
+
+	If dataBuf Then
+		handle = _fm.CreateTtf( dataBuf )
+	Endif
+
+	Return handle
+End
+
+Class FontSdfExample Extends App
+
+	Field bgfxCaps            := New BgfxCaps()
+
+	Field m_width             :Int
+	Field m_height            :Int
+	' Field m_debug             :Int = BGFX_DEBUG_NONE
+	Field m_debug             :Int = BGFX_DEBUG_TEXT
+	Field m_reset             :Int
+
+	Field m_bigText           :String
+
+	' Init the text rendering system.
+	Field m_fontManager       :FontManager
+	Field m_textBufferManager :TextBufferManager
+
+	Field m_font              :Int ' TrueTypeHandle
+	Field m_fontSdf           :Int ' FontHandle
+	Field m_fontScaled        :Int ' FontHandle
+
+	Field m_scrollableBuffer  :Int ' TextBufferHandle
+
+'  	Field m_metrics           :TextLineMetrics ' = TextLineMetrics(FontInfo());
+	Field m_lineCount         :Int
+	Field m_visibleLineCount  :Float
+'  	Field const char* m_textBegin;
+'  	Field const char* m_textEnd;
+
+	Field m_textScroll   :Float
+	Field m_textRotation :Float
+	Field m_textScale    :Float
+	Field m_textSize     :Float
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = BGFX_RESET_VSYNC
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		' m_bigText = "To Sherlock Holmes she is always THE woman."
+		m_bigText = LoadString( "text/sherlock_holmes_a_scandal_in_bohemia_arthur_conan_doyle.txt" )
+		' Local bigTextDb := DataBuffer.Load( "cerberus://data/text/sherlock_holmes_a_scandal_in_bohemia_arthur_conan_doyle.txt" )
+		' m_bigText = bigTextDb.PeekString( 0 )
+
+		' Init the text rendering system.
+		m_fontManager       = New FontManager( 512 )
+		m_textBufferManager = New TextBufferManager( m_fontManager )
+
+		m_font = LoadTtf( m_fontManager, "special_elite.ttf" )
+
+		' Create a distance field font.
+		m_fontSdf = m_fontManager.CreateFontByPixelSize( m_font, 0, 48, FONT_TYPE_DISTANCE )
+
+		' Create a scaled down version of the same font (without adding anything to the atlas).
+		m_fontScaled = m_fontManager.CreateScaledFontToPixelSize( m_fontSdf, 14 )
+
+'  		m_metrics = TextLineMetrics( m_fontManager.GetFontInfo( m_fontScaled ) )
+'  		m_lineCount = m_metrics.GetLineCount( m_bigText )
+
+		m_visibleLineCount = 20.0
+
+'  		m_textBegin = 0
+'  		m_textEnd = 0
+'  		m_metrics.GetSubText( m_bigText, 0, m_visibleLineCount, m_textBegin, m_textEnd )
+
+		m_scrollableBuffer = m_textBufferManager.CreateTextBuffer( FONT_TYPE_DISTANCE, BufferType.TransientBuffer )
+		m_textBufferManager.SetTextColor( m_scrollableBuffer, $FFFFFFFF )
+
+		' DebugStop()
+
+		Local ch:Int = m_bigText[872]
+		Print "ch=" + ch + " " + String.FromChar( ch )
+
+'  		m_textBufferManager.AppendText( m_scrollableBuffer, m_fontScaled, m_textBegin, m_textEnd )
+		m_textBufferManager.AppendText( m_scrollableBuffer, m_fontScaled, m_bigText )
+
+		m_textScroll = 0.0
+		m_textRotation = 0.0
+		m_textScale = 1.0
+		m_textSize = 14.0
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		If KeyDown( KEY_UP ) Then linePosY -= 10
+		If KeyDown( KEY_DOWN ) Then linePosY += 10
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		m_bigText = "" ' BX_FREE(entry::getAllocator(), m_bigText);
+'  
+'  		m_fontManager.DestroyTtf( m_font )
+'  		' Destroy the fonts.
+'  		m_fontManager.DestroyFont( m_fontSdf )
+'  		m_fontManager.DestroyFont( m_fontScaled )
+'  
+'  		m_textBufferManager.DestroyTextBuffer( m_scrollableBuffer )
+'  
+'  		m_textBufferManager = Null ' delete m_textBufferManager;
+'  		m_fontManager = Null ' delete m_fontManager;
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field last:Int
+	Field linePosY:Int = 0
+
+	Method OnRender:Int()
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch( 0 )
+
+		' Update frame timer
+		Local now       :Int = Millisecs()
+		Local frameTime :Int = now - last
+		last = now
+
+'  		DrawText( "Settings", 16, 14 * 1 )
+'  		DrawText( "# of lines: " + m_visibleLineCount, 16, 14 * 2 )
+'  		DrawText( "Font size" + m_textSize, 16, 14 * 3 )
+
+'  		bool recomputeVisibleText = false;
+'  		recomputeVisibleText |= ImGui::SliderFloat("# of lines", &m_visibleLineCount, 1.0f, 177.0f);
+'  
+'  		if (ImGui::SliderFloat("Font size", &m_textSize, 6.0f, 64.0f) )
+'  		{
+'  			m_fontManager->destroyFont(m_fontScaled);
+'  			m_fontScaled = m_fontManager->createScaledFontToPixelSize(m_fontSdf, (uint32_t) m_textSize);
+'  			m_metrics = TextLineMetrics(m_fontManager->getFontInfo(m_fontScaled) );
+'  			recomputeVisibleText = true;
+'  		}
+'  
+'  		recomputeVisibleText |= ImGui::SliderFloat("Scroll", &m_textScroll, 0.0f, (m_lineCount-m_visibleLineCount));
+'  		ImGui::SliderFloat("Rotate", &m_textRotation, 0.0f, bx::kPi*2.0f);
+'  		recomputeVisibleText |= ImGui::SliderFloat("Scale", &m_textScale, 0.1f, 10.0f);
+'  
+'  		if (recomputeVisibleText)
+'  		{
+'  			m_textBufferManager->clearTextBuffer(m_scrollableBuffer);
+'  			m_metrics.getSubText(m_bigText,(uint32_t)m_textScroll, (uint32_t)(m_textScroll+m_visibleLineCount), m_textBegin, m_textEnd);
+'  			m_textBufferManager->appendText(m_scrollableBuffer, m_fontScaled, m_textBegin, m_textEnd);
+'  		}
+'  
+'  		ImGui::End();
+'  
+'  		imguiEndFrame();
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect( 0, 0, 0, Int( m_width ), Int( m_height ) )
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch(0)
+
+		Local at   :Float[] = [ 0.0, 0.0,  0.0 ]
+		Local eye  :Float[] = [ 0.0, 0.0, -1.0 ]
+
+		Local view :Float[ 16 ]
+		bxMtxLookAt( view, eye, at )
+
+		Const centering:Float = 0.5
+
+		' Setup a top-left ortho matrix for screen space drawing.
+		bgfxGetCaps( bgfxCaps ) ' const bgfx::Caps* caps = bgfx::getCaps();
+		' {
+			Local ortho:Float[ 16 ]
+			bxMtxOrtho( ortho, centering, m_width + centering, m_height + centering, centering, -1.0, 1.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+			bgfxSetViewTransform( 0, view, ortho )
+			bgfxSetViewRect( 0, 0, 0, Int( m_width ), Int( m_height ) )
+		' }
+
+		'very crude approximation :(
+		Local textAreaWidth   :Float = 0.5 * 66.0 * m_fontManager.GetFontInfo( m_fontScaled ).maxAdvanceWidth
+
+		Local textRotMat      :Float[ 16 ]
+		Local textCenterMat   :Float[ 16 ]
+		Local textScaleMat    :Float[ 16 ]
+		Local screenCenterMat :Float[ 16 ]
+
+		bxMtxRotateZ( textRotMat, m_textRotation )
+'  		bxMtxTranslate( textCenterMat, -( textAreaWidth * 0.5 ), ( -m_visibleLineCount ) * m_metrics.GetLineHeight() * 0.5, 0)
+		bxMtxTranslate( textCenterMat, -( textAreaWidth * 0.5 ), linePosY, 0)
+		bxMtxScale( textScaleMat, m_textScale, m_textScale, 1.0 )
+		bxMtxTranslate( screenCenterMat, ( (m_width) * 0.5), ( (m_height) * 0.5), 0 )
+
+		'first translate to text center, then scale, then rotate
+		Local tmpMat  :Float[ 16 ]
+		bxMtxMul( tmpMat, textCenterMat, textRotMat )
+
+		Local tmpMat2 :Float[ 16 ]
+		bxMtxMul( tmpMat2, tmpMat, textScaleMat )
+
+		Local tmpMat3 :Float[ 16 ]
+		bxMtxMul( tmpMat3, tmpMat2, screenCenterMat )
+
+		' Set model matrix for rendering.
+		bgfxSetTransform( tmpMat3 )
+
+		' Draw your text.
+		m_textBufferManager.SubmitTextBuffer( m_scrollableBuffer, 0 )
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame(False)
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 11-fontsdf"
+	Print "Description: Use a single distance field font to render text of various size."
+	New FontSdfExample()
+	Return 0
+End
+
+
