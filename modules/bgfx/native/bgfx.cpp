@@ -1135,6 +1135,11 @@ float _bx_lerp( float _a, float _b, float _t )
 	return bx::lerp( _a, _b, _t );
 }
 
+void _bx_mtx_rotate_x( Array<float> _result, float _ax )
+{
+	bx::mtxRotateX( &_result[0], _ax );
+}
+
 void _bx_mtx_rotate_y( Array<float> _result, float _ay )
 {
 	bx::mtxRotateY( &_result[0], _ay );
