@@ -1,0 +1,1105 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Import camera
+
+'  /*
+'   * Intro
+'   * =====
+'   *
+'   * RSM (reflective shadow map) is a technique for global illumination.
+'   * It is similar to shadow map.  It piggybacks on the shadow map, in fact.
+'   *
+'   * RSM is compatible with any type of lighting which can handle handle
+'   * a lot of point lights.  This sample happens to use a deferred renderer,
+'   * but other types would work.
+'   *
+'   * Overview:
+'   *
+'   *  - Draw into G-Buffer
+'   *  - Draw Shadow Map (with RSM piggybacked on)
+'   *  - Populate light buffer
+'   *  - Deferred "combine" pass.
+'   *
+'   * Details
+'   * =======
+'   *
+'   * ## G-Buffer
+'   *
+'   * Typical G-Buffer with normals, color, depth.
+'   *
+'   * ## RSM
+'   *
+'   * A typical shadow map, except it also outputs to a "RSM" buffer.
+'   * The RSM contains the color of the item drawn, as well as a scalar value which represents
+'   * how much light would bounce off of the surface if it were hit with light from the origin
+'   * of the shadow map.
+'   *
+'   * ## Light Buffer
+'   *
+'   * We draw a lot of spheres into the light buffer.  These spheres are called VPL (virtual
+'   * point lights).  VPLs represent bounced light, and let us eliminate the classic "ambient"
+'   * term.  Instead of us supplying their world space position in a transform matrix,
+'   * VPLs gain their position from the shadow map from step 2, using an unprojection.  They gain
+'   * their color from the RSM.  You could also store their position in a buffer while drawing shadows,
+'   * I'm just using depth to keep the sample smaller.
+'   *
+'   * ## Deferred combine
+'   *
+'   * Typical combine used in almost any sort of deferred renderer.
+'   *
+'   * References
+'   * ==========
+'   *
+'   * http: *www.bpeers.com/blog/?itemid=517
+'   *
+'   */
+
+' Render passes
+Const RENDER_PASS_GBUFFER      :Int = 0  ' GBuffer for normals and albedo
+Const RENDER_PASS_SHADOW_MAP   :Int = 1  ' Draw into the shadow map (RSM and regular shadow map at same time)
+Const RENDER_PASS_LIGHT_BUFFER :Int = 2  ' Light buffer for point lights
+Const RENDER_PASS_COMBINE      :Int = 3  ' Directional light and final result
+
+' Gbuffer has multiple render targets
+Const GBUFFER_RT_NORMAL :Int = 0
+Const GBUFFER_RT_COLOR  :Int = 1
+Const GBUFFER_RT_DEPTH  :Int = 2
+
+' Shadow map has multiple render targets
+Const SHADOW_RT_RSM     :Int = 0        ' In this algorithm, shadows write lighting info as well.
+Const SHADOW_RT_DEPTH   :Int = 1        ' Shadow maps always write a depth
+
+' Random meshes we draw
+Const MODEL_COUNT       :Int = 222  ' In this demo, a model is a mesh plus a transform and a color
+
+Const SHADOW_MAP_DIM    :Int = 512
+Const LIGHT_DIST        :Float = 10.0
+
+Global s_meshPaths:String[] = [
+	"meshes/cube.bin",
+	"meshes/orb.bin",
+	"meshes/column.bin",
+	"meshes/bunny.bin",
+	"meshes/tree.bin",
+	"meshes/hollowcube.bin" ]
+
+Global s_meshScale:Float[] = [ 0.25, 0.5, 0.05, 0.5, 0.05, 0.05 ]
+
+' Vertex decl for our screen space quad (used in deferred rendering)
+Class PosTexCoord0Vertex
+
+	Field m_x :Float
+	Field m_y :Float
+	Field m_z :Float
+
+	Field m_u :Float
+	Field m_v :Float
+
+	Method New( _x:Float, _y:Float, _z:Float, _u:Float, _v:Float )
+
+		Self.m_x = _x
+		Self.m_y = _y
+		Self.m_z = _z
+
+		Self.m_u = _u
+		Self.m_v = _v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global _tvb := New BgfxTransientVertexBuffer()
+
+Function ScreenSpaceQuad:Void( _textureWidth:Float, _textureHeight:Float, _texelHalf:Float, _originBottomLeft:Bool=False, _width:Float=1.0, _height:Float=1.0 )
+
+	If 3 = bgfxGetAvailTransientVertexBuffer( 3, PosTexCoord0Vertex.ms_decl ) Then
+
+		bgfxAllocTransientVertexBuffer( _tvb, 3, PosTexCoord0Vertex.ms_decl )
+
+		Local vertex     :Int   = 0 
+
+		Local zz         :Float = 0.0
+
+		Local minx       :Float = -_width
+		Local maxx       :Float =  _width
+		Local miny       :Float = 0.0
+		Local maxy       :Float = _height * 2.0
+
+		Local texelHalfW :Float = _texelHalf / _textureWidth
+		Local texelHalfH :Float = _texelHalf / _textureHeight
+		Local minu       :Float = -1.0 + texelHalfW
+		Local maxu       :Float =  1.0 + texelHalfW
+
+		Local minv       :Float = texelHalfH
+		Local maxv       :Float = 2.0 + texelHalfH
+
+		If _originBottomLeft Then
+
+			Local temp:Float = minv
+			minv = maxv
+			maxv = temp
+
+			minv -= 1.0
+			maxv -= 1.0
+		Endif
+
+		_tvb.PokeFloat( vertex, minx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, miny      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, minv      ) ; vertex += 4
+
+		_tvb.PokeFloat( vertex, maxx      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxy      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, zz        ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxu      ) ; vertex += 4
+		_tvb.PokeFloat( vertex, maxv      ) ; vertex += 4
+
+		bgfxSetTransientVertexBuffer( 0, _tvb )
+	Endif
+End
+
+Class Model
+	Field mesh     :Int ' Index of mesh in m_meshes
+	Field color    :Float[ 4 ]
+	Field position :Float[ 3 ]
+End
+
+Class ReflectiveShadowMapExample Extends App
+
+	Field bgfxCaps          := New BgfxCaps()
+
+	Field m_width           :Int ' use DeviceWidth directly
+	Field m_height          :Int ' use DeviceHeight directly
+'  	Field m_debug           :Int = BGFX_DEBUG_NONE
+	Field m_debug           :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset           :Int ' = BGFX_RESET_VSYNC
+
+	Field m_ground          :BgfxUtilsMesh
+	Field m_lightSphere     :BgfxUtilsMesh ' Unit sphere
+
+	' Resource handles
+	Field m_gbufferProgram  :Int ' bgfx::ProgramHandle
+	Field m_shadowProgram   :Int ' bgfx::ProgramHandle
+	Field m_lightProgram    :Int ' bgfx::ProgramHandle
+	Field m_combineProgram  :Int ' bgfx::ProgramHandle
+	Field m_gbuffer         :Int ' bgfx::FrameBufferHandle
+	Field m_lightBuffer     :Int ' bgfx::FrameBufferHandle
+	Field m_shadowBuffer    :Int ' bgfx::FrameBufferHandle
+
+	' Shader uniforms
+	Field u_tint            :Int ' bgfx::UniformHandle
+	Field u_invMvp          :Int ' bgfx::UniformHandle
+	Field u_invMvpShadow    :Int ' bgfx::UniformHandle
+	Field u_lightMtx        :Int ' bgfx::UniformHandle
+	Field u_lightDir        :Int ' bgfx::UniformHandle
+	Field u_sphereInfo      :Int ' bgfx::UniformHandle
+	Field u_shadowDimsInv   :Int ' bgfx::UniformHandle
+	Field u_rsmAmount       :Int ' bgfx::UniformHandle
+
+	' Uniforms to identify texture samples
+	Field s_normal          :Int ' bgfx::UniformHandle
+	Field s_depth           :Int ' bgfx::UniformHandle
+	Field s_color           :Int ' bgfx::UniformHandle
+	Field s_light           :Int ' bgfx::UniformHandle
+	Field s_shadowMap       :Int ' bgfx::UniformHandle
+	Field s_rsm             :Int ' bgfx::UniformHandle
+
+	' Various render targets
+	Field m_gbufferTex      :Int[3] ' bgfx::TextureHandle
+	Field m_lightBufferTex  :Int    ' bgfx::TextureHandle
+	Field m_shadowBufferTex :Int[2] ' bgfx::TextureHandle
+
+	Field m_gbufferTexDb      := New DataBuffer( 6 )
+	Field m_lightBufferTexDb  := New DataBuffer( 2 )
+	Field m_shadowBufferTexDb := New DataBuffer( 4 )
+
+	Field m_models          :Model[ MODEL_COUNT ]
+	Field m_meshes          :BgfxUtilsMesh[]
+
+	' Field m_reading         :Int = 0
+	' Field m_currFrame       :Int = UINT32_MAX
+
+	' UI
+	Field m_cameraSpin      :Bool = False
+
+	' Light position;
+	Field m_lightDir        :Float[ 4 ]
+	Field m_lightElevation  :Float = 35.0
+	Field m_lightAzimuth    :Float = 215.0
+
+	Field m_rsmAmount       :Float = 0.25 ' Amount of rsm
+	Field m_vplRadius       :Float = 3.0  ' Radius of virtual point light
+
+	Field m_texelHalf       :Float = 0.0
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_TEXT
+		m_reset  = BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Labeling for renderdoc captures, etc
+		bgfxSetViewName( RENDER_PASS_GBUFFER,      "gbuffer"      )
+		bgfxSetViewName( RENDER_PASS_SHADOW_MAP,   "shadow map"   )
+		bgfxSetViewName( RENDER_PASS_LIGHT_BUFFER, "light buffer" )
+		bgfxSetViewName( RENDER_PASS_COMBINE,      "post combine" )
+
+		' Set up screen clears
+		bgfxSetViewClear( RENDER_PASS_GBUFFER,      BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0, 1.0, 0 )
+		bgfxSetViewClear( RENDER_PASS_LIGHT_BUFFER, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0, 1.0, 0 )
+		bgfxSetViewClear( RENDER_PASS_SHADOW_MAP,   BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0, 1.0, 0 )
+
+		' Create uniforms
+		u_tint          = bgfxCreateUniform( "u_tint",          BGFX_UNIFORM_TYPE_VEC4 )  ' Tint for when you click on items
+		u_lightDir      = bgfxCreateUniform( "u_lightDir",      BGFX_UNIFORM_TYPE_VEC4 )  ' Single directional light for entire scene
+		u_sphereInfo    = bgfxCreateUniform( "u_sphereInfo",    BGFX_UNIFORM_TYPE_VEC4 )  ' Info for RSM
+		u_invMvp        = bgfxCreateUniform( "u_invMvp",        BGFX_UNIFORM_TYPE_MAT4 )  ' Matrix needed in light buffer
+		u_invMvpShadow  = bgfxCreateUniform( "u_invMvpShadow",  BGFX_UNIFORM_TYPE_MAT4 )  ' Matrix needed in light buffer
+		u_lightMtx      = bgfxCreateUniform( "u_lightMtx",      BGFX_UNIFORM_TYPE_MAT4 )  ' Matrix needed to use shadow map (world to shadow space)
+		u_shadowDimsInv = bgfxCreateUniform( "u_shadowDimsInv", BGFX_UNIFORM_TYPE_VEC4 )  ' Used in PCF
+		u_rsmAmount     = bgfxCreateUniform( "u_rsmAmount",     BGFX_UNIFORM_TYPE_VEC4 )  ' How much RSM to use vs directional light
+
+		' Create texture sampler uniforms (used when we bind textures)
+		s_normal    = bgfxCreateUniform( "s_normal",    BGFX_UNIFORM_TYPE_INT1 )  ' Normal gbuffer
+		s_depth     = bgfxCreateUniform( "s_depth",     BGFX_UNIFORM_TYPE_INT1 )  ' Normal gbuffer
+		s_color     = bgfxCreateUniform( "s_color",     BGFX_UNIFORM_TYPE_INT1 )  ' Color (albedo) gbuffer
+		s_light     = bgfxCreateUniform( "s_light",     BGFX_UNIFORM_TYPE_INT1 )  ' Light buffer
+		s_shadowMap = bgfxCreateUniform( "s_shadowMap", BGFX_UNIFORM_TYPE_INT1 )  ' Shadow map
+		s_rsm       = bgfxCreateUniform( "s_rsm",       BGFX_UNIFORM_TYPE_INT1 )  ' Reflective shadow map
+
+		' Create program from shaders.
+		m_gbufferProgram = bgfxUtilsLoadProgram( "vs_rsm_gbuffer", "fs_rsm_gbuffer" )  ' Gbuffer
+		m_shadowProgram  = bgfxUtilsLoadProgram( "vs_rsm_shadow",  "fs_rsm_shadow"  )  ' Drawing shadow map
+		m_lightProgram   = bgfxUtilsLoadProgram( "vs_rsm_lbuffer", "fs_rsm_lbuffer" )  ' Light buffer
+		m_combineProgram = bgfxUtilsLoadProgram( "vs_rsm_combine", "fs_rsm_combine" )  ' Combiner
+
+		' Load some meshes
+		m_meshes = New BgfxUtilsMesh[ s_meshPaths.Length() ]
+		For Local ii:Int = 0 Until s_meshPaths.Length()
+			m_meshes[ ii ] = bgfxUtilsMeshLoad( s_meshPaths[ ii ] )
+		Next
+
+		' Randomly create some models
+		' bx::RngMwc mwc;  ' Random number generator
+		For Local ii:Int = 0 Until m_models.Length()
+
+			m_models[ ii ] = New Model()
+
+			Local model := m_models[ ii ]
+
+			Local rr:Int = Rnd( 256 )
+			Local gg:Int = Rnd( 256 )
+			Local bb:Int = Rnd( 256 )
+
+			model.mesh = 1 + Int( Rnd( s_meshPaths.Length() -1 ) )
+
+			model.color[ 0 ] = rr / 255.0
+			model.color[ 1 ] = gg / 255.0
+			model.color[ 2 ] = bb / 255.0
+			model.color[ 3 ] = 1.0
+
+			model.position[ 0 ] = ((( Rnd( 256 ) )) - 128.0) / 20.0
+			model.position[ 1 ] = 0;
+			model.position[ 2 ] = ((( Rnd( 256 ) )) - 128.0) / 20.0
+		Next
+
+		' Load ground.  We'll just use the cube since I don't have a ground model right now
+		m_ground = bgfxUtilsMeshLoad( "meshes/cube.bin" )
+
+		' Light sphere
+		m_lightSphere = bgfxUtilsMeshLoad( "meshes/unit_sphere.bin" )
+
+		Local tsFlags:Int[ 2 ]
+		bgfxUtilsClear64Bit( tsFlags )
+		bgfxUtilsSet64Bit( tsFlags, BGFX_TEXTURE_RT )
+		tsFlags[ 1 ] |= BGFX_SAMPLER_MIN_POINT
+		tsFlags[ 1 ] |= BGFX_SAMPLER_MAG_POINT
+		tsFlags[ 1 ] |= BGFX_SAMPLER_MIP_POINT
+		tsFlags[ 1 ] |= BGFX_SAMPLER_U_CLAMP
+		tsFlags[ 1 ] |= BGFX_SAMPLER_V_CLAMP
+
+		' Make gbuffer and related textures
+		m_gbufferTex[ GBUFFER_RT_NORMAL ] = bgfxCreateTexture2DScaled( BGFX_BACKBUFFER_RATIO_EQUAL, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, tsFlags )
+		m_gbufferTex[ GBUFFER_RT_COLOR  ] = bgfxCreateTexture2DScaled( BGFX_BACKBUFFER_RATIO_EQUAL, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, tsFlags )
+		m_gbufferTex[ GBUFFER_RT_DEPTH  ] = bgfxCreateTexture2DScaled( BGFX_BACKBUFFER_RATIO_EQUAL, False, 1, BGFX_TEXTURE_FORMAT_D24,   tsFlags )
+
+		m_gbufferTexDb.PokeShort( 0, m_gbufferTex[ GBUFFER_RT_NORMAL ] )
+		m_gbufferTexDb.PokeShort( 2, m_gbufferTex[ GBUFFER_RT_COLOR ] )
+		m_gbufferTexDb.PokeShort( 4, m_gbufferTex[ GBUFFER_RT_DEPTH ] )
+
+		m_gbuffer = bgfxCreateFrameBufferFromHandles( m_gbufferTex.Length(), m_gbufferTexDb, True )
+
+		' Make light buffer
+		m_lightBufferTex = bgfxCreateTexture2DScaled( BGFX_BACKBUFFER_RATIO_EQUAL, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, tsFlags )
+
+		Local lightBufferRTs:Int[] = [ m_lightBufferTex ]
+		m_lightBufferTexDb.PokeShort( 0, m_lightBufferTex )
+
+		m_lightBuffer = bgfxCreateFrameBufferFromHandles( lightBufferRTs.Length(), m_lightBufferTexDb, True )
+
+		' Make shadow buffer
+		Local rsmFlags:Int[ 2 ]
+		bgfxUtilsClear64Bit( rsmFlags )
+		bgfxUtilsSet64Bit( rsmFlags, BGFX_TEXTURE_RT )
+		rsmFlags[ 1 ] |= BGFX_SAMPLER_MIN_POINT
+		rsmFlags[ 1 ] |= BGFX_SAMPLER_MAG_POINT
+		rsmFlags[ 1 ] |= BGFX_SAMPLER_MIP_POINT
+		rsmFlags[ 1 ] |= BGFX_SAMPLER_U_CLAMP
+		rsmFlags[ 1 ] |= BGFX_SAMPLER_V_CLAMP
+
+		' Reflective shadow map
+		m_shadowBufferTex[ SHADOW_RT_RSM ] = bgfxCreateTexture2D( SHADOW_MAP_DIM, SHADOW_MAP_DIM, False, 1, BGFX_TEXTURE_FORMAT_BGRA8, rsmFlags )
+
+		' Typical shadow map
+		m_shadowBufferTex[ SHADOW_RT_DEPTH ] = bgfxCreateTexture2D( SHADOW_MAP_DIM, SHADOW_MAP_DIM, False, 1, BGFX_TEXTURE_FORMAT_D16, BGFX_TEXTURE_RT ) ' | BGFX_TEXTURE_COMPARE_LEQUAL
+		' Note I'm not setting BGFX_TEXTURE_COMPARE_LEQUAL.  Why?
+		' Normally a PCF shadow map such as this requires a compare.  However, this sample also
+		' reads from this texture in the lighting pass, and only uses the PCF capabilites in the
+		' combine pass, so the flag is disabled by default.
+
+		m_shadowBufferTexDb.PokeShort( 0, m_shadowBufferTex[ SHADOW_RT_RSM ] )
+		m_shadowBufferTexDb.PokeShort( 2, m_shadowBufferTex[ SHADOW_RT_DEPTH ] )
+
+		m_shadowBuffer = bgfxCreateFrameBufferFromHandles( m_shadowBufferTex.Length(), m_shadowBufferTexDb, True )
+
+		' Vertex decl
+		PosTexCoord0Vertex.Init()
+
+		' Init camera
+		CameraCreate()
+		Local camPos:Float[] = [ 0.0, 1.5, 0.0 ]
+		CameraSetPosition( camPos )
+		CameraSetVerticalAngle( -0.3 )
+
+		' Init directional light
+		UpdateLightDir()
+
+		' Get renderer capabilities info.
+		bgfxGetCaps( bgfxCaps )
+		Local renderer:Int = bgfxGetRendererType()
+		m_texelHalf = 0.0 ; If BGFX_RENDERER_TYPE_DIRECT3D9 = renderer Then m_texelHalf = 0.5
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		For Local ii:Int = 0 Until s_meshPaths.Length()
+'  			bgfxUtilsMeshUnload( m_meshes[ ii ] )
+'  		Next
+'  
+'  		bgfxUtilsMeshUnload( m_ground )
+'  		bgfxUtilsMeshUnload( m_lightSphere )
+'  
+'  		' Cleanup.
+'  		bgfxDestroyProgram( m_gbufferProgram )
+'  		bgfxDestroyProgram( m_lightProgram )
+'  		bgfxDestroyProgram( m_combineProgram )
+'  		bgfxDestroyProgram( m_shadowProgram )
+'  
+'  		bgfxDestroyUniform( u_tint )
+'  		bgfxDestroyUniform( u_lightDir )
+'  		bgfxDestroyUniform( u_sphereInfo )
+'  		bgfxDestroyUniform( u_invMvp )
+'  		bgfxDestroyUniform( u_invMvpShadow )
+'  		bgfxDestroyUniform( u_lightMtx )
+'  		bgfxDestroyUniform( u_shadowDimsInv )
+'  		bgfxDestroyUniform( u_rsmAmount )
+'  		bgfxDestroyUniform( s_normal )
+'  		bgfxDestroyUniform( s_depth )
+'  		bgfxDestroyUniform( s_light )
+'  		bgfxDestroyUniform( s_color )
+'  		bgfxDestroyUniform( s_shadowMap )
+'  		bgfxDestroyUniform( s_rsm )
+'  
+'  		bgfxDestroyFrameBuffer( m_gbuffer )
+'  		bgfxDestroyFrameBuffer( m_lightBuffer )
+'  		bgfxDestroyFrameBuffer( m_shadowBuffer )
+'  
+'  		For Local ii:Int = 0 Until m_gbufferTex.Length()
+'  			bgfxDestroyTexture( m_gbufferTex[ ii ] )
+'  		Next
+'  
+'  		bgfxDestroyTexture( m_lightBufferTex )
+'  
+'  		For Local ii:Int = 0 Until m_shadowBufferTex.Length()
+'  			bgfxDestroyTexture( m_shadowBufferTex[ ii ] )
+'  		Next
+'  
+'  		CameraDestroy()
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field idenMtx:Float[] = [
+		1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.0, 0.0, 0.0, 1.0]
+
+	Field last  :Int
+	Field state :Int[ 2 ]
+
+	Method OnRender:Int()
+
+		Local m_width  :Int = DeviceWidth()
+		Local m_height :Int = DeviceHeight()
+
+		' Update frame timer
+		Local now       :Int = Millisecs()
+		Local frameTime :Int = now - last
+		last = now
+
+		Local deltaTime :Float = Float( frameTime ) * 0.001
+
+		bgfxGetCaps( bgfxCaps )
+
+		' Update camera
+		CameraUpdate( deltaTime * 0.15 )
+
+		' Set up matrices for gbuffer
+		Local view:Float[ 16 ]
+		CameraGetViewMtx( view )
+
+		Local proj:Float[ 16 ]
+		bxMtxProj( proj, 60.0, Float( m_width ) / Float( m_height ), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+
+		bgfxSetViewRect( RENDER_PASS_GBUFFER, 0, 0, Int( m_width ), Int( m_height ) )
+		bgfxSetViewTransform( RENDER_PASS_GBUFFER, view, proj )
+		' Make sure when we draw it goes into gbuffer and not backbuffer
+		bgfxSetViewFrameBuffer( RENDER_PASS_GBUFFER, m_gbuffer )
+		' Draw everything into g-buffer
+		DrawAllModels( RENDER_PASS_GBUFFER, m_gbufferProgram )
+
+		' Draw shadow map
+
+		' Set up transforms for shadow map
+		Local smView   :Float[ 16 ]
+		Local smProj   :Float[ 16 ]
+		Local lightEye :Float[ 3 ]
+		Local lightAt  :Float[ 3 ]
+
+		lightEye[ 0 ] = m_lightDir[ 0 ] * LIGHT_DIST
+		lightEye[ 1 ] = m_lightDir[ 1 ] * LIGHT_DIST
+		lightEye[ 2 ] = m_lightDir[ 2 ] * LIGHT_DIST
+
+		lightAt[ 0 ] = 0.0
+		lightAt[ 1 ] = 0.0
+		lightAt[ 2 ] = 0.0
+
+		bxMtxLookAt( smView, lightEye, lightAt )
+		Const area:Float = 10.0
+		' const bgfx::Caps* caps = bgfx::getCaps();
+		bxMtxOrtho( smProj, -area, area, -area, area, -100.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+		bgfxSetViewTransform( RENDER_PASS_SHADOW_MAP, smView, smProj )
+		bgfxSetViewFrameBuffer( RENDER_PASS_SHADOW_MAP, m_shadowBuffer )
+		bgfxSetViewRect( RENDER_PASS_SHADOW_MAP, 0, 0, SHADOW_MAP_DIM, SHADOW_MAP_DIM )
+
+		DrawAllModels( RENDER_PASS_SHADOW_MAP, m_shadowProgram )
+
+		' Next draw light buffer
+
+		' Set up matrices for light buffer
+		bgfxSetViewRect( RENDER_PASS_LIGHT_BUFFER, 0, 0, Int( m_width ), Int( m_height ) )
+		bgfxSetViewTransform( RENDER_PASS_LIGHT_BUFFER, view, proj )  ' Notice, same view and proj as gbuffer
+		' Set drawing into light buffer
+		bgfxSetViewFrameBuffer( RENDER_PASS_LIGHT_BUFFER, m_lightBuffer )
+
+		' Inverse view projection is needed in shader so set that up
+		Local vp     :Float[ 16 ]
+		Local invMvp :Float[ 16 ]
+		bxMtxMul( vp, view, proj )
+		bxMtxInverse( invMvp, vp )
+
+		' Light matrix used in combine pass and inverse used in light pass
+		Local lightMtx:Float[ 16 ] ' World space to light space (shadow map space)
+		bxMtxMul( lightMtx, smView, smProj )
+		Local invMvpShadow:Float[ 16 ]
+		bxMtxInverse( invMvpShadow, lightMtx )
+
+		' Draw some lights (these should really be instanced but for this example they aren't...)
+		Const kMaxSpheres:Int = 32;
+
+		For Local ii:Int = 0 Until kMaxSpheres
+			For Local jj:Int = 0 Until kMaxSpheres
+
+				' These are used in the fragment shader
+				bgfxSetTexture( 0, s_normal, bgfxGetTexture( m_gbuffer, GBUFFER_RT_NORMAL ) )  ' Normal for lighting calculations
+				bgfxSetTexture( 1, s_depth,  bgfxGetTexture( m_gbuffer, GBUFFER_RT_DEPTH  ) )  ' Depth to reconstruct world position
+
+				' Thse are used in the vert shader
+				bgfxSetTexture( 2, s_shadowMap, bgfxGetTexture( m_shadowBuffer, SHADOW_RT_DEPTH ) )  ' Used to place sphere
+				bgfxSetTexture( 3, s_rsm,       bgfxGetTexture( m_shadowBuffer, SHADOW_RT_RSM   ) )  ' Used to scale/color sphere
+
+				bgfxSetUniform( u_invMvp, invMvp )
+				bgfxSetUniform( u_invMvpShadow, invMvpShadow )
+				Local sphereInfo:Float[ 4 ]
+				sphereInfo[ 0 ] = ( Float( ii ) / ( kMaxSpheres -1 ) )
+				sphereInfo[ 1 ] = ( Float( jj ) / ( kMaxSpheres -1 ) )
+				sphereInfo[ 2 ] = m_vplRadius
+				sphereInfo[ 3 ] = 0.0  ' Unused
+				bgfxSetUniform( u_sphereInfo, sphereInfo )
+
+				Local lightDrawState:Int[ 2 ]
+'  				bgfxUtilsClear64Bit( lightDrawState )
+'  				bgfxUtilsSet64Bit( lightDrawState, BGFX_STATE_WRITE_RGB )
+'  				bgfxUtilsSet64Bit( lightDrawState, BGFX_STATE_BLEND_ADD ) ' <===  Overlapping lights contribute more
+'  				bgfxUtilsSet64Bit( lightDrawState, BGFX_STATE_WRITE_A )
+'  				bgfxUtilsSet64Bit( lightDrawState, BGFX_STATE_CULL_CW ) ' <===  If we go into the lights, there will be problems, so we draw the far back face.
+				lightDrawState[ 0 ] = $00000010
+				lightDrawState[ 1 ] = $0222200f
+				bgfxUtilsMeshSubmit( m_lightSphere, RENDER_PASS_LIGHT_BUFFER, m_lightProgram, idenMtx, lightDrawState )
+			Next
+		Next
+
+		' Draw combine pass
+
+		' Texture inputs for combine pass
+		bgfxSetTexture( 0, s_normal,    bgfxGetTexture( m_gbuffer, GBUFFER_RT_NORMAL ) )
+		bgfxSetTexture( 1, s_color,     bgfxGetTexture( m_gbuffer, GBUFFER_RT_COLOR ) )
+		bgfxSetTexture( 2, s_light,     bgfxGetTexture( m_lightBuffer, 0 ) )
+		bgfxSetTexture( 3, s_depth,     bgfxGetTexture( m_gbuffer, GBUFFER_RT_DEPTH ) )
+		bgfxSetTexture( 4, s_shadowMap, bgfxGetTexture( m_shadowBuffer, SHADOW_RT_DEPTH ), BGFX_SAMPLER_COMPARE_LEQUAL )
+
+		' Uniforms for combine pass
+		bgfxSetUniform( u_lightDir, m_lightDir )
+		bgfxSetUniform( u_invMvp, invMvp )
+		bgfxSetUniform( u_lightMtx, lightMtx )
+		Local invDim:Float[] = [ 1.0 / SHADOW_MAP_DIM, 0.0, 0.0, 0.0 ]
+		bgfxSetUniform( u_shadowDimsInv, invDim )
+		Local rsmAmount:Float[] = [ m_rsmAmount, m_rsmAmount, m_rsmAmount, m_rsmAmount ]
+		bgfxSetUniform( u_rsmAmount, rsmAmount )
+
+		' Set up state for combine pass
+		' point of this is to avoid doing depth test, which is in the default state
+		bgfxUtilsClear64Bit( state )
+		bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_RGB )
+		bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_A )
+		bgfxSetState( state )
+
+		' Set up transform matrix for fullscreen quad
+		Local orthoProj:Float[ 16 ]
+		bxMtxOrtho( orthoProj, 0.0, 1.0, 1.0, 0.0, 0.0, 100.0, 0.0, bgfxCaps.GetHomogeneousDepth() )
+		bgfxSetViewTransform( RENDER_PASS_COMBINE, idenMtx, orthoProj )
+		bgfxSetViewRect( RENDER_PASS_COMBINE, 0, 0, Int( m_width ), Int( m_height ) );
+		' Bind vertex buffer and draw quad
+		ScreenSpaceQuad( Float( m_width ), Float( m_height ), m_texelHalf, bgfxCaps.GetOriginBottomLeft() )
+		bgfxSubmit( RENDER_PASS_COMBINE, m_combineProgram )
+
+		' Draw UI
+		DrawText( "Settings", 16, 14 * 1 )
+		DrawText( "RSM Amount      : " + m_rsmAmount,      16, 14 * 2 )
+		DrawText( "VPL Radius      : " + m_vplRadius,      16, 14 * 3 )
+		DrawText( "Light Azimuth   : " + m_lightAzimuth,   16, 14 * 4 )
+		DrawText( "Light Elevation : " + m_lightElevation, 16, 14 * 5 )
+
+		UpdateLightDir()
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' m_currFrame = bgfx::frame(); <-- this bgfx frame return a frame number!
+
+		Return 0
+	End
+
+	Method DrawAllModels:Void( _pass:Int, _program:Int )
+
+		For Local ii:Int = 0 Until m_models.Length()
+
+			Local model := m_models[ ii ]
+
+			' Set up transform matrix for each model
+			Local scale :Float = s_meshScale[ model.mesh ]
+			Local mtx   :Float[ 16 ]
+			bxMtxSRT( mtx, scale, scale, scale, 0.0, 0.0, 0.0, model.position[ 0 ], model.position[ 1 ], model.position[ 2 ] )
+
+			' Submit mesh to gbuffer
+			bgfxSetUniform( u_tint, model.color )
+			bgfxUtilsMeshSubmit( m_meshes[ model.mesh ], _pass, _program, mtx )
+		Next
+
+		' Draw ground
+
+		Local white    :Float[] = [ 1.0, 1.0, 1.0, 1.0 ]
+		Local mtxScale :Float[ 16 ]
+		Local scale    :Float = 10.0
+		Local mtxTrans :Float[ 16 ]
+		Local mtx      :Float[ 16 ]
+
+		bgfxSetUniform( u_tint, white )
+		bxMtxScale( mtxScale, scale, scale, scale )
+		bxMtxTranslate( mtxTrans, 0.0, -10.0, 0.0 )
+		bxMtxMul( mtx, mtxScale, mtxTrans )
+		bgfxUtilsMeshSubmit( m_ground, _pass, _program, mtx )
+	End
+
+	Method UpdateLightDir:Void()
+
+		Local el:Float = m_lightElevation ' * (bx::kPi/180.0f);
+		Local az:Float = m_lightAzimuth   ' * (bx::kPi/180.0f);
+
+		m_lightDir[ 0 ] = Cos( el ) * Cos( az )
+		m_lightDir[ 2 ] = Cos( el ) * Sin( az )
+		m_lightDir[ 1 ] = Sin( el )
+		m_lightDir[ 3 ] = 0.0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 31-rsm"
+	Print "Description: Global Illumination with Reflective Shadow Map."
+	New ReflectiveShadowMapExample()
+	Return 0
+End
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Function BoolToString:String( value:Bool )
+	If value Then Return "True"
+	Return "False"
+End
+
+'  Global CalcTangentsPosTexcoordPool := New Pool<CalcTangentsPosTexcoord>()
+'  
+'  Class CalcTangentsPosTexcoord
+'  
+'  	Method Free:Void()
+'  		CalcTangentsPosTexcoordPool.Free( Self )
+'  	End
+'  
+'  	Const m_x      :Int = 0
+'  	Const m_y      :Int = 1
+'  	Const m_z      :Int = 2
+'  	Const m_pad0   :Int = 3
+'  
+'  	Const m_u      :Int = 0
+'  	Const m_v      :Int = 1
+'  	Const m_pad1   :Int = 2
+'  	Const m_pad2   :Int = 3
+'  
+'  	Field position :Float[ 4 ]
+'  	Field texcoord :Float[ 4 ]
+'  End
+
+Function bgfxUtilsCalcTangents:Void( _vertices:DataBuffer, _numVertices:Int, _decl:BgfxVertexDecl, _indices:DataBuffer, _numIndices:Int )
+
+	'
+	' @Cleanup: not sure if this function will be called at every frame, if it 
+	' is every frame then make this tangents global
+	'
+	Local tangents:Float[] = New Float[ 6 * _numVertices ]
+
+	For Local ii:Int = 0 Until tangents.Length()
+		tangents[ ii ] = 0
+	Next
+
+	Local v0position :Float[ 4 ]
+	Local v0texcoord :Float[ 4 ]
+
+	Local v1position :Float[ 4 ]
+	Local v1texcoord :Float[ 4 ]
+
+	Local v2position :Float[ 4 ]
+	Local v2texcoord :Float[ 4 ]
+
+	Local num        :Int = _numIndices / 3
+
+	For Local ii:Int = 0 Until num
+
+		Local indices :Int = ii * 3 * 2
+		
+		Local i0      :Int = _indices.PeekShort( indices + 0 )
+		Local i1      :Int = _indices.PeekShort( indices + 2 )
+		Local i2      :Int = _indices.PeekShort( indices + 4 )
+
+		bgfxVertexUnpack( v0position, BGFX_ATTRIB_POSITION,  _decl, _vertices, i0)
+		bgfxVertexUnpack( v0texcoord, BGFX_ATTRIB_TEXCOORD0, _decl, _vertices, i0)
+
+		bgfxVertexUnpack( v1position, BGFX_ATTRIB_POSITION,  _decl, _vertices, i1)
+		bgfxVertexUnpack( v1texcoord, BGFX_ATTRIB_TEXCOORD0, _decl, _vertices, i1)
+
+		bgfxVertexUnpack( v2position, BGFX_ATTRIB_POSITION,  _decl, _vertices, i2)
+		bgfxVertexUnpack( v2texcoord, BGFX_ATTRIB_TEXCOORD0, _decl, _vertices, i2)
+
+		Local v0x     :Float = v0position[ 0 ]
+		Local v0y     :Float = v0position[ 1 ]
+		Local v0z     :Float = v0position[ 2 ]
+		Local v0u     :Float = v0texcoord[ 0 ]
+		Local v0v     :Float = v0texcoord[ 1 ]
+
+		Local v1x     :Float = v1position[ 0 ]
+		Local v1y     :Float = v1position[ 1 ]
+		Local v1z     :Float = v1position[ 2 ]
+		Local v1u     :Float = v1texcoord[ 0 ]
+		Local v1v     :Float = v1texcoord[ 1 ]
+
+		Local v2x     :Float = v2position[ 0 ]
+		Local v2y     :Float = v2position[ 1 ]
+		Local v2z     :Float = v2position[ 2 ]
+		Local v2u     :Float = v2texcoord[ 0 ]
+		Local v2v     :Float = v2texcoord[ 1 ]
+
+		Local bax     :Float = v1x - v0x
+		Local bay     :Float = v1y - v0y
+		Local baz     :Float = v1z - v0z
+		Local bau     :Float = v1u - v0u
+		Local bav     :Float = v1v - v0v
+
+		Local cax     :Float = v2x - v0x
+		Local cay     :Float = v2y - v0y
+		Local caz     :Float = v2z - v0z
+		Local cau     :Float = v2u - v0u
+		Local cav     :Float = v2v - v0v
+
+		Local det     :Float = (bau * cav - bav * cau)
+		Local invDet  :Float = 1.0 / det
+
+		Local tx      :Float = (bax * cav - cax * bav) * invDet
+		Local ty      :Float = (bay * cav - cay * bav) * invDet
+		Local tz      :Float = (baz * cav - caz * bav) * invDet
+
+		Local bx      :Float = (cax * bau - bax * cau) * invDet
+		Local by      :Float = (cay * bau - bay * cau) * invDet
+		Local bz      :Float = (caz * bau - baz * cau) * invDet
+
+		For Local jj:Int = 0 Until 3
+
+			Local index:Int = _indices.PeekShort( (ii * 3 + jj) * 2 )
+
+			tangents[ index * 6 + 0 ] += tx
+			tangents[ index * 6 + 1 ] += ty
+			tangents[ index * 6 + 2 ] += tz
+
+			tangents[ index * 6 + 3 ] += bx
+			tangents[ index * 6 + 4 ] += by
+			tangents[ index * 6 + 5 ] += bz
+		Next
+	Next
+
+	For Local ii:Int = 0 Until _numVertices 
+
+		Local tanu:Float[ 4 ]
+		Local tanv:Float[ 4 ]
+
+		tanu[ 0 ] = tangents[ ii * 6 + 0 ]
+		tanu[ 1 ] = tangents[ ii * 6 + 1 ]
+		tanu[ 2 ] = tangents[ ii * 6 + 2 ]
+		tanu[ 3 ] = 0.0
+
+		tanv[ 0 ] = tangents[ ii * 6 + 3 ]
+		tanv[ 1 ] = tangents[ ii * 6 + 4 ]
+		tanv[ 2 ] = tangents[ ii * 6 + 5 ]
+		tanv[ 3 ] = 0.0
+
+		Local normal:Float[ 4 ]
+		bgfxVertexUnpack( normal, BGFX_ATTRIB_NORMAL, _decl, _vertices, ii )
+		Local ndt:Float = bxVec3Dot( normal, tanu )
+
+		Local nxt:Float[ 3 ]
+		bxVec3Cross( nxt, normal, tanu )
+
+		Local tmp:Float[ 3 ]
+		tmp[ 0 ] = tanu[ 0 ] - normal[ 0 ] * ndt
+		tmp[ 1 ] = tanu[ 1 ] - normal[ 1 ] * ndt
+		tmp[ 2 ] = tanu[ 2 ] - normal[ 2 ] * ndt
+
+		Local tangent:Float[ 4 ]
+		bxVec3Norm( tangent, tmp )
+
+		tangent[ 3 ] = 1.0 ; If bxVec3Dot( nxt, tanv ) < 0.0 Then tangent[ 3 ] = -1.0
+
+		bgfxVertexPack( tangent, True, BGFX_ATTRIB_TANGENT, _decl, _vertices, ii )
+	Next
+
+	' delete [] tangents;
+End
+
+Function BoundsSphereToAabb:Void( _aabb:BgfxUtilsAabb, _sphere:BgfxUtilsSphere )
+	Local radius:Float = _sphere.m_radius
+	bxVec3Sub( _aabb.m_min, _sphere.m_center, radius )
+	bxVec3Add( _aabb.m_max, _sphere.m_center, radius )
+End
+
+
+
+
+
+Const RENDER_PASS_GEOMETRY_ID      :Int = 0
+Const RENDER_PASS_LIGHT_ID         :Int = 1
+Const RENDER_PASS_COMBINE_ID       :Int = 2
+Const RENDER_PASS_DEBUG_LIGHTS_ID  :Int = 3
+Const RENDER_PASS_DEBUG_GBUFFER_ID :Int = 4
+
+Global s_texelHalf:Float = 0.0
+
+Class PosNormalTangentTexcoordVertex
+
+	Field m_x       :Float
+	Field m_y       :Float
+	Field m_z       :Float
+
+	Field m_normal  :Int
+	Field m_tangent :Int
+
+	Field m_u       :Int
+	Field m_v       :Int
+
+	Method New( _x:Float, _y:Float, _z:Float, _nx:Float, _ny:Float, _nz:Float, _tangent:Int, _u:Int, _v:Int )
+
+		Self.m_x       = _x
+		Self.m_y       = _y
+		Self.m_z       = _z
+
+		Self.m_normal  = bgfxUtilsEncodeNormalRgba8( _nx, _ny, _nz )
+		Print "m_normal=" + IntToHex( m_normal )
+		Self.m_tangent = _tangent
+
+		Self.m_u       = _u
+		Self.m_v       = _v
+	End
+
+	Method New( _x:Float, _y:Float, _z:Float, _normal:Int, _tangent:Int, _u:Int, _v:Int )
+
+		Self.m_x       = _x
+		Self.m_y       = _y
+		Self.m_z       = _z
+
+		Self.m_normal  = _normal
+		Self.m_tangent = _tangent
+
+		Self.m_u       = _u
+		Self.m_v       = _v
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_NORMAL,    4, BGFX_ATTRIB_TYPE_UINT8, True, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TANGENT,   4, BGFX_ATTRIB_TYPE_UINT8, True, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_INT16, True, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+
+Class DebugVertex
+
+	Field m_x    :Float
+	Field m_y    :Float
+	Field m_z    :Float
+
+	Field m_abgr :Int
+
+	Method New( m_x:Float, m_y:Float, m_z:Float, m_abgr:Int )
+
+		Self.m_x    = m_x
+		Self.m_y    = m_y
+		Self.m_z    = m_z
+
+		Self.m_abgr = m_abgr
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,   4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+'  Global s_cubeVertices:PosNormalTangentTexcoordVertex[] = [
+'  	New  PosNormalTangentTexcoordVertex( -1.0,  1.0,  1.0,  0.0,  0.0,  1.0, 0,     0,     0 ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0,  1.0,  1.0,  0.0,  0.0,  1.0, 0, $7fff,     0 ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0, -1.0,  1.0,  0.0,  0.0,  1.0, 0,     0, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0, -1.0,  1.0,  0.0,  0.0,  1.0, 0, $7fff, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0,  1.0, -1.0,  0.0,  0.0, -1.0, 0,     0,     0 ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0,  1.0, -1.0,  0.0,  0.0, -1.0, 0, $7fff,     0 ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0, -1.0, -1.0,  0.0,  0.0, -1.0, 0,     0, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0, -1.0, -1.0,  0.0,  0.0, -1.0, 0, $7fff, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0,  1.0,  1.0,  0.0,  1.0,  0.0, 0,     0,     0 ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0,  1.0,  1.0,  0.0,  1.0,  0.0, 0, $7fff,     0 ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0,  1.0, -1.0,  0.0,  1.0,  0.0, 0,     0, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0,  1.0, -1.0,  0.0,  1.0,  0.0, 0, $7fff, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0, -1.0,  1.0,  0.0, -1.0,  0.0, 0,     0,     0 ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0, -1.0,  1.0,  0.0, -1.0,  0.0, 0, $7fff,     0 ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0, -1.0, -1.0,  0.0, -1.0,  0.0, 0,     0, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0, -1.0, -1.0,  0.0, -1.0,  0.0, 0, $7fff, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0, -1.0,  1.0,  1.0,  0.0,  0.0, 0,     0,     0 ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0,  1.0,  1.0,  1.0,  0.0,  0.0, 0, $7fff,     0 ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0, -1.0, -1.0,  1.0,  0.0,  0.0, 0,     0, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex(  1.0,  1.0, -1.0,  1.0,  0.0,  0.0, 0, $7fff, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0, -1.0,  1.0, -1.0,  0.0,  0.0, 0,     0,     0 ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0,  1.0,  1.0, -1.0,  0.0,  0.0, 0, $7fff,     0 ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0, -1.0, -1.0, -1.0,  0.0,  0.0, 0,     0, $7fff ),
+'  	New  PosNormalTangentTexcoordVertex( -1.0,  1.0, -1.0, -1.0,  0.0,  0.0, 0, $7fff, $7fff ) ]
+
+Global s_cubeVertices:PosNormalTangentTexcoordVertex[] = [
+	New  PosNormalTangentTexcoordVertex( -1.0,  1.0,  1.0, $80ff8080, 0,     0,     0 ),
+	New  PosNormalTangentTexcoordVertex(  1.0,  1.0,  1.0, $80ff8080, 0, $7fff,     0 ),
+	New  PosNormalTangentTexcoordVertex( -1.0, -1.0,  1.0, $80ff8080, 0,     0, $7fff ),
+	New  PosNormalTangentTexcoordVertex(  1.0, -1.0,  1.0, $80ff8080, 0, $7fff, $7fff ),
+	New  PosNormalTangentTexcoordVertex( -1.0,  1.0, -1.0, $80008080, 0,     0,     0 ),
+	New  PosNormalTangentTexcoordVertex(  1.0,  1.0, -1.0, $80008080, 0, $7fff,     0 ),
+	New  PosNormalTangentTexcoordVertex( -1.0, -1.0, -1.0, $80008080, 0,     0, $7fff ),
+	New  PosNormalTangentTexcoordVertex(  1.0, -1.0, -1.0, $80008080, 0, $7fff, $7fff ),
+	New  PosNormalTangentTexcoordVertex( -1.0,  1.0,  1.0, $8080ff80, 0,     0,     0 ),
+	New  PosNormalTangentTexcoordVertex(  1.0,  1.0,  1.0, $8080ff80, 0, $7fff,     0 ),
+	New  PosNormalTangentTexcoordVertex( -1.0,  1.0, -1.0, $8080ff80, 0,     0, $7fff ),
+	New  PosNormalTangentTexcoordVertex(  1.0,  1.0, -1.0, $8080ff80, 0, $7fff, $7fff ),
+	New  PosNormalTangentTexcoordVertex( -1.0, -1.0,  1.0, $80800080, 0,     0,     0 ),
+	New  PosNormalTangentTexcoordVertex(  1.0, -1.0,  1.0, $80800080, 0, $7fff,     0 ),
+	New  PosNormalTangentTexcoordVertex( -1.0, -1.0, -1.0, $80800080, 0,     0, $7fff ),
+	New  PosNormalTangentTexcoordVertex(  1.0, -1.0, -1.0, $80800080, 0, $7fff, $7fff ),
+	New  PosNormalTangentTexcoordVertex(  1.0, -1.0,  1.0, $808080ff, 0,     0,     0 ),
+	New  PosNormalTangentTexcoordVertex(  1.0,  1.0,  1.0, $808080ff, 0, $7fff,     0 ),
+	New  PosNormalTangentTexcoordVertex(  1.0, -1.0, -1.0, $808080ff, 0,     0, $7fff ),
+	New  PosNormalTangentTexcoordVertex(  1.0,  1.0, -1.0, $808080ff, 0, $7fff, $7fff ),
+	New  PosNormalTangentTexcoordVertex( -1.0, -1.0,  1.0, $80808000, 0,     0,     0 ),
+	New  PosNormalTangentTexcoordVertex( -1.0,  1.0,  1.0, $80808000, 0, $7fff,     0 ),
+	New  PosNormalTangentTexcoordVertex( -1.0, -1.0, -1.0, $80808000, 0,     0, $7fff ),
+	New  PosNormalTangentTexcoordVertex( -1.0,  1.0, -1.0, $80808000, 0, $7fff, $7fff ) ]
+
+Global s_cubeIndices:Int[] = [
+	 0,  2,  1,
+	 1,  2,  3,
+	 4,  5,  6,
+	 5,  7,  6,
+
+	 8, 10,  9,
+	 9, 10, 11,
+	12, 13, 14,
+	13, 15, 14,
+
+	16, 18, 17,
+	17, 18, 19,
+	20, 21, 22,
+	21, 23, 22]
+
+Function PosNormalTangentTexcoordVertexToDataBuffer:DataBuffer( _vertices:PosNormalTangentTexcoordVertex[] )
+
+	Local bufferAddress  :Int = 0
+	Local verticesCount  :Int = _vertices.Length()
+
+	' there are 5 fields in PosNormalTangentTexcoordVertex (m_x, m_y, m_z, m_normal, m_tangent) are 4 bytes in size
+	' and there are 2 fields (m_u & m_v) are 2 bytes in size:
+	Local verticesBuffer := New DataBuffer( verticesCount * (5 * 4 + 2 * 2) )
+
+	For Local ii:Int = 0 Until verticesCount
+
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		verticesBuffer.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+
+		verticesBuffer.PokeInt( bufferAddress, _vertices[ ii ].m_normal ) ; bufferAddress += 4
+		verticesBuffer.PokeInt( bufferAddress, _vertices[ ii ].m_tangent ) ; bufferAddress += 4
+
+		verticesBuffer.PokeShort( bufferAddress, _vertices[ ii ].m_u ) ; bufferAddress += 2
+		verticesBuffer.PokeShort( bufferAddress, _vertices[ ii ].m_v ) ; bufferAddress += 2
+	Next
+
+	Return verticesBuffer
+End
+
+Function Index16ToDataBuffer:DataBuffer( _indices:Int[] )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	' the size of each index is 16 bit, which is 2 bytes:
+	Local indicesBuffer := New DataBuffer( indicesCount * 2 )
+
+	For Local ii:Int = 0 Until indicesCount
+		indicesBuffer.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+
+	Return indicesBuffer
+End
+
+
+
