@@ -1,0 +1,354 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Function BoolToInt:Int( bb:Bool )
+	If bb = True Then Return 1
+	Return 0
+End
+
+Class PosVertex
+
+	Const SIZE_IN_BYTES:Int = 3 * 4
+
+	Field m_x :Float
+	Field m_y :Float
+	Field m_z :Float
+
+	Method New( _x:Float, _y:Float, _z:Float )
+
+		Self.m_x = _x
+		Self.m_y = _y
+		Self.m_z = _z
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Class ColorVertex
+
+	Const SIZE_IN_BYTES:Int = 1 * 4
+
+	Field m_abgr:Int
+
+	Method New( _abgr:Int )
+		Self.m_abgr = _abgr
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0, 4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Function PosVertexToDataBuffer:DataBuffer( _vertices:PosVertex[], _verticesDb:DataBuffer=Null )
+
+	Local bufferAddress :Int = 0
+	Local verticesCount :Int = _vertices.Length()
+
+	If Not _verticesDb Then
+		_verticesDb = New DataBuffer( verticesCount * PosVertex.SIZE_IN_BYTES )
+	Endif
+
+	For Local ii:Int = 0 Until verticesCount
+
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_x ) ; bufferAddress += 4
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_y ) ; bufferAddress += 4
+		_verticesDb.PokeFloat( bufferAddress, _vertices[ ii ].m_z ) ; bufferAddress += 4
+	Next
+
+	Return _verticesDb
+End
+
+Function ColorVertexToDataBuffer:DataBuffer( _vertices:ColorVertex[], _verticesDb:DataBuffer=Null )
+
+	Local bufferAddress :Int = 0
+	Local verticesCount :Int = _vertices.Length()
+
+	If Not _verticesDb Then
+		_verticesDb = New DataBuffer( verticesCount * ColorVertex.SIZE_IN_BYTES )
+	Endif
+
+	For Local ii:Int = 0 Until verticesCount
+		_verticesDb.PokeInt( bufferAddress, _vertices[ ii ].m_abgr ) ; bufferAddress += 4
+	Next
+
+	Return _verticesDb
+End
+
+Function Index16ToDataBuffer:DataBuffer( _indices:Int[], _indicesDb:DataBuffer=Null )
+
+	Local bufferAddress :Int = 0
+	Local indicesCount  :Int = _indices.Length()
+
+	If Not _indicesDb Then
+		_indicesDb = New DataBuffer( indicesCount * 2 )
+	Endif
+
+	For Local ii:Int = 0 Until indicesCount
+		_indicesDb.PokeShort( bufferAddress, _indices[ ii ] ) ; bufferAddress += 2
+	Next
+
+	Return _indicesDb
+End
+
+'  Function PackUint32:Int( _x:Int, _y:Int, _z:Int, _w:Int )
+'  
+'  	Local result:Int = _x & $ff
+'  
+'  	result |= (_y & $ff) Shl  8
+'  	result |= (_z & $ff) Shl 16
+'  	result |= (_w & $ff) Shl 24
+'  
+'  	Print "_x=" + _x + " _y=" + _y + " _z=" + _z + " hex=" + IntToHex( result )
+'  
+'  	Return result
+'  End
+'  
+'  Function PackF4u:Int( _x:Float, _y:Float=0.0, _z:Float=0.0, _w:Float=0.0 )
+'  
+'  	Local xx :Int = Int( _x * 127.0 + 128.0 )
+'  	Local yy :Int = Int( _y * 127.0 + 128.0 )
+'  	Local zz :Int = Int( _z * 127.0 + 128.0 )
+'  	Local ww :Int = Int( _w * 127.0 + 128.0 )
+'  
+'  	Return PackUint32( xx, yy, zz, ww )
+'  End
+
+Global s_cubePosVertices:PosVertex[] = [
+	New PosVertex( -1.0,  1.0,  1.0 ),
+	New PosVertex(  1.0,  1.0,  1.0 ),
+	New PosVertex( -1.0, -1.0,  1.0 ),
+	New PosVertex(  1.0, -1.0,  1.0 ),
+	New PosVertex( -1.0,  1.0, -1.0 ),
+	New PosVertex(  1.0,  1.0, -1.0 ),
+	New PosVertex( -1.0, -1.0, -1.0 ),
+	New PosVertex(  1.0, -1.0, -1.0 ) ]
+
+Global s_cubeColorVertices:ColorVertex[] = [
+	New ColorVertex( $ff000000 ),
+	New ColorVertex( $ff0000ff ),
+	New ColorVertex( $ff00ff00 ),
+	New ColorVertex( $ff00ffff ),
+	New ColorVertex( $ffff0000 ),
+	New ColorVertex( $ffff00ff ),
+	New ColorVertex( $ffffff00 ),
+	New ColorVertex( $ffffffff ) ]
+
+Global s_cubeTriList:Int[] = [
+	0, 1, 2, ' 0
+	1, 3, 2,
+	4, 6, 5, ' 2
+	5, 6, 7,
+	0, 2, 4, ' 4
+	4, 2, 6,
+	1, 5, 3, ' 6
+	5, 7, 3,
+	0, 4, 1, ' 8
+	4, 5, 1,
+	2, 3, 6, '10
+	6, 3, 7 ]
+
+Global s_cubeTriStrip:Int[] = [
+	0, 1, 2,
+	3,
+	7,
+	1,
+	5,
+	0,
+	4,
+	2,
+	6,
+	7,
+	4,
+	5 ]
+
+Class MvsExample Extends App
+
+	Field bgfxCaps     := New BgfxCaps()
+
+	Field m_width      :Int
+	Field m_height     :Int
+	Field m_debug      :Int = BGFX_DEBUG_NONE
+'  	Field m_debug      :Int = BGFX_DEBUG_TEXT
+	Field m_reset      :Int
+
+	Field m_vbh        :Int[ 2 ] ' bgfx::VertexBufferHandle
+	Field m_ibh        :Int      ' bgfx::IndexBufferHandle
+
+	Field m_program    :Int      ' bgfx::ProgramHandle
+
+	Field m_timeOffset :Int
+
+	Field state        :Int[ 2 ]
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $303030ff, 1.0, 0 )
+
+		' Create vertex stream declaration.
+		PosVertex.Init()
+		ColorVertex.Init()
+
+		' Create static vertex buffer.
+		m_vbh[ 0 ] = bgfxCreateVertexBuffer(
+				' Static data can be passed with bgfxUtilsMakeRef
+				bgfxUtilsMakeRef( PosVertexToDataBuffer( s_cubePosVertices ) ),
+				PosVertex.ms_decl )
+
+		m_vbh[ 1 ] = bgfxCreateVertexBuffer(
+				' Static data can be passed with bgfxUtilsMakeRef
+				bgfxUtilsMakeRef( ColorVertexToDataBuffer( s_cubeColorVertices ) ),
+				ColorVertex.ms_decl )
+
+		' Create static index buffer.
+		m_ibh = bgfxCreateIndexBuffer(
+				' Static data can be passed with bgfxUtilsMakeRef
+				bgfxUtilsMakeRef( Index16ToDataBuffer( s_cubeTriStrip ) ) )
+
+		' Create program from shaders.
+		m_program = bgfxUtilsLoadProgram( "vs_cubes", "fs_cubes" )
+
+		m_timeOffset = Millisecs()
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		' Cleanup.
+'  		bgfxDestroyIndexBuffer( m_ibh )
+'  
+'  		bgfxDestroyVertexBuffer( m_vbh[ 0 ] )
+'  		bgfxDestroyVertexBuffer( m_vbh[ 1 ] )
+'  
+'  		bgfxDestroyProgram( m_program )
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Method OnRender:Int()
+
+		bgfxGetCaps( bgfxCaps )
+
+		Local time :Float = Float( Millisecs() - m_timeOffset ) * 0.001
+
+		Local at   :Float[] = [ 0.0, 0.0,   0.0 ]
+		Local eye  :Float[] = [ 0.0, 0.0, -35.0 ]
+
+		' Set view and projection matrix for view 0.
+		' {
+			Local view:Float[ 16 ]
+			bxMtxLookAt( view, eye, at )
+
+			Local proj:Float[ 16 ]
+			bxMtxProj( proj, 60.0, Float( m_width ) / Float( m_height ), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+			bgfxSetViewTransform( 0, view, proj )
+
+			' Set view 0 default viewport.
+			bgfxSetViewRect( 0, 0, 0, m_width, m_height )
+		' }
+
+		' This dummy draw call is here to make sure that view 0 is cleared
+		' if no other draw calls are submitted to view 0.
+		bgfxTouch( 0 )
+
+		' Submit 11x11 cubes.
+		For Local yy:Int = 0 Until 11
+			For Local xx:Int = 0 Until 11
+
+				Local mtx:Float[ 16 ]
+				bxMtxRotateXY( mtx, time + xx * 0.21, time + yy * 0.37 )
+				mtx[ 12 ] = -15.0 + Float( xx ) * 3.0
+				mtx[ 13 ] = -15.0 + Float( yy ) * 3.0
+				mtx[ 14 ] = 0.0
+
+				' Set model matrix for rendering.
+				bgfxSetTransform( mtx )
+
+				' Set vertex and index buffer.
+				bgfxSetVertexBuffer( 0, m_vbh[ 0 ] )
+				bgfxSetVertexBuffer( 1, m_vbh[ 1 ] )
+				bgfxSetIndexBuffer( m_ibh )
+
+				' Set render states.
+				bgfxUtilsClear64Bit( state )
+				bgfxUtilsSet64Bit( state, BGFX_STATE_DEFAULT )
+				bgfxUtilsSet64Bit( state, BGFX_STATE_PT_TRISTRIP )
+				bgfxSetState( state )
+
+				' Submit primitive for rendering to view 0.
+				bgfxSubmit( 0, m_program )
+
+			Next
+		Next
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame()
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 34-mvs"
+	Print "Description: Multiple vertex streams."
+	New MvsExample()
+	Return 0
+End

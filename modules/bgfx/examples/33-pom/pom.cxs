@@ -414,6 +414,8 @@ Class PomExample Extends App
 End
 
 Function Main:Int()
+	Print "Title: 33-pom"
+	Print "Description: Parallax mapping."
 	New PomExample()
 	Return 0
 End
