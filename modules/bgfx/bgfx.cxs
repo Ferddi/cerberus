@@ -1218,6 +1218,19 @@ Function bgfxUtilsSet64Bit:Void( numbers:Int[], value:Int[] )
 	numbers[1] |= value[1]
 End
 
+Function bgfxUtilsSet64Bit:Void( numbers:Int[], value:Int )
+	numbers[1] |= value
+End
+
+Function bgfxUtilsIs64BitEquals:Bool( numbers:Int[], bitMasks:Int[] )
+	Return ( numbers[ 0 ] & bitMasks[ 0 ] ) = bitMasks[ 0 ] And
+			( numbers[ 1 ] & bitMasks[ 1 ] ) = bitMasks[ 1 ]
+End
+
+Function bgfxUtilsIs64BitEquals:Bool( numbers:Int[], bitMasks:Int )
+	Return ( numbers[ 1 ] & bitMasks ) = bitMasks
+End
+
 Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer )
 	Local _mem := New BgfxMemory()
 	bgfxMakeRef( _mem, _data )
