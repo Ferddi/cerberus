@@ -471,13 +471,53 @@ public:
 class bgfx_transform_object : public Object
 {
 public:
-	bgfx_transform_t * _transform;
+	bgfx_transform_t _transform;
 
 	bgfx_transform_object()
 	{
 	}
 	~bgfx_transform_object()
 	{
+	}
+
+	void PokeByte( int addr, int value )
+	{
+		*(_transform.data + addr) = value;
+	}
+
+	void PokeShort( int addr, int value )
+	{
+		*(short *)(_transform.data + addr) = value;
+	}
+
+	void PokeInt( int addr, int value )
+	{
+		*(int *)(_transform.data + addr) = value;
+	}
+
+	void PokeFloat( int addr, float value )
+	{
+		*(float *)(_transform.data + addr) = value;
+	}
+
+	int PeekByte( int addr )
+	{
+		return *(_transform.data + addr);
+	}
+
+	int PeekShort( int addr )
+	{
+		return *(short *)(_transform.data + addr);
+	}
+
+	int PeekInt( int addr )
+	{
+		return *(int *)(_transform.data + addr);
+	}
+
+	float PeekFloat( int addr )
+	{
+		return *(float *)(_transform.data + addr);
 	}
 };
 
@@ -969,9 +1009,48 @@ public:
 	}
 };
 
+// class bgfx_embedded_shader_object : public Object
+// {
+// public:
+	// bgfx::EmbeddedShader _es;
+
+	// void SetName( String _name )
+	// {
+		// _es.name = (const char *)_name.ToCString<char>();
+	// }
+
+	// void SetData( int type, BBDataBuffer * data )
+	// {
+		// SetData( 0, type, data );
+	// }
+
+	// void SetData( int index, int type, BBDataBuffer * data )
+	// {
+		// bgfx::EmbeddedShader::Data * esdata = &_es.data[ index ];
+
+		// esdata->type = (bgfx::RendererType::Enum)type;
+
+		// if ( data == NULL )
+		// {
+			// esdata->data = NULL;
+			// esdata->size = 0;
+		// }
+		// else
+		// {
+			// esdata->data = (const uint8_t *)data->ReadPointer( 0 );
+			// esdata->size = data->Length();
+		// }
+	// }
+// };
+
 //-----------------------------------------------------------------------------
 // functions
 //-----------------------------------------------------------------------------
+
+// int _bgfx_create_embedded_shader( bgfx_embedded_shader_object * _es, int type, String _name )
+// {
+	// return ( bgfx::createEmbeddedShader( &_es->_es, (bgfx::RendererType::Enum)type, (const char *)_name.ToCString<char>() ) ).idx;
+// }
 
 
 //-----------------------------------------------------------------------------
@@ -985,171 +1064,15 @@ public:
 	// return _handle;
 // }
 
-void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at )
+float _cast_int_to_float( int _ii )
 {
-	bx::mtxLookAt( &_result[0], &_eye[0], &_at[0], NULL );
+	return *(float *)&_ii;
 }
 
-void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up )
+int _cast_float_to_int( float _ff )
 {
-	bx::mtxLookAt( &_result[0], &_eye[0], &_at[0], &_up[0] );
+	return *(int *)&_ff;
 }
-
-void _bx_mtx_proj( Array<float> _result, float _eye, float _aspect, float _near, float _far, bool _oglNdc )
-{
-	bx::mtxProj( &_result[0], _eye, _aspect, _near, _far, _oglNdc );
-}
-
-void _bx_mtx_rotate_x_y( Array<float> _result, float _ax, float _ay )
-{
-	bx::mtxRotateXY( &_result[0], _ax, _ay );
-}
-
-void _bx_mtx_ortho( Array<float> _result, float _left, float _right, float _bottom, float _top, float _near, float _far, float _offset, bool _oglNdc )
-{
-	bx::mtxOrtho( &_result[0], _left, _right, _bottom, _top, _near, _far, _offset, _oglNdc );
-}
-
-void _bx_vec3_norm( Array<float> _result, Array<float> _a )
-{
-	bx::vec3Norm( &_result[0], &_a[0] );
-}
-
-void _bx_mtx_mul( Array<float> _result, Array<float> _a, Array<float> _b )
-{
-	bx::mtxMul( &_result[0], &_a[0], &_b[0] );
-}
-
-void _bx_mtx_inverse( Array<float> _result, Array<float> _a )
-{
-	bx::mtxInverse( &_result[0], &_a[0] );
-}
-
-void _bx_vec4_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
-{
-	bx::vec4MulMtx( &_result[0], &_vec[0], &_mat[0] );
-}
-
-int _bx_cnt_t_z( int _val )
-{
-	return bx::uint32_cnttz( (uint32_t)_val );
-}
-
-void _bx_mtx_s_r_t( Array<float> _result, float _sx, float _sy, float _sz, float _ax, float _ay, float _az, float _tx, float _ty, float _tz)
-{
-	bx::mtxSRT( &_result[0], _sx, _sy, _sz, _ax, _ay, _az, _tx, _ty, _tz );
-}
-
-void _bx_mtx_translate( Array<float> _result, float _tx, float _ty, float _tz )
-{
-	bx::mtxTranslate( &_result[0], _tx, _ty, _tz );
-}
-
-void _bx_vec3_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
-{
-	bx::vec3MulMtx( &_result[0], &_vec[0], &_mat[0] );
-}
-
-float _bx_square( float _a )
-{
-	return bx::square( _a );
-}
-
-void _bx_mtx_scale( Array<float> _result, float _sx, float _sy, float _sz )
-{
-	bx::mtxScale( &_result[0], _sx, _sy, _sz );
-}
-
-void _bx_vec3_cross( Array<float> _result, Array<float> _a, Array<float> _b )
-{
-	bx::vec3Cross( &_result[0], &_a[0], &_b[0] );
-}
-
-void _bx_vec3_move( Array<float> _result, Array<float> _a )
-{
-	bx::vec3Move( &_result[0], &_a[0] );
-}
-
-void _bx_vec3_mul( Array<float> _result, Array<float> _a, Array<float> _b )
-{
-	bx::vec3Mul( &_result[0], &_a[0], &_b[0] );
-}
-
-void _bx_vec3_mul( Array<float> _result, Array<float> _a, float _b )
-{
-	bx::vec3Mul( &_result[0], &_a[0], _b );
-}
-
-void _bx_vec3_add( Array<float> _result, Array<float> _a, Array<float> _b )
-{
-	bx::vec3Add( &_result[0], &_a[0], &_b[0] );
-}
-
-void _bx_vec3_add( Array<float> _result, Array<float> _a, float _b )
-{
-	bx::vec3Add( &_result[0], &_a[0], _b );
-}
-
-void _bx_vec3_sub( Array<float> _result, Array<float> _a, Array<float> _b )
-{
-	bx::vec3Sub( &_result[0], &_a[0], &_b[0] );
-}
-
-void _bx_vec3_sub( Array<float> _result, Array<float> _a, float _b )
-{
-	bx::vec3Sub( &_result[0], &_a[0], _b );
-}
-
-float _bx_vec3_dot( Array<float> _a, Array<float> _b )
-{
-	return bx::vec3Dot( &_a[0], &_b[0] );
-}
-
-void _bx_mtx_identity( Array<float> _result )
-{
-	bx::mtxIdentity( &_result[0] );
-}
-
-float _bx_to_rad( float _deg )
-{
-	return bx::toRad( _deg );
-}
-
-void _bx_mtx_transpose( Array<float> _result, Array<float> _a )
-{
-	bx::mtxTranspose( &_result[0], &_a[0] );
-}
-
-void _bx_vec3_mul_mtx_h( Array<float> _result, Array<float> _vec, Array<float> _mat )
-{
-	bx::vec3MulMtxH( &_result[0], &_vec[0], &_mat[0] );
-}
-
-float _bx_vec3_length( Array<float> _a )
-{
-	return bx::vec3Length( &_a[0] );
-}
-
-float _bx_lerp( float _a, float _b, float _t )
-{
-	return bx::lerp( _a, _b, _t );
-}
-
-void _bx_mtx_rotate_x( Array<float> _result, float _ax )
-{
-	bx::mtxRotateX( &_result[0], _ax );
-}
-
-void _bx_mtx_rotate_y( Array<float> _result, float _ay )
-{
-	bx::mtxRotateY( &_result[0], _ay );
-}
-
-void _bx_mtx_rotate_z( Array<float> _result, float _az )
-{
-	bx::mtxRotateZ( &_result[0], _az );
-}
-
 
 
 
@@ -1507,14 +1430,28 @@ void _bgfx_vertex_convert( bgfx_vertex_decl_object * _destDecl, BBDataBuffer * _
 // BGFX_C_API uint16_t bgfx_weld_vertices(uint16_t* _output, const bgfx_vertex_decl_t* _decl, const void* _data, uint16_t _num, float _epsilon);
 int _bgfx_weld_vertices( BBDataBuffer * _output, bgfx_vertex_decl_object * _decl, BBDataBuffer * _data, int _num, float _epsilon )
 {
-	bgfx_weld_vertices( (uint16_t *)_output->WritePointer(0), &_decl->_decl, _data->ReadPointer(0), _num, _epsilon );
+	return bgfx_weld_vertices( (uint16_t *)_output->WritePointer(0), &_decl->_decl, _data->ReadPointer(0), _num, _epsilon );
 }
 
 // Function bgfxTopologyConvert:Int( _conversion:Int, _dst:DataBuffer, _dstSize:Int, _indices:DataBuffer, _numIndices:Int, _index32:Bool )="_bgfx_topology_convert"
 // BGFX_C_API uint32_t bgfx_topology_convert(bgfx_topology_convert_t _conversion, void* _dst, uint32_t _dstSize, const void* _indices, uint32_t _numIndices, bool _index32);
 int _bgfx_topology_convert( int _conversion, BBDataBuffer * _dst, int _dstSize, BBDataBuffer * _indices, int _numIndices, bool _index32 )
 {
-	bgfx_topology_convert( (bgfx_topology_convert_t)_conversion, _dst->WritePointer(0), _dstSize, _indices->ReadPointer(0), _numIndices, _index32 );
+	if ( _dst == NULL )
+	{
+		return bgfx_topology_convert( (bgfx_topology_convert_t)_conversion, NULL, 0, _indices->ReadPointer(0), _numIndices, _index32 );
+	}
+
+	return bgfx_topology_convert( (bgfx_topology_convert_t)_conversion, _dst->WritePointer(0), _dstSize, _indices->ReadPointer(0), _numIndices, _index32 );
+}
+int _bgfx_topology_convert( int _conversion, BBDataBuffer * _dst, int _dstStart, int _dstSize, BBDataBuffer * _indices, int _indicesStart, int _numIndices, bool _index32 )
+{
+	if ( _dst == NULL )
+	{
+		return bgfx_topology_convert( (bgfx_topology_convert_t)_conversion, NULL, 0, _indices->ReadPointer(_indicesStart), _numIndices, _index32 );
+	}
+
+	return bgfx_topology_convert( (bgfx_topology_convert_t)_conversion, _dst->WritePointer(_dstStart), _dstSize, _indices->ReadPointer(_indicesStart), _numIndices, _index32 );
 }
 
 // Function bgfxTopologySortTriList:Void( _sort:Int, _dst:DataBuffer, _dstSize:Int, _dir:Float[], _pos:Float[], _vertices:DataBuffer, _stride:Int, _indices:DataBuffer, _numIndices:Int, _index32:Bool )="_intri_list"
@@ -1530,11 +1467,11 @@ void _bgfx_topology_sort_tri_list( int _sort, BBDataBuffer * _dst, int _dstSize,
 // BGFX_C_API uint8_t bgfx_get_supported_renderers(uint8_t _max, bgfx_renderer_type_t* _enum);
 int _bgfx_get_supported_renderers( int _max )
 {
-	bgfx_get_supported_renderers( _max, NULL );
+	return bgfx_get_supported_renderers( _max, NULL );
 }
 int _bgfx_get_supported_renderers( int _max, Array<int> _enum )
 {
-	bgfx_get_supported_renderers( _max, (bgfx_renderer_type_t *)&_enum[0] );
+	return bgfx_get_supported_renderers( _max, (bgfx_renderer_type_t *)&_enum[0] );
 }
 
 // Function bgfxGetRendererName:String( _type:Int )="_bgfx_get_renderer_name"
@@ -1575,14 +1512,15 @@ bool _bgfx_init( bgfx_init_object * _init )
 // BGFX_C_API struct bgfx_encoder_s* bgfx_begin(void);
 void _bgfx_begin( bgfx_encoder_object * _encoder, bool _forThread )
 {
-	// _encoder->_encoder = bgfx_begin();
+	// _encoder->_encoder = (struct bgfx_encoder_s *)bgfx::begin();
+	_encoder->_encoder = reinterpret_cast< bgfx_encoder_s * >( bgfx::begin() );
 }
 
 // Function bgfxEnd:Void( _encoder:BgfxEncoder )="_bgfx_end"
 // BGFX_C_API void bgfx_end(struct bgfx_encoder_s* _encoder);
 void _bgfx_end( bgfx_encoder_object * _encoder )
 {
-	// bgfx_end( _encoder->_encoder );
+	bgfx::end( reinterpret_cast< bgfx::Encoder * >( _encoder->_encoder ) );
 }
 
 // Function bgfxFrame:Int( _capture:Bool=False )="bgfx_frame"
@@ -1650,6 +1588,30 @@ void _bgfx_make_ref( bgfx_memory_object * _mem, BBDataBuffer * _data, int _size 
 void _bgfx_make_ref( bgfx_memory_object * _mem, BBDataBuffer * _data )
 {
 	_bgfx_make_ref( _mem, _data, _data->Length() );
+}
+void _bgfx_make_ref( bgfx_memory_object * _mem, Array<int> _data, int _index, int _size )
+{
+	_mem->_mem = (bgfx_memory_t *)bgfx_make_ref( &_data[ _index ], _size );
+}
+void _bgfx_make_ref( bgfx_memory_object * _mem, Array<int> _data, int _size )
+{
+	_mem->_mem = (bgfx_memory_t *)bgfx_make_ref( &_data[ 0 ], _size );
+}
+void _bgfx_make_ref( bgfx_memory_object * _mem, Array<int> _data )
+{
+	_mem->_mem = (bgfx_memory_t *)bgfx_make_ref( &_data[ 0 ], (_data.Length() << 2) );
+}
+void _bgfx_make_ref( bgfx_memory_object * _mem, Array<float> _data, int _index, int _size )
+{
+	_mem->_mem = (bgfx_memory_t *)bgfx_make_ref( &_data[ _index ], _size );
+}
+void _bgfx_make_ref( bgfx_memory_object * _mem, Array<float> _data, int _size )
+{
+	_mem->_mem = (bgfx_memory_t *)bgfx_make_ref( &_data[ 0 ], _size );
+}
+void _bgfx_make_ref( bgfx_memory_object * _mem, Array<float> _data )
+{
+	_mem->_mem = (bgfx_memory_t *)bgfx_make_ref( &_data[ 0 ], (_data.Length() << 2) );
 }
 
 // this function requires a function pointer
@@ -2338,7 +2300,7 @@ int _bgfx_set_transform_null()
 // BGFX_C_API uint32_t bgfx_alloc_transform(bgfx_transform_t* _transform, uint16_t _num);
 int _bgfx_alloc_transform( bgfx_transform_object * _transform, int _num )
 {
-	return bgfx_alloc_transform( _transform->_transform, _num );
+	return bgfx_alloc_transform( &_transform->_transform, _num );
 }
 
 // Function bgfxSetTransformCached:Void( _cache:Int, _num:Int=1 )="bgfx_set_transform_cached"
@@ -2629,7 +2591,7 @@ void _bgfx_encoder_set_stencil( bgfx_encoder_object * _encoder, int _fstencil, i
 // BGFX_C_API uint16_t bgfx_encoder_set_scissor(struct bgfx_encoder_s* _encoder, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height);
 int _bgfx_encoder_set_scissor( bgfx_encoder_object * _encoder, int _x, int _y, int _width, int _height )
 {
-	bgfx_encoder_set_scissor( _encoder->_encoder, _x, _y, _width, _height );
+	return bgfx_encoder_set_scissor( _encoder->_encoder, _x, _y, _width, _height );
 }
 
 // Function bgfxEncoderSetScissorCached:Void( _encoder:BgfxEncoder, _cache:Int=UINT16_MAX )="_bgfx_encoder_set_scissor_cached"
@@ -2643,14 +2605,14 @@ void _bgfx_encoder_set_scissor_cached( bgfx_encoder_object * _encoder, int _cach
 // BGFX_C_API uint32_t bgfx_encoder_set_transform(struct bgfx_encoder_s* _encoder, const void* _mtx, uint16_t _num);
 int _bgfx_encoder_set_transform( bgfx_encoder_object * _encoder, Array<float> _mtx, int _num )
 {
-	bgfx_encoder_set_transform( _encoder->_encoder, &_mtx[0], _num );
+	return bgfx_encoder_set_transform( _encoder->_encoder, &_mtx[0], _num );
 }
 
 // Function bgfxEncoderAllocTransform:Int( _encoder:BgfxEncoder, _transform:BgfxTransform, _num:Int )="_bgfx_encoder_alloc_transform"
 // BGFX_C_API uint32_t bgfx_encoder_alloc_transform(struct bgfx_encoder_s* _encoder, bgfx_transform_t* _transform, uint16_t _num);
 int _bgfx_encoder_alloc_transform( bgfx_encoder_object * _encoder, bgfx_transform_object * _transform, int _num )
 {
-	bgfx_encoder_alloc_transform( _encoder->_encoder, _transform->_transform, _num );
+	return bgfx_encoder_alloc_transform( _encoder->_encoder, &_transform->_transform, _num );
 }
 
 // Function bgfxEncoderSetTransformCached:Void( _encoder:BgfxEncoder, _cache:Int, _num:Int=1 )="_bgfx_encoder_set_transform_cached"
@@ -2924,3 +2886,1163 @@ BBDataBuffer *BBLoadImageData( BBDataBuffer *buf,String path,Array<int> info ){
 	
 	return buf;
 }
+
+
+//------------------------------------------------------------------------------
+// bx math
+//------------------------------------------------------------------------------
+
+/// Returns converted the argument _deg to radians.
+// BX_CONST_FUNC float toRad(float _deg);
+
+/// Returns converted the argument _rad to degrees.
+// BX_CONST_FUNC float toDeg(float _rad);
+
+/// Reinterprets the bit pattern of _a as uint32_t.
+// BX_CONST_FUNC uint32_t floatToBits(float _a);
+
+/// Reinterprets the bit pattern of _a as float.
+// BX_CONST_FUNC float bitsToFloat(uint32_t _a);
+
+/// Reinterprets the bit pattern of _a as uint64_t.
+// BX_CONST_FUNC uint64_t doubleToBits(double _a);
+
+/// Reinterprets the bit pattern of _a as double.
+// BX_CONST_FUNC double bitsToDouble(uint64_t _a);
+
+/// Returns sortable floating point value.
+// BX_CONST_FUNC uint32_t floatFlip(uint32_t _value);
+
+/// Returns true if _f is a number that is NaN.
+// BX_CONST_FUNC bool isNan(float _f);
+
+/// Returns true if _f is a number that is NaN.
+///
+// BX_CONST_FUNC bool isNan(double _f);
+
+/// Returns true if _f is not infinite and is not a NaN.
+///
+// BX_CONST_FUNC bool isFinite(float _f);
+
+/// Returns true if _f is not infinite and is not a NaN.
+///
+// BX_CONST_FUNC bool isFinite(double _f);
+
+/// Returns true if _f is infinite and is not a NaN.
+///
+// BX_CONST_FUNC bool isInfinite(float _f);
+
+/// Returns true if _f is infinite and is not a NaN.
+///
+// BX_CONST_FUNC bool isInfinite(double _f);
+
+/// Returns the largest integer value not greater than _f.
+///
+// BX_CONST_FUNC float floor(float _f);
+
+/// Returns the smallest integer value not less than _f.
+///
+// BX_CONST_FUNC float ceil(float _f);
+
+/// Returns the nearest integer value to _f, rounding halfway cases away from zero,
+///
+// BX_CONST_FUNC float round(float _f);
+
+/// Returns linear interpolation between two values _a and _b.
+///
+// BX_CONST_FUNC float lerp(float _a, float _b, float _t);
+
+/// Returns the sign of _a.
+///
+// BX_CONST_FUNC float sign(float _a);
+
+/// Returns the absolute of _a.
+///
+// BX_CONST_FUNC float abs(float _a);
+
+/// Returns the square of _a.
+///
+// BX_CONST_FUNC float square(float _a);
+
+/// Returns the cosine of the argument _a.
+///
+// BX_CONST_FUNC float sin(float _a);
+
+/// Returns hyperbolic sine of the argument _a.
+///
+// BX_CONST_FUNC float sinh(float _a);
+
+/// Returns radian angle between -pi/2 and +pi/2 whose sine is _a.
+///
+// BX_CONST_FUNC float asin(float _a);
+
+/// Returns the cosine of the argument _a.
+///
+// BX_CONST_FUNC float cos(float _a);
+
+/// Returns hyperbolic cosine of the argument _a.
+///
+// BX_CONST_FUNC float cosh(float _a);
+
+/// Returns radian angle between 0 and pi whose cosine is _a.
+///
+// BX_CONST_FUNC float acos(float _a);
+
+/// Returns the circular tangent of the radian argument _a.
+///
+// BX_CONST_FUNC float tan(float _a);
+
+/// Returns hyperbolic tangent of the argument _a.
+///
+// BX_CONST_FUNC float tanh(float _a);
+
+/// Returns radian angle between -pi/2 and +pi/2 whose tangent is _a.
+///
+// BX_CONST_FUNC float atan(float _a);
+
+/// Retruns the inverse tangent of _y/_x.
+///
+// BX_CONST_FUNC float atan2(float _y, float _x);
+
+/// Computes _a raised to the _b power.
+///
+// BX_CONST_FUNC float pow(float _a, float _b);
+
+/// Returns the result of multiplying _a by 2 raised to the power of the exponent.
+///
+// BX_CONST_FUNC float ldexp(float _a, int32_t _b);
+
+/// Returns decomposed given floating point value _a into a normalized fraction and
+/// an integral power of two.
+///
+// float frexp(float _a, int32_t* _outExp);
+
+/// Returns e (2.71828...) raised to the _a power.
+///
+// BX_CONST_FUNC float exp(float _a);
+
+/// Returns 2 raised to the _a power.
+///
+// BX_CONST_FUNC float exp2(float _a);
+
+/// Returns the base e (2.71828...) logarithm of _a.
+///
+// BX_CONST_FUNC float log(float _a);
+
+/// Returns the base 2 logarithm of _a.
+///
+// BX_CONST_FUNC float log2(float _a);
+
+/// Returns the square root of _a.
+///
+// BX_CONST_FUNC float sqrt(float _a);
+
+/// Returns reciprocal square root of _a.
+///
+// BX_CONST_FUNC float rsqrt(float _a);
+
+/// Returns the nearest integer not greater in magnitude than _a.
+///
+// BX_CONST_FUNC float trunc(float _a);
+
+/// Returns the fractional (or decimal) part of _a, which is greater than or equal to 0
+/// and less than 1.
+///
+// BX_CONST_FUNC float fract(float _a);
+
+/// Returns result of multipla and add (_a * _b + _c).
+///
+// BX_CONST_FUNC float mad(float _a, float _b, float _c);
+
+/// Returns the floating-point remainder of the division operation _a/_b.
+///
+// BX_CONST_FUNC float mod(float _a, float _b);
+
+///
+// BX_CONST_FUNC bool equal(float _a, float _b, float _epsilon);
+
+///
+// BX_CONST_FUNC bool equal(const Array<float> _a, const Array<float> _b, uint32_t _num, float _epsilon);
+
+///
+// BX_CONST_FUNC float wrap(float _a, float _wrap);
+
+///
+// BX_CONST_FUNC float step(float _edge, float _a);
+
+///
+// BX_CONST_FUNC float pulse(float _a, float _start, float _end);
+
+///
+// BX_CONST_FUNC float smoothStep(float _a);
+
+// References:
+//  - Bias And Gain Are Your Friend
+//    http://blog.demofox.org/2012/09/24/bias-and-gain-are-your-friend/
+//  - http://demofox.org/biasgain.html
+///
+// BX_CONST_FUNC float bias(float _time, float _bias);
+
+///
+// BX_CONST_FUNC float gain(float _time, float _gain);
+
+///
+// BX_CONST_FUNC float angleDiff(float _a, float _b);
+
+/// Returns shortest distance linear interpolation between two angles.
+///
+// BX_CONST_FUNC float angleLerp(float _a, float _b, float _t);
+
+///
+void _bx_vec3_move( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Move( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_vec3_abs( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Abs( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_vec3_neg( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Neg( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_vec3_add( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Add( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec3_add( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Add( &_result[ 0 ], &_a[ 0 ], _b );
+}
+
+///
+void _bx_vec3_sub( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Sub( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec3_sub( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Sub( &_result[ 0 ], &_a[ 0 ], _b );
+}
+
+///
+void _bx_vec3_mul( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Mul( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec3_mul( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Mul( &_result[ 0 ], &_a[ 0 ], _b );
+}
+
+///
+float _bx_vec3_dot( Array<float> _a, Array<float> _b )
+{
+	return bx::vec3Dot( &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec3_cross( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Cross( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+float _bx_vec3_length( Array<float> _a )
+{
+	return bx::vec3Length( &_a[ 0 ] );
+}
+
+///
+void _bx_vec3_lerp( Array<float> _result, Array<float> _a, Array<float> _b, float _t )
+{
+	bx::vec3Lerp( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ], _t );
+}
+
+///
+void _bx_vec3_lerp( Array<float> _result, Array<float> _a, Array<float> _b, Array<float> _c )
+{
+	bx::vec3Lerp( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ], &_c[ 0 ] );
+}
+
+///
+float _bx_vec3_norm( Array<float> _result, Array<float> _a )
+{
+	return bx::vec3Norm( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_vec3_min( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Min( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec3_max( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Max( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec3_rcp( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Rcp( &_result[ 0 ], &_a[ 0 ] );
+}
+
+/// Calculate tangent frame from normal.
+///
+void _bx_vec3_tangent_frame( Array<float> _n, Array<float> _t, Array<float> _b )
+{
+	bx::vec3TangentFrame( &_n[ 0 ], &_t[ 0 ], &_b[ 0 ] );
+}
+
+/// Calculate tangent frame from normal and angle.
+///
+void _bx_vec3_tangent_frame( Array<float> _n, Array<float> _t, Array<float> _b, float _angle )
+{
+	bx::vec3TangentFrame( &_n[ 0 ], &_t[ 0 ], &_b[ 0 ], _angle );
+}
+
+///
+void _bx_vec3_from_lat_long( Array<float> _vec, float _u, float _v )
+{
+	bx::vec3FromLatLong( &_vec[ 0 ], _u, _v );
+}
+
+/// Convert direction to 2D latitude and longitude.
+///
+/// @param[out] _outU U-coordinate.
+/// @param[out] _outV V-coordinate.
+/// @param[in]  _dir Normalized direction vector.
+///
+void _bx_vec3_to_lat_long( Array<float> _outU, Array<float> _outV, Array<float> _dir )
+{
+	bx::vec3ToLatLong( &_outU[ 0 ], &_outV[ 0 ], &_dir[ 0 ] );
+}
+
+///
+void _bx_quat_identity( Array<float> _result )
+{
+	bx::quatIdentity( &_result[ 0 ] );
+}
+
+///
+void _bx_quat_move( Array<float> _result, Array<float> _a )
+{
+	bx::quatMove( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_quat_mul_xyz( Array<float> _result, Array<float> _qa, Array<float> _qb )
+{
+	bx::quatMulXYZ( &_result[ 0 ], &_qa[ 0 ], &_qb[ 0 ] );
+}
+
+///
+void _bx_quat_mul( Array<float> _result, Array<float> _qa, Array<float> _qb )
+{
+	bx::quatMul( &_result[ 0 ], &_qa[ 0 ], &_qb[ 0 ] );
+}
+
+///
+void _bx_quat_invert( Array<float> _result, Array<float> _quat )
+{
+	bx::quatInvert( &_result[ 0 ], &_quat[ 0 ] );
+}
+
+///
+float _bx_quat_dot( Array<float> _a, Array<float> _b )
+{
+	return bx::quatDot( &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_quat_norm( Array<float> _result, Array<float> _quat )
+{
+	bx::quatNorm( &_result[ 0 ], &_quat[ 0 ] );
+}
+
+///
+void _bx_quat_to_euler( Array<float> _result, Array<float> _quat )
+{
+	bx::quatToEuler( &_result[ 0 ], &_quat[ 0 ] );
+}
+
+///
+void _bx_quat_rotate_axis( Array<float> _result, Array<float> _axis, float _angle )
+{
+	bx::quatRotateAxis( &_result[ 0 ], &_axis[ 0 ], _angle );
+}
+
+///
+void _bx_quat_rotate_x( Array<float> _result, float _ax )
+{
+	bx::quatRotateX( &_result[ 0 ], _ax );
+}
+
+///
+void _bx_quat_rotate_y( Array<float> _result, float _ay )
+{
+	bx::quatRotateY( &_result[ 0 ], _ay );
+}
+
+///
+void _bx_quat_rotate_z( Array<float> _result, float _az )
+{
+	bx::quatRotateZ( &_result[ 0 ], _az );
+}
+
+///
+void _bx_vec3_mul_quat( Array<float> _result, Array<float> _vec, Array<float> _quat )
+{
+	bx::vec3MulQuat( &_result[ 0 ], &_vec[ 0 ], &_quat[ 0 ] );
+}
+
+///
+void _bx_mtx_identity( Array<float> _result )
+{
+	bx::mtxIdentity( &_result[ 0 ] );
+}
+
+///
+void _bx_mtx_translate( Array<float> _result, float _tx, float _ty, float _tz )
+{
+	bx::mtxTranslate( &_result[ 0 ], _tx, _ty, _tz );
+}
+
+///
+void _bx_mtx_scale( Array<float> _result, float _sx, float _sy, float _sz )
+{
+	bx::mtxScale( &_result[ 0 ], _sx, _sy, _sz );
+}
+
+///
+void _bx_mtx_scale( Array<float> _result, float _scale )
+{
+	bx::mtxScale( &_result[ 0 ], _scale );
+}
+
+///
+void _bx_mtx_from_normal( Array<float> _result, Array<float> _normal, float _scale, Array<float> _pos )
+{
+	bx::mtxFromNormal( &_result[ 0 ], &_normal[ 0 ], _scale, &_pos[ 0 ] );
+}
+
+///
+void _bx_mtx_from_normal( Array<float> _result, Array<float> _normal, float _scale, Array<float> _pos, float _angle )
+{
+	bx::mtxFromNormal( &_result[ 0 ], &_normal[ 0 ], _scale, &_pos[ 0 ], _angle );
+}
+
+///
+void _bx_mtx_quat( Array<float> _result, Array<float> _quat )
+{
+	bx::mtxQuat( &_result[ 0 ], &_quat[ 0 ] );
+}
+
+///
+void _bx_mtx_quat_translation( Array<float> _result, Array<float> _quat, Array<float> _translation )
+{
+	bx::mtxQuatTranslation( &_result[ 0 ], &_quat[ 0 ], &_translation[ 0 ] );
+}
+
+///
+void _bx_mtx_quat_translation_hmd( Array<float> _result, Array<float> _quat, Array<float> _translation )
+{
+	bx::mtxQuatTranslationHMD( &_result[ 0 ], &_quat[ 0 ], &_translation[ 0 ] );
+}
+
+///
+// void _bx_mtx_look_at_lh( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up = NULL )
+void _bx_mtx_look_at_lh( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up )
+{
+	bx::mtxLookAtLh( &_result[ 0 ], &_eye[ 0 ], &_at[ 0 ], &_up[ 0 ] );
+}
+void _bx_mtx_look_at_lh( Array<float> _result, Array<float> _eye, Array<float> _at )
+{
+	bx::mtxLookAtLh( &_result[ 0 ], &_eye[ 0 ], &_at[ 0 ], NULL );
+}
+
+///
+// void _bx_mtx_look_at_rh( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up = NULL )
+void _bx_mtx_look_at_rh( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up )
+{
+	bx::mtxLookAtRh( &_result[ 0 ], &_eye[ 0 ], &_at[ 0 ], &_up[ 0 ] );
+}
+void _bx_mtx_look_at_rh( Array<float> _result, Array<float> _eye, Array<float> _at )
+{
+	bx::mtxLookAtRh( &_result[ 0 ], &_eye[ 0 ], &_at[ 0 ], NULL );
+}
+
+///
+// void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up = NULL )
+void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up )
+{
+	bx::mtxLookAt( &_result[ 0 ], &_eye[ 0 ], &_at[ 0 ], &_up[ 0 ] );
+}
+void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at )
+{
+	bx::mtxLookAt( &_result[ 0 ], &_eye[ 0 ], &_at[ 0 ], NULL );
+}
+
+///
+void _bx_mtx_proj( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProj( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj( Array<float> _result, Array<float> _fov, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProj( &_result[ 0 ], &_fov[ 0 ], _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj( Array<float> _result, float _fovy, float _aspect, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProj( &_result[ 0 ], _fovy, _aspect, _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_lh( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProjLh( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_lh( Array<float> _result, Array<float> _fov, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProjLh( &_result[ 0 ], &_fov[ 0 ], _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_lh( Array<float> _result, float _fovy, float _aspect, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProjLh( &_result[ 0 ], _fovy, _aspect, _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rh( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProjRh( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rh( Array<float> _result, Array<float> _fov, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProjRh( &_result[ 0 ], &_fov[ 0 ], _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rh( Array<float> _result, float _fovy, float _aspect, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProjRh( &_result[ 0 ], _fovy, _aspect, _near, _far, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf( Array<float> _result, Array<float> _fov, float _near, bool _oglNdc )
+{
+	bx::mtxProjInf( &_result[ 0 ], &_fov[ 0 ], _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, bool _oglNdc )
+{
+	bx::mtxProjInf( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf( Array<float> _result, float _fovy, float _aspect, float _near, bool _oglNdc )
+{
+	bx::mtxProjInf( &_result[ 0 ], _fovy, _aspect, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf_lh( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, bool _oglNdc )
+{
+	bx::mtxProjInfLh( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf_lh( Array<float> _result, Array<float> _fov, float _near, bool _oglNdc )
+{
+	bx::mtxProjInfLh( &_result[ 0 ], &_fov[ 0 ], _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf_lh( Array<float> _result, float _fovy, float _aspect, float _near, bool _oglNdc )
+{
+	bx::mtxProjInfLh( &_result[ 0 ], _fovy, _aspect, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf_rh( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, bool _oglNdc )
+{
+	bx::mtxProjInfRh( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf_rh( Array<float> _result, Array<float> _fov, float _near, bool _oglNdc )
+{
+	bx::mtxProjInfRh( &_result[ 0 ], &_fov[ 0 ], _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_inf_rh( Array<float> _result, float _fovy, float _aspect, float _near, bool _oglNdc )
+{
+	bx::mtxProjInfRh( &_result[ 0 ], _fovy, _aspect, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rev_inf_lh( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, bool _oglNdc )
+{
+	bx::mtxProjRevInfLh( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rev_inf_lh( Array<float> _result, Array<float> _fov, float _near, bool _oglNdc )
+{
+	bx::mtxProjRevInfLh( &_result[ 0 ], &_fov[ 0 ], _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rev_inf_lh( Array<float> _result, float _fovy, float _aspect, float _near, bool _oglNdc )
+{
+	bx::mtxProjRevInfLh( &_result[ 0 ], _fovy, _aspect, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rev_inf_rh( Array<float> _result, float _ut, float _dt, float _lt, float _rt, float _near, bool _oglNdc )
+{
+	bx::mtxProjRevInfRh( &_result[ 0 ], _ut, _dt, _lt, _rt, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rev_inf_rh( Array<float> _result, Array<float> _fov, float _near, bool _oglNdc )
+{
+	bx::mtxProjRevInfRh( &_result[ 0 ], &_fov[ 0 ], _near, _oglNdc );
+}
+
+///
+void _bx_mtx_proj_rev_inf_rh( Array<float> _result, float _fovy, float _aspect, float _near, bool _oglNdc )
+{
+	bx::mtxProjRevInfRh( &_result[ 0 ], _fovy, _aspect, _near, _oglNdc );
+}
+
+///
+void _bx_mtx_ortho( Array<float> _result, float _left, float _right, float _bottom, float _top, float _near, float _far, float _offset, bool _oglNdc )
+{
+	bx::mtxOrtho( &_result[ 0 ], _left, _right, _bottom, _top, _near, _far, _offset, _oglNdc );
+}
+
+///
+void _bx_mtx_ortho_lh( Array<float> _result, float _left, float _right, float _bottom, float _top, float _near, float _far, float _offset, bool _oglNdc )
+{
+	bx::mtxOrthoLh( &_result[ 0 ], _left, _right, _bottom, _top, _near, _far, _offset, _oglNdc );
+}
+
+///
+void _bx_mtx_ortho_rh( Array<float> _result, float _left, float _right, float _bottom, float _top, float _near, float _far, float _offset, bool _oglNdc )
+{
+	bx::mtxOrthoRh( &_result[ 0 ], _left, _right, _bottom, _top, _near, _far, _offset, _oglNdc );
+}
+
+///
+void _bx_mtx_rotate_x( Array<float> _result, float _ax )
+{
+	bx::mtxRotateX( &_result[ 0 ], _ax );
+}
+
+///
+void _bx_mtx_rotate_y( Array<float> _result, float _ay )
+{
+	bx::mtxRotateY( &_result[ 0 ], _ay );
+}
+
+///
+void _bx_mtx_rotate_z( Array<float> _result, float _az )
+{
+	bx::mtxRotateZ( &_result[ 0 ], _az );
+}
+
+///
+void _bx_mtx_rotate_xy( Array<float> _result, float _ax, float _ay )
+{
+	bx::mtxRotateXY( &_result[ 0 ], _ax, _ay );
+}
+
+///
+void _bx_mtx_rotate_xyz( Array<float> _result, float _ax, float _ay, float _az )
+{
+	bx::mtxRotateXYZ( &_result[ 0 ], _ax, _ay, _az );
+}
+
+///
+void _bx_mtx_rotate_zyx( Array<float> _result, float _ax, float _ay, float _az )
+{
+	bx::mtxRotateZYX( &_result[ 0 ], _ax, _ay, _az );
+}
+
+///
+void _bx_mtx_srt( Array<float> _result, float _sx, float _sy, float _sz, float _ax, float _ay, float _az, float _tx, float _ty, float _tz )
+{
+	bx::mtxSRT( &_result[ 0 ], _sx, _sy, _sz, _ax, _ay, _az, _tx, _ty, _tz );
+}
+
+///
+void _bx_vec3_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtx( &_result[ 0 ], &_vec[ 0 ], &_mat[ 0 ] );
+}
+
+///
+void _bx_vec3_mul_mtx_xyz0( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtxXyz0( &_result[ 0 ], &_vec[ 0 ], &_mat[ 0 ] );
+}
+
+///
+void _bx_vec3_mul_mtx_h( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtxH( &_result[ 0 ], &_vec[ 0 ], &_mat[ 0 ] );
+}
+
+///
+void _bx_vec4_mul( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec4Mul( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_vec4_mul( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec4Mul( &_result[ 0 ], &_a[ 0 ], _b );
+}
+
+///
+void _bx_vec4_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec4MulMtx( &_result[ 0 ], &_vec[ 0 ], &_mat[ 0 ] );
+}
+
+///
+void _bx_mtx_mul( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::mtxMul( &_result[ 0 ], &_a[ 0 ], &_b[ 0 ] );
+}
+
+///
+void _bx_mtx_transpose( Array<float> _result, Array<float> _a )
+{
+	bx::mtxTranspose( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_mtx3_inverse( Array<float> _result, Array<float> _a )
+{
+	bx::mtx3Inverse( &_result[ 0 ], &_a[ 0 ] );
+}
+
+///
+void _bx_mtx_inverse( Array<float> _result, Array<float> _a )
+{
+	bx::mtxInverse( &_result[ 0 ], &_a[ 0 ] );
+}
+
+/// Convert LH to RH projection matrix and vice versa.
+///
+void _bx_mtx_proj_flip_handedness( Array<float> _dst, Array<float> _src )
+{
+	bx::mtxProjFlipHandedness( &_dst[ 0 ], &_src[ 0 ] );
+}
+
+/// Convert LH to RH view matrix and vice versa.
+///
+void _bx_mtx_view_flip_handedness( Array<float> _dst, Array<float> _src )
+{
+	bx::mtxViewFlipHandedness( &_dst[ 0 ], &_src[ 0 ] );
+}
+
+///
+void _bx_calc_normal( Array<float> _result, Array<float> _va, Array<float> _vb, Array<float> _vc )
+{
+	bx::calcNormal( &_result[ 0 ], &_va[ 0 ], &_vb[ 0 ], &_vc[ 0 ] );
+}
+
+///
+void _bx_calc_plane( Array<float> _result, Array<float> _va, Array<float> _vb, Array<float> _vc )
+{
+	bx::calcPlane( &_result[ 0 ], &_va[ 0 ], &_vb[ 0 ], &_vc[ 0 ] );
+}
+
+/// _points is type void so using data buffer for now
+// void _bx_calc_linear_fit_2d( Array<float> _result, void* _points, uint32_t _stride, uint32_t _numPoints )
+void _bx_calc_linear_fit_2d( Array<float> _result, BBDataBuffer * _points, int _stride, int _numPoints )
+{
+	bx::calcLinearFit2D( &_result[ 0 ], _points->ReadPointer(0), _stride, _numPoints );
+}
+
+/// _points is type void so using data buffer for now
+// void _bx_calc_linear_fit_3d( Array<float> _result, void* _points, uint32_t _stride, uint32_t _numPoints )
+void _bx_calc_linear_fit_3d( Array<float> _result, BBDataBuffer * _points, int _stride, int _numPoints )
+{
+	bx::calcLinearFit3D( &_result[ 0 ], _points->ReadPointer(0), _stride, _numPoints );
+}
+
+///
+void _bx_rgb_to_hsv( Array<float> _hsv, Array<float> _rgb )
+{
+	bx::rgbToHsv( &_hsv[ 0 ], &_rgb[ 0 ] );
+}
+
+///
+void _bx_hsv_to_rgb( Array<float> _rgb, Array<float> _hsv )
+{
+	bx::hsvToRgb( &_rgb[ 0 ], &_hsv[ 0 ] );
+}
+
+///
+// BX_CONST_FUNC float toLinear(float _a);
+
+///
+// BX_CONST_FUNC float toGamma(float _a);
+
+// void xchg( void* _a, void* _b, size_t _numBytes )
+void _bx_xchg( Array<int> _a, Array<int> _b, int _numBytes )
+{
+	bx::xchg( (void *)&_a[ 0 ], (void *)&_b[ 0 ], _numBytes );
+}
+void _bx_xchg( Array<float> _a, Array<float> _b, int _numBytes)
+{
+	bx::xchg( (void *)&_a[ 0 ], (void *)&_b[ 0 ], _numBytes );
+}
+void _bx_xchg( BBDataBuffer * _a, BBDataBuffer * _b, int _numBytes)
+{
+	bx::xchg( (void *)_a->WritePointer(0), (void *)_b->WritePointer(0), _numBytes );
+}
+
+// void memCopy( void* _dst, const void* _src, size_t _numBytes )
+void _bx_mem_copy( Array<int> _dst, Array<int> _src, int _numBytes )
+{
+	bx::memCopy( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _numBytes );
+}
+void _bx_mem_copy( Array<float> _dst, Array<float> _src, int _numBytes )
+{
+	bx::memCopy( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _numBytes );
+}
+void _bx_mem_copy( BBDataBuffer * _dst, BBDataBuffer * _src, int _numBytes )
+{
+	bx::memCopy( (void *)_dst->WritePointer(0), (const void *)_src->ReadPointer(0), _numBytes );
+}
+
+// void memCopy( void* _dst, const void* _src, uint32_t _size, uint32_t _num, uint32_t _srcPitch, uint32_t _dstPitch )
+void _bx_mem_copy( Array<int> _dst, Array<int> _src, int _size, int _num, int _srcPitch, int _dstPitch )
+{
+	bx::memCopy( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _size, _num, _srcPitch, _dstPitch );
+}
+void _bx_mem_copy( Array<float> _dst, Array<float> _src, int _size, int _num, int _srcPitch, int _dstPitch )
+{
+	bx::memCopy( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _size, _num, _srcPitch, _dstPitch );
+}
+void _bx_mem_copy( BBDataBuffer * _dst, BBDataBuffer * _src, int _size, int _num, int _srcPitch, int _dstPitch )
+{
+	bx::memCopy( (void *)_dst->WritePointer(0), (const void *)_src->ReadPointer(0), _size, _num, _srcPitch, _dstPitch );
+}
+
+// void gather( void* _dst, const void* _src, uint32_t _size, uint32_t _num, uint32_t _srcPitch )
+void _bx_gather( Array<int> _dst, Array<int> _src, int _size, int _num, int _srcPitch )
+{
+	bx::gather( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _size, _num, _srcPitch );
+}
+void _bx_gather( Array<float> _dst, Array<float> _src, int _size, int _num, int _srcPitch )
+{
+	bx::gather( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _size, _num, _srcPitch );
+}
+void _bx_gather( BBDataBuffer * _dst, BBDataBuffer * _src, int _size, int _num, int _srcPitch )
+{
+	bx::gather( (void *)_dst->WritePointer(0), (const void *)_src->ReadPointer(0), _size, _num, _srcPitch );
+}
+
+// void scatter( void* _dst, const void* _src, uint32_t _size, uint32_t _num, uint32_t _dstPitch )
+void _bx_scatter( Array<int> _dst, Array<int> _src, int _size, int _num, int _dstPitch )
+{
+	bx::scatter( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _size, _num, _dstPitch );
+}
+void _bx_scatter( Array<float> _dst, Array<float> _src, int _size, int _num, int _dstPitch )
+{
+	bx::scatter( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _size, _num, _dstPitch );
+}
+void _bx_scatter( BBDataBuffer * _dst, BBDataBuffer * _src, int _size, int _num, int _dstPitch )
+{
+	bx::scatter( (void *)_dst->WritePointer(0), (const void *)_src->ReadPointer(0), _size, _num, _dstPitch );
+}
+
+// void memMove( void* _dst, const void* _src, size_t _numBytes )
+void _bx_mem_move( Array<int> _dst, Array<int> _src, int _numBytes )
+{
+	bx::memMove( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _numBytes );
+}
+void _bx_mem_move( Array<float> _dst, Array<float> _src, int _numBytes )
+{
+	bx::memMove( (void *)&_dst[ 0 ], (const void *)&_src[ 0 ], _numBytes );
+}
+void _bx_mem_move( BBDataBuffer * _dst, BBDataBuffer * _src, int _numBytes )
+{
+	bx::memMove( (void *)_dst->WritePointer(0), (const void *)_src->ReadPointer(0), _numBytes );
+}
+
+// void memSet( void* _dst, uint8_t _ch, size_t _numBytes )
+void _bx_mem_set( Array<int> _dst, int _ch, int _numBytes )
+{
+	bx::memSet( (void *)&_dst[ 0 ], _ch, _numBytes );
+}
+void _bx_mem_set( Array<float> _dst, int _ch, int _numBytes )
+{
+	bx::memSet( (void *)&_dst[ 0 ], _ch, _numBytes );
+}
+void _bx_mem_set( BBDataBuffer * _dst, int _ch, int _numBytes )
+{
+	bx::memSet( (void *)_dst->WritePointer(0), _ch, _numBytes );
+}
+
+// int32_t memCmp( const void* _lhs, const void* _rhs, size_t _numBytes )
+int _bx_mem_cmp( Array<int> _lhs, Array<int> _rhs, int _numBytes )
+{
+	return bx::memCmp( (const void *)&_lhs[ 0 ], (const void *)&_rhs[ 0 ], _numBytes );
+}
+int _bx_mem_cmp( Array<float> _lhs, Array<float> _rhs, int _numBytes )
+{
+	return bx::memCmp( (const void *)&_lhs[ 0 ], (const void *)&_rhs[ 0 ], _numBytes );
+}
+int _bx_mem_cmp( BBDataBuffer * _lhs, BBDataBuffer * _rhs, int _numBytes )
+{
+	return bx::memCmp( (const void *)_lhs->ReadPointer(0), (const void *)_rhs->ReadPointer(0), _numBytes );
+}
+
+
+
+int _bx_cnt_t_z( int _val )
+{
+	return bx::uint32_cnttz( (uint32_t)_val );
+}
+
+
+/*
+void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at )
+{
+	bx::mtxLookAt( &_result[0], &_eye[0], &_at[0], NULL );
+}
+
+void _bx_mtx_look_at( Array<float> _result, Array<float> _eye, Array<float> _at, Array<float> _up )
+{
+	bx::mtxLookAt( &_result[0], &_eye[0], &_at[0], &_up[0] );
+}
+
+void _bx_mtx_proj( Array<float> _result, float _eye, float _aspect, float _near, float _far, bool _oglNdc )
+{
+	bx::mtxProj( &_result[0], _eye, _aspect, _near, _far, _oglNdc );
+}
+
+void _bx_mtx_rotate_x_y( Array<float> _result, float _ax, float _ay )
+{
+	bx::mtxRotateXY( &_result[0], _ax, _ay );
+}
+
+void _bx_mtx_ortho( Array<float> _result, float _left, float _right, float _bottom, float _top, float _near, float _far, float _offset, bool _oglNdc )
+{
+	bx::mtxOrtho( &_result[0], _left, _right, _bottom, _top, _near, _far, _offset, _oglNdc );
+}
+
+float _bx_vec3_norm( Array<float> _result, Array<float> _a )
+{
+	return bx::vec3Norm( &_result[0], &_a[0] );
+}
+
+void _bx_mtx_mul( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::mtxMul( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_mtx_inverse( Array<float> _result, Array<float> _a )
+{
+	bx::mtxInverse( &_result[0], &_a[0] );
+}
+
+void _bx_vec4_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec4MulMtx( &_result[0], &_vec[0], &_mat[0] );
+}
+
+
+void _bx_mtx_s_r_t( Array<float> _result, float _sx, float _sy, float _sz, float _ax, float _ay, float _az, float _tx, float _ty, float _tz)
+{
+	bx::mtxSRT( &_result[0], _sx, _sy, _sz, _ax, _ay, _az, _tx, _ty, _tz );
+}
+
+void _bx_mtx_translate( Array<float> _result, float _tx, float _ty, float _tz )
+{
+	bx::mtxTranslate( &_result[0], _tx, _ty, _tz );
+}
+
+void _bx_vec3_mul_mtx( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtx( &_result[0], &_vec[0], &_mat[0] );
+}
+
+float _bx_square( float _a )
+{
+	return bx::square( _a );
+}
+
+void _bx_mtx_scale( Array<float> _result, float _sx, float _sy, float _sz )
+{
+	bx::mtxScale( &_result[0], _sx, _sy, _sz );
+}
+
+void _bx_vec3_cross( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Cross( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_move( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Move( &_result[0], &_a[0] );
+}
+
+void _bx_vec3_mul( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Mul( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_mul( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Mul( &_result[0], &_a[0], _b );
+}
+
+void _bx_vec3_add( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Add( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_add( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Add( &_result[0], &_a[0], _b );
+}
+
+void _bx_vec3_sub( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Sub( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_sub( Array<float> _result, Array<float> _a, float _b )
+{
+	bx::vec3Sub( &_result[0], &_a[0], _b );
+}
+
+float _bx_vec3_dot( Array<float> _a, Array<float> _b )
+{
+	return bx::vec3Dot( &_a[0], &_b[0] );
+}
+
+void _bx_mtx_identity( Array<float> _result )
+{
+	bx::mtxIdentity( &_result[0] );
+}
+
+float _bx_to_rad( float _deg )
+{
+	return bx::toRad( _deg );
+}
+
+void _bx_mtx_transpose( Array<float> _result, Array<float> _a )
+{
+	bx::mtxTranspose( &_result[0], &_a[0] );
+}
+
+void _bx_vec3_mul_mtx_h( Array<float> _result, Array<float> _vec, Array<float> _mat )
+{
+	bx::vec3MulMtxH( &_result[0], &_vec[0], &_mat[0] );
+}
+
+float _bx_vec3_length( Array<float> _a )
+{
+	return bx::vec3Length( &_a[0] );
+}
+
+float _bx_lerp( float _a, float _b, float _t )
+{
+	return bx::lerp( _a, _b, _t );
+}
+
+void _bx_mtx_rotate_x( Array<float> _result, float _ax )
+{
+	bx::mtxRotateX( &_result[0], _ax );
+}
+
+void _bx_mtx_rotate_y( Array<float> _result, float _ay )
+{
+	bx::mtxRotateY( &_result[0], _ay );
+}
+
+void _bx_mtx_rotate_z( Array<float> _result, float _az )
+{
+	bx::mtxRotateZ( &_result[0], _az );
+}
+
+void _bx_vec3_rcp( Array<float> _result, Array<float> _a )
+{
+	bx::vec3Rcp( &_result[0], &_a[0] );
+}
+
+void _bx_vec3_min( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Min( &_result[0], &_a[0], &_b[0] );
+}
+
+void _bx_vec3_max( Array<float> _result, Array<float> _a, Array<float> _b )
+{
+	bx::vec3Max( &_result[0], &_a[0], &_b[0] );
+}
+
+float _bx_min( float _a, float_b )
+{
+	return bx::min( _a, _b );
+}
+
+float _bx_max( float _a, float_b )
+{
+	return bx::max( _a, _b );
+}
+
+float _bx_min( float _a, float_b, float _c )
+{
+	return bx::min( _a, _b, _c );
+}
+
+float _bx_max( float _a, float_b, float _c )
+{
+	return bx::max( _a, _b, _c );
+}
+
+void _bx_vec3_lerp( Array<float> _result, Array<float> _a, Array<float> _b, float _t )
+{
+	bx::vec3Lerp( &_result[0], &_a[0], &_b[0], _t );
+}
+
+void _bx_vec3_lerp( Array<float> _result, Array<float> _a, Array<float> _b, Array<float> _c )
+{
+	bx::vec3Lerp( &_result[0], &_a[0], &_b[0], &_c[0] );
+}
+*/

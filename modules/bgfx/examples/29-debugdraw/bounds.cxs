@@ -1,0 +1,1359 @@
+'  /*
+'   * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+'   * License: https:'github.com/bkaradzic/bgfx#license-bsd-2-clause
+'   */
+
+Import brl.pool
+Import bgfx
+
+Class BoundsShape
+
+End
+
+Global BoundsAabbPool := New Pool< BoundsAabb >()
+
+Class BoundsAabb Extends BoundsShape
+
+	Method Free:Void()
+		BoundsAabbPool.Free( Self )
+	End
+
+	Field m_min    :Float[ 3 ]
+	Field m_max    :Float[ 3 ]
+
+	Method New( _minX:Float, _minY:Float, _minZ:Float, _maxX:Float, _maxY:Float, _maxZ:Float )
+		Init( _minX, _minY, _minZ, _maxX, _maxY, _maxZ )
+	End
+
+	Method Init:Void( _minX:Float, _minY:Float, _minZ:Float, _maxX:Float, _maxY:Float, _maxZ:Float )
+		m_min[ 0 ] = _minX
+		m_min[ 1 ] = _minY
+		m_min[ 2 ] = _minZ
+		m_max[ 0 ] = _maxX
+		m_max[ 1 ] = _maxY
+		m_max[ 2 ] = _maxZ
+	End
+End
+
+Global BoundsCylinderPool := New Pool< BoundsCylinder >()
+
+Class BoundsCylinder Extends BoundsShape
+
+	Method Free:Void()
+		BoundsCylinderPool.Free( Self )
+	End
+
+	Field m_pos    :Float[ 3 ]
+	Field m_end    :Float[ 3 ]
+	Field m_radius :Float
+
+	Method New( _posX:Float, _posY:Float, _posZ:Float, _endX:Float, _endY:Float, _endZ:Float, _radius:Float )
+		Init( _posX, _posY, _posZ, _endX, _endY, _endZ, _radius )
+	End
+
+	Method Init:Void( _posX:Float, _posY:Float, _posZ:Float, _endX:Float, _endY:Float, _endZ:Float, _radius:Float )
+		m_pos[ 0 ] = _posX
+		m_pos[ 1 ] = _posY
+		m_pos[ 2 ] = _posZ
+		m_end[ 0 ] = _endX
+		m_end[ 1 ] = _endY
+		m_end[ 2 ] = _endZ
+		m_radius = _radius
+	End
+End
+
+Global BoundsCapsulePool := New Pool< BoundsCapsule >()
+
+Class BoundsCapsule Extends BoundsCylinder
+
+	Method Free:Void()
+		BoundsCapsulePool.Free( Self )
+	End
+
+	' this class (BoundsCapsule) extends class BoundsCylinder
+'  	Field m_pos    :Float[ 3 ]
+'  	Field m_end    :Float[ 3 ]
+'  	Field m_radius :Float
+
+	Method New( _posX:Float, _posY:Float, _posZ:Float, _endX:Float, _endY:Float, _endZ:Float, _radius:Float )
+		Init( _posX, _posY, _posZ, _endX, _endY, _endZ, _radius )
+	End
+
+	Method Init:Void( _posX:Float, _posY:Float, _posZ:Float, _endX:Float, _endY:Float, _endZ:Float, _radius:Float )
+		m_pos[ 0 ] = _posX
+		m_pos[ 1 ] = _posY
+		m_pos[ 2 ] = _posZ
+		m_end[ 0 ] = _endX
+		m_end[ 1 ] = _endY
+		m_end[ 2 ] = _endZ
+		m_radius = _radius
+	End
+End
+
+Global BoundsConePool := New Pool< BoundsCone >()
+
+Class BoundsCone Extends BoundsShape
+
+	Method Free:Void()
+		BoundsConePool.Free( Self )
+	End
+
+	Field m_pos    :Float[ 3 ]
+	Field m_end    :Float[ 3 ]
+	Field m_radius :Float
+
+	Method New( _posX:Float, _posY:Float, _posZ:Float, _endX:Float, _endY:Float, _endZ:Float, _radius:Float )
+		Init( _posX, _posY, _posZ, _endX, _endY, _endZ, _radius )
+	End
+
+	Method Init:Void( _posX:Float, _posY:Float, _posZ:Float, _endX:Float, _endY:Float, _endZ:Float, _radius:Float )
+		m_pos[ 0 ] = _posX
+		m_pos[ 1 ] = _posY
+		m_pos[ 2 ] = _posZ
+		m_end[ 0 ] = _endX
+		m_end[ 1 ] = _endY
+		m_end[ 2 ] = _endZ
+		m_radius = _radius
+	End
+End
+
+Global BoundsDiskPool := New Pool< BoundsDisk >()
+
+Class BoundsDisk Extends BoundsShape
+
+	Method Free:Void()
+		BoundsDiskPool.Free( Self )
+	End
+
+	Field m_center :Float[ 3 ]
+	Field m_normal :Float[ 3 ]
+	Field m_radius :Float
+
+	Method New( _centerX:Float, _centerY:Float, _centerZ:Float, _normalX:Float, _normalY:Float, _normalZ:Float, _radius:Float )
+		Init( _centerX, _centerY, _centerZ, _normalX, _normalY, _normalZ, _radius )
+	End
+
+	Method Init:Void( _centerX:Float, _centerY:Float, _centerZ:Float, _normalX:Float, _normalY:Float, _normalZ:Float, _radius:Float )
+		m_center[ 0 ] = _centerX
+		m_center[ 1 ] = _centerY
+		m_center[ 2 ] = _centerZ
+		m_normal[ 0 ] = _normalX
+		m_normal[ 1 ] = _normalY
+		m_normal[ 2 ] = _normalZ
+		m_radius = _radius
+	End
+End
+
+Global BoundsObbPool := New Pool< BoundsObb >()
+
+Class BoundsObb Extends BoundsShape
+
+	Method Free:Void()
+		BoundsObbPool.Free( Self )
+	End
+
+	Field m_mtx:Float[ 16 ]
+
+	Method New( _mtx:Float[] )
+		Init( _mtx )
+	End
+
+	Method Init:Void( _mtx:Float[] )
+		For Local ii:Int = 0 Until 16
+			m_mtx[ ii ] = _mtx[ ii ]
+		Next
+	End
+End
+
+Global BoundsPlanePool := New Pool< BoundsPlane >()
+
+Class BoundsPlane Extends BoundsShape
+
+	Method Free:Void()
+		BoundsPlanePool.Free( Self )
+	End
+
+	Field m_normal :Float[ 3 ]
+	Field m_dist   :Float
+
+	Method New( _normalX:Float, _normalY:Float, _normalZ:Float, _dist:Float )
+		Init( _normalX, _normalY, _normalZ, _dist )
+	End
+
+	Method Init:Void( _normalX:Float, _normalY:Float, _normalZ:Float, _dist:Float )
+		m_normal[ 0 ] = _normalX
+		m_normal[ 1 ] = _normalY
+		m_normal[ 2 ] = _normalZ
+		m_dist = _dist
+	End
+End
+
+Global BoundsRayPool := New Pool< BoundsRay >()
+
+Class BoundsRay Extends BoundsShape
+
+	Method Free:Void()
+		BoundsRayPool.Free( Self )
+	End
+
+	Field m_pos :Float[ 3 ]
+	Field m_dir :Float[ 3 ]
+
+	Method New( _posX:Float, _posY:Float, _posZ:Float, _dirX:Float, _dirY:Float, _dirZ:Float )
+		Init( _posX, _posY, _posZ, _dirX, _dirY, _dirZ )
+	End
+
+	Method Init:Void( _posX:Float, _posY:Float, _posZ:Float, _dirX:Float, _dirY:Float, _dirZ:Float )
+		m_pos[ 0 ] = _posX
+		m_pos[ 1 ] = _posY
+		m_pos[ 2 ] = _posZ
+		m_dir[ 0 ] = _dirX
+		m_dir[ 1 ] = _dirY
+		m_dir[ 2 ] = _dirZ
+	End
+End
+
+Global BoundsSpherePool := New Pool< BoundsSphere >()
+
+Class BoundsSphere Extends BoundsShape
+
+	Method Free:Void()
+		BoundsSpherePool.Free( Self )
+	End
+
+	Field m_center :Float[ 3 ]
+	Field m_radius :Float
+
+	Method New( _centerX:Float, _centerY:Float, _centerZ:Float, _radius:Float )
+		Init( _centerX, _centerY, _centerZ, _radius )
+	End
+
+	Method Init:Void( _centerX:Float, _centerY:Float, _centerZ:Float, _radius:Float )
+		m_center[ 0 ] = _centerX
+		m_center[ 1 ] = _centerY
+		m_center[ 2 ] = _centerZ
+		m_radius = _radius
+	End
+End
+
+Global BoundsTrisPool := New Pool< BoundsTris >()
+
+Class BoundsTris Extends BoundsShape
+
+	Method Free:Void()
+		BoundsTrisPool.Free( Self )
+	End
+
+	Field m_v0 :Float[ 3 ]
+	Field m_v1 :Float[ 3 ]
+	Field m_v2 :Float[ 3 ]
+
+	Method New( _v0x:Float, _v0y:Float, _v0z:Float, _v1x:Float, _v1y:Float, _v1z:Float, _v2x:Float, _v2y:Float, _v2z:Float )
+		Init( _v0x, _v0y, _v0z, _v1x, _v1y, _v1z, _v2x, _v2y, _v2z )
+	End
+
+	Method Init:Void( _v0x:Float, _v0y:Float, _v0z:Float, _v1x:Float, _v1y:Float, _v1z:Float, _v2x:Float, _v2y:Float, _v2z:Float )
+		m_v0[ 0 ] = _v0x ; m_v0[ 1 ] = _v0y ; m_v0[ 2 ] = _v0z
+		m_v1[ 0 ] = _v1x ; m_v1[ 1 ] = _v1y ; m_v1[ 2 ] = _v1z
+		m_v2[ 0 ] = _v2x ; m_v2[ 1 ] = _v2y ; m_v2[ 2 ] = _v2z
+	End
+End
+
+Global BoundsHitPool := New Pool< BoundsHit >()
+
+Class BoundsHit Extends BoundsShape
+
+	Method Free:Void()
+		BoundsHitPool.Free( Self )
+	End
+
+	Field m_pos    :Float[ 3 ]
+	Field m_normal :Float[ 3 ]
+	Field m_dist   :Float
+
+	Method New( _posX:Float, _posY:Float, _posZ:Float, _normalX:Float, _normalY:Float, _normalZ:Float, _dist:Float )
+		Init( _posX, _posY, _posZ, _normalX, _normalY, _normalZ, _dist )
+	End
+
+	Method Init:Void( _posX:Float, _posY:Float, _posZ:Float, _normalX:Float, _normalY:Float, _normalZ:Float, _dist:Float )
+		m_pos[ 0 ] = _posX
+		m_pos[ 1 ] = _posY
+		m_pos[ 2 ] = _posZ
+		m_normal[ 0 ] = _normalX
+		m_normal[ 1 ] = _normalY
+		m_normal[ 2 ] = _normalZ
+		m_dist = _dist
+	End
+End
+
+' Convert axis aligned bounding box to oriented bounding box.
+Function BoundsAabbToObb:Void( _obb:BoundsObb, _aabb:BoundsAabb )
+	' bx::memSet(_obb.m_mtx, 0, sizeof(_obb.m_mtx) )
+	_obb.m_mtx[  0 ] = ( _aabb.m_max[ 0 ] - _aabb.m_min[ 0 ] ) * 0.5
+	_obb.m_mtx[  1 ] = 0.0
+	_obb.m_mtx[  2 ] = 0.0
+	_obb.m_mtx[  3 ] = 0.0
+
+	_obb.m_mtx[  4 ] = 0.0
+	_obb.m_mtx[  5 ] = ( _aabb.m_max[ 1 ] - _aabb.m_min[ 1 ] ) * 0.5
+	_obb.m_mtx[  6 ] = 0.0
+	_obb.m_mtx[  7 ] = 0.0
+
+	_obb.m_mtx[  8 ] = 0.0
+	_obb.m_mtx[  9 ] = 0.0
+	_obb.m_mtx[ 10 ] = ( _aabb.m_max[ 2 ] - _aabb.m_min[ 2 ] ) * 0.5
+	_obb.m_mtx[ 11 ] = 0.0
+
+	_obb.m_mtx[ 12 ] = ( _aabb.m_min[ 0 ] + _aabb.m_max[ 0 ] ) * 0.5
+	_obb.m_mtx[ 13 ] = ( _aabb.m_min[ 1 ] + _aabb.m_max[ 1 ] ) * 0.5
+	_obb.m_mtx[ 14 ] = ( _aabb.m_min[ 2 ] + _aabb.m_max[ 2 ] ) * 0.5
+	_obb.m_mtx[ 15 ] = 1.0
+End
+
+' Convert oriented bounding box to axis aligned bounding box.
+Function BoundsToAabb:Void( _aabb:BoundsAabb, _obb:BoundsObb )
+
+	Local xyz:Float[ 3 ]
+	Local tmp:Float[ 3 ]
+
+	xyz[ 0 ] = 1.0
+	xyz[ 1 ] = 1.0
+	xyz[ 2 ] = 1.0
+
+	bxVec3MulMtx( tmp, xyz, _obb.m_mtx )
+
+	bxVec3Move( _aabb.m_min, tmp )
+	bxVec3Move( _aabb.m_max, tmp )
+
+	For Local ii:Int = 1 Until 8
+
+		If ii & 1 Then xyz[ 0 ] = -1.0 Else xyz[ 0 ] = 1.0
+		If ii & 2 Then xyz[ 1 ] = -1.0 Else xyz[ 1 ] = 1.0
+		If ii & 4 Then xyz[ 2 ] = -1.0 Else xyz[ 2 ] = 1.0
+
+		bxVec3MulMtx( tmp, xyz, _obb.m_mtx )
+
+		bxVec3Min( _aabb.m_min, _aabb.m_min, tmp )
+		bxVec3Max( _aabb.m_max, _aabb.m_max, tmp )
+	Next
+End
+
+' Convert sphere to axis aligned bounding box.
+Function BoundsToAabb:Void( _aabb:BoundsAabb, _sphere:BoundsSphere )
+
+	Local radius:Float = _sphere.m_radius
+
+	bxVec3Sub( _aabb.m_min, _sphere.m_center, radius )
+	bxVec3Add( _aabb.m_max, _sphere.m_center, radius )
+End
+
+' Convert disk to axis aligned bounding box.
+Function BoundsToAabb:Void( _aabb:BoundsAabb, _disk:BoundsDisk )
+
+	' Reference: http://iquilezles.org/www/articles/diskbbox/diskbbox.htm
+
+	Local nsq:Float[ 3 ]
+
+	bxVec3Mul( nsq, _disk.m_normal, _disk.m_normal )
+
+	Local one:Float[ 3 ]
+	Local tmp:Float[ 3 ]
+
+	one[ 0 ] = 1.0
+	one[ 1 ] = 1.0
+	one[ 2 ] = 1.0
+
+	bxVec3Sub( tmp, one, nsq )
+
+	Local inv:Float = 1.0 / ( tmp[ 0 ] * tmp[ 1 ] * tmp[ 2 ] )
+	Local extent:Float[ 3 ]
+
+	extent[ 0 ] = _disk.m_radius * tmp[ 0 ] * Sqrt( ( nsq[ 0 ] + nsq[ 1 ] * nsq[ 2 ] ) * inv )
+	extent[ 1 ] = _disk.m_radius * tmp[ 1 ] * Sqrt( ( nsq[ 1 ] + nsq[ 2 ] * nsq[ 0 ] ) * inv )
+	extent[ 2 ] = _disk.m_radius * tmp[ 2 ] * Sqrt( ( nsq[ 2 ] + nsq[ 0 ] * nsq[ 1 ] ) * inv )
+
+	bxVec3Sub( _aabb.m_min, _disk.m_center, extent )
+	bxVec3Add( _aabb.m_max, _disk.m_center, extent )
+End
+
+' Convert cylinder to axis aligned bounding box.
+Function BoundsToAabb:Void( _aabb:BoundsAabb, _cylinder:BoundsCylinder )
+
+	' Reference: http://iquilezles.org/www/articles/diskbbox/diskbbox.htm
+
+	Local axis:Float[ 3 ]
+	bxVec3Sub( axis, _cylinder.m_end, _cylinder.m_pos )
+
+	Local asq:Float[ 3 ]
+	bxVec3Mul( asq, axis, axis )
+
+	Local nsq:Float[ 3 ]
+	bxVec3Mul( nsq, asq, 1.0 / bxVec3Dot( axis, axis ) )
+
+	Local one:Float[ 3 ]
+	one[ 0 ] = 1.0
+	one[ 1 ] = 1.0
+	one[ 2 ] = 1.0
+
+	Local tmp:Float[ 3 ]
+	bxVec3Sub( tmp, one, nsq )
+
+	Local inv:Float = 1.0 / ( tmp[ 0 ] * tmp[ 1 ] * tmp[ 2 ] )
+
+	Local extent:Float[ 3 ]
+	extent[ 0 ] = _cylinder.m_radius * tmp[ 0 ] * Sqrt( (nsq[ 0 ] + nsq[ 1 ] * nsq[ 2 ]) * inv )
+	extent[ 1 ] = _cylinder.m_radius * tmp[ 1 ] * Sqrt( (nsq[ 1 ] + nsq[ 2 ] * nsq[ 0 ]) * inv )
+	extent[ 2 ] = _cylinder.m_radius * tmp[ 2 ] * Sqrt( (nsq[ 2 ] + nsq[ 0 ] * nsq[ 1 ]) * inv )
+
+	Local minP:Float[ 3 ]
+	bxVec3Sub( minP, _cylinder.m_pos, extent )
+
+	Local minE:Float[ 3 ]
+	bxVec3Sub( minE, _cylinder.m_end, extent )
+
+	Local maxP:Float[ 3 ]
+	bxVec3Add( maxP, _cylinder.m_pos, extent )
+
+	Local maxE:Float[ 3 ]
+	bxVec3Add( maxE, _cylinder.m_end, extent )
+
+	bxVec3Min( _aabb.m_min, minP, minE )
+	bxVec3Max( _aabb.m_max, maxP, maxE )
+End
+
+Function BoundsAabbTransformToObb:Void( _obb:BoundsObb, _aabb:BoundsAabb, _mtx:Float[] )
+
+	BoundsAabbToObb( _obb, _aabb )
+
+	Local result:Float[ 16 ]
+	Local obbMtx:Float[] = _obb.m_mtx
+
+	bxMtxMul( result, obbMtx, _mtx )
+
+	' bxMemCopy(_obb.m_mtx, result, sizeof(result) )
+	For Local ii:Int = 0 Until 16
+		obbMtx[ ii ] = result[ ii ]
+	Next
+End
+
+' Calculate axis aligned bounding box.
+Function BoundsToAabb:Void( _aabb:BoundsAabb, _vertices:DataBuffer, _numVertices:Int, _stride:Int )
+
+	Local min:Float[ 3 ]
+	Local max:Float[ 3 ]
+
+	Local address:Int = 0 ' uint8_t* vertex = (uint8_t*)_vertices
+
+	' float* position = (float*)vertex
+	Local xx:Float = _vertices.PeekFloat( address + 0 )
+	Local yy:Float = _vertices.PeekFloat( address + 4 )
+	Local zz:Float = _vertices.PeekFloat( address + 8 )
+
+	address += _stride
+
+	min[ 0 ] = xx
+	min[ 1 ] = yy
+	min[ 2 ] = zz
+
+	max[ 0 ] = xx
+	max[ 1 ] = yy
+	max[ 2 ] = zz
+
+	For Local ii:Int = 1 Until _numVertices
+
+		' position = (float*)vertex
+		xx = _vertices.PeekFloat( address + 0 )
+		yy = _vertices.PeekFloat( address + 4 )
+		zz = _vertices.PeekFloat( address + 8 )
+
+		address += _stride
+
+		min[ 0 ] = Min( xx, min[ 0 ] )
+		min[ 1 ] = Min( yy, min[ 1 ] )
+		min[ 2 ] = Min( zz, min[ 2 ] )
+
+		max[ 0 ] = Max( xx, max[ 0 ] )
+		max[ 1 ] = Max( yy, max[ 1 ] )
+		max[ 2 ] = Max( zz, max[ 2 ] )
+	Next
+
+	_aabb.m_min[ 0 ] = min[ 0 ]
+	_aabb.m_min[ 1 ] = min[ 1 ]
+	_aabb.m_min[ 2 ] = min[ 2 ]
+
+	_aabb.m_max[ 0 ] = max[ 0 ]
+	_aabb.m_max[ 1 ] = max[ 1 ]
+	_aabb.m_max[ 2 ] = max[ 2 ]
+End
+
+' Transform vertices and calculate axis aligned bounding box.
+Function BoundsToAabb:Void( _aabb:BoundsAabb, _mtx:Float[], _vertices:DataBuffer, _numVertices:Int, _stride:Int )
+
+	Local min      :Float[ 3 ]
+	Local max      :Float[ 3 ]
+
+	Local address  :Int = 0
+
+	Local vertex   :Float[ 3 ] ' uint8_t* vertex = (uint8_t*)_vertices
+	Local position :Float[ 3 ]
+
+	vertex[ 0 ] = _vertices.PeekFloat( address + 0 )
+	vertex[ 1 ] = _vertices.PeekFloat( address + 4 )
+	vertex[ 2 ] = _vertices.PeekFloat( address + 8 )
+
+	bxVec3MulMtx( position, vertex, _mtx )
+	address += _stride
+
+	Local xx:Float = position[ 0 ]
+	Local yy:Float = position[ 1 ]
+	Local zz:Float = position[ 2 ]
+
+	min[ 0 ] = xx
+	min[ 1 ] = yy
+	min[ 2 ] = zz
+
+	max[ 0 ] = xx
+	max[ 1 ] = yy
+	max[ 2 ] = zz
+
+	For Local ii:Int = 1 Until _numVertices
+
+		vertex[ 0 ] = _vertices.PeekFloat( address + 0 )
+		vertex[ 1 ] = _vertices.PeekFloat( address + 4 )
+		vertex[ 2 ] = _vertices.PeekFloat( address + 8 )
+
+		bxVec3MulMtx( position, vertex, _mtx )
+		address += _stride
+
+		xx = position[ 0 ]
+		yy = position[ 1 ]
+		zz = position[ 2 ]
+
+		min[ 0 ] = Min( xx, min[ 0 ] )
+		min[ 1 ] = Min( yy, min[ 1 ] )
+		min[ 2 ] = Min( zz, min[ 2 ] )
+
+		max[ 0 ] = Max( xx, max[ 0 ] )
+		max[ 1 ] = Max( yy, max[ 1 ] )
+		max[ 2 ] = Max( zz, max[ 2 ] )
+	Next
+
+	_aabb.m_min[ 0 ] = min[ 0 ]
+	_aabb.m_min[ 1 ] = min[ 1 ]
+	_aabb.m_min[ 2 ] = min[ 2 ]
+
+	_aabb.m_max[ 0 ] = max[ 0 ]
+	_aabb.m_max[ 1 ] = max[ 1 ]
+	_aabb.m_max[ 2 ] = max[ 2 ]
+End
+
+' Expand AABB.
+Function BoundsAabbExpand:Void( _aabb:BoundsAabb, _factor:Float )
+
+	_aabb.m_min[ 0 ] -= _factor
+	_aabb.m_min[ 1 ] -= _factor
+	_aabb.m_min[ 2 ] -= _factor
+
+	_aabb.m_max[ 0 ] += _factor
+	_aabb.m_max[ 1 ] += _factor
+	_aabb.m_max[ 2 ] += _factor
+End
+
+' Expand AABB with xyz.
+Function BoundsAabbExpand:Void( _aabb:BoundsAabb, _pos:Float[] )
+
+	bxVec3Min( _aabb.m_min, _aabb.m_min, _pos )
+	bxVec3Max( _aabb.m_max, _aabb.m_max, _pos )
+End
+
+' Calculate surface area of axis aligned bounding box.
+Function BoundsCalcAreaAabb:Float( _aabb:BoundsAabb )
+
+	Local ww:Float = _aabb.m_max[ 0 ] - _aabb.m_min[ 0 ]
+	Local hh:Float = _aabb.m_max[ 1 ] - _aabb.m_min[ 1 ]
+	Local dd:Float = _aabb.m_max[ 2 ] - _aabb.m_min[ 2 ]
+
+	Return 2.0 * (ww * hh + ww * dd + hh * dd)
+End
+
+' Returns 0 is two AABB don't overlap, otherwise returns flags of overlap
+' test.
+Function BoundsAabbOverlapTest:Int( _aabb0:BoundsAabb, _aabb1:BoundsAabb )
+
+	Local ltMinX:Int = 0 ; If _aabb0.m_max[ 0 ] < _aabb1.m_min[ 0 ] Then ltMinX =  1
+	Local gtMaxX:Int = 0 ; If _aabb0.m_min[ 0 ] > _aabb1.m_max[ 0 ] Then gtMaxX =  2
+	Local ltMinY:Int = 0 ; If _aabb0.m_max[ 1 ] < _aabb1.m_min[ 1 ] Then ltMinY =  4
+	Local gtMaxY:Int = 0 ; If _aabb0.m_min[ 1 ] > _aabb1.m_max[ 1 ] Then gtMaxY =  8
+	Local ltMinZ:Int = 0 ; If _aabb0.m_max[ 2 ] < _aabb1.m_min[ 2 ] Then ltMinZ = 16
+	Local gtMaxZ:Int = 0 ; If _aabb0.m_min[ 2 ] > _aabb1.m_max[ 2 ] Then gtMaxZ = 32
+
+	Return 0 | ltMinX | gtMaxX | ltMinY | gtMaxY | ltMinZ | gtMaxZ
+End
+
+' Calculate oriented bounding box.
+Function BoundsCalcObb:Void( _obb:BoundsObb, _vertices:DataBuffer, _numVertices:Int, _stride:Int, _steps:Int=17 )
+
+	Local aabb := BoundsAabbPool.Allocate()
+	BoundsToAabb( aabb, _vertices, _numVertices, _stride )
+	Local minArea:Float = BoundsCalcAreaAabb( aabb )
+
+	Local best := BoundsObbPool.Allocate()
+	BoundsAabbToObb( best, aabb )
+
+	Local angleStep:Float = Float( HALFPI / _steps )
+	Local ax:Float = 0.0
+	Local mtx:Float[ 16 ]
+
+	For Local ii:Int = 0 Until _steps
+
+		Local ay:Float = 0.0
+
+		For Local jj:Int = 0 Until _steps
+
+			Local az:Float = 0.0
+
+			For Local kk:Int = 0 Until _steps
+
+				bxMtxRotateXYZ( mtx, ax, ay, az )
+
+				Local mtxT:Float[ 16 ]
+				bxMtxTranspose( mtxT, mtx )
+				BoundsToAabb( aabb, mtxT, _vertices, _numVertices, _stride )
+
+				Local area:Float = BoundsCalcAreaAabb( aabb )
+				If area < minArea Then
+					minArea = area
+					BoundsAabbTransformToObb( best, aabb, mtx )
+				Endif
+
+				az += angleStep
+			Next
+
+			ay += angleStep
+		Next
+
+		ax += angleStep
+	Next
+
+	' bx::memCopy(&_obb, &best, sizeof(Obb) )
+	For Local ii:Int = 0 Until _obb.m_mtx.Length()
+		_obb.m_mtx[ ii ] = best.m_mtx[ ii ]
+	Next
+
+	best.Free()
+	aabb.Free()
+End
+
+' Calculate maximum bounding sphere.
+Function BoundsCalcMaxBoundingSphere:Void( _sphere:BoundsSphere, _vertices:DataBuffer, _numVertices:Int, _stride:Int )
+
+	Local aabb := BoundsAabbPool.Allocate()
+
+	BoundsToAabb( aabb, _vertices, _numVertices, _stride )
+
+	Local center:Float[ 3 ]
+
+	center[ 0 ] = ( aabb.m_min[ 0 ] + aabb.m_max[ 0 ] ) * 0.5
+	center[ 1 ] = ( aabb.m_min[ 1 ] + aabb.m_max[ 1 ] ) * 0.5
+	center[ 2 ] = ( aabb.m_min[ 2 ] + aabb.m_max[ 2 ] ) * 0.5
+
+	Local maxDistSq:Float = 0.0
+
+	For Local ii:Int = 0 Until _numVertices
+
+		Local xx:Float = _vertices.PokeFloat( address ) - center[ 0 ]
+		Local yy:Float = _vertices.PokeFloat( address ) - center[ 1 ]
+		Local zz:Float = _vertices.PokeFloat( address ) - center[ 2 ]
+
+		address += _stride
+
+		Local distSq:Float = xx * xx + yy * yy + zz * zz
+
+		maxDistSq = Max( distSq, maxDistSq )
+	Next
+
+	bxVec3Move( _sphere.m_center, center )
+	_sphere.m_radius = Sqrt( maxDistSq )
+
+	aabb.Free()
+End
+
+' Calculate minimum bounding sphere.
+Function BoundsCalcMinBoundingSphere:Void( _sphere:BoundsSphere, _vertices:DataBuffer, _numVertices:Int, _stride:Int, _step:Float=0.01 )
+
+	' bx::RngMwc rng
+	' uint8_t* vertex = (uint8_t*)_vertices
+	' float* position = (float*)&vertex[ 0 ]
+
+	Local address  :Int = 0
+	Local center   :Float[ 3 ]
+	Local position :Float[ 3 ]
+
+	position[ 0 ] = _vertices.PeekFloat( address + 0 )
+	position[ 1 ] = _vertices.PeekFloat( address + 4 )
+	position[ 2 ] = _vertices.PeekFloat( address + 8 )
+	address += _stride
+
+	bxVec3Move( center, position )
+
+	' position = (float*)&vertex[1*_stride]
+	position[ 0 ] = _vertices.PeekFloat( address + 0 )
+	position[ 1 ] = _vertices.PeekFloat( address + 4 )
+	position[ 2 ] = _vertices.PeekFloat( address + 8 )
+	address += _stride
+
+	center[ 0 ] += position[0]
+	center[ 1 ] += position[1]
+	center[ 2 ] += position[2]
+
+	center[ 0 ] *= 0.5
+	center[ 1 ] *= 0.5
+	center[ 2 ] *= 0.5
+
+	Local xx         :Float = position[ 0 ] - center[ 0 ]
+	Local yy         :Float = position[ 1 ] - center[ 1 ]
+	Local zz         :Float = position[ 2 ] - center[ 2 ]
+	Local maxDistSq  :Float = xx * xx + yy * yy + zz * zz
+	Local radiusStep :Float = _step * 0.37
+
+	Local done       :Bool = False
+
+	Repeat
+
+		done = True
+
+		Local index:Int = Rnd( _numVertices )
+
+		For Local ii:Int = 0 Until _numVertices
+
+			' position = (float*)&vertex[index*_stride]
+			address = index * _stride
+			position[ 0 ] = _vertices.PeekFloat( address + 0 )
+			position[ 1 ] = _vertices.PeekFloat( address + 4 )
+			position[ 2 ] = _vertices.PeekFloat( address + 8 )
+
+			xx = position[ 0 ] - center[ 0 ]
+			yy = position[ 1 ] - center[ 1 ]
+			zz = position[ 2 ] - center[ 2 ]
+			Local distSq:Float = xx * xx + yy * yy + zz * zz
+
+			If distSq > maxDistSq Then
+
+				done = False
+
+				center[ 0 ] += xx * radiusStep
+				center[ 1 ] += yy * radiusStep
+				center[ 2 ] += zz * radiusStep
+				maxDistSq = bxLerp( maxDistSq, distSq, _step )
+
+				Exit
+			Endif
+
+			index = (index + 1) Mod _numVertices
+		Next
+
+	Until done
+
+	bxVec3Move( _sphere.m_center, center )
+	_sphere.m_radius = Sqrt( maxDistSq )
+End
+
+Function BoundsCalcPlaneUv:Void( _plane:BoundsPlane, _udir:Float[], _vdir:Float[] )
+	bxVec3TangentFrame( _plane.m_normal, _udir, _vdir )
+End
+
+' Returns 6 (near, far, left, right, top, bottom) planes representing frustum planes.
+Function BoundsBuildFrustumPlanes:Void( _result:BoundsPlane[], _viewProj:Float[] )
+
+	Local xw:Float = _viewProj[  3 ]
+	Local yw:Float = _viewProj[  7 ]
+	Local zw:Float = _viewProj[ 11 ]
+	Local ww:Float = _viewProj[ 15 ]
+
+	Local xz:Float = _viewProj[  2 ]
+	Local yz:Float = _viewProj[  6 ]
+	Local zz:Float = _viewProj[ 10 ]
+	Local wz:Float = _viewProj[ 14 ]
+
+	Local near   := _result[ 0 ]
+	Local far    := _result[ 1 ]
+	Local left   := _result[ 2 ]
+	Local right  := _result[ 3 ]
+	Local top    := _result[ 4 ]
+	Local bottom := _result[ 5 ]
+
+	near.m_normal[ 0 ] = xw - xz
+	near.m_normal[ 1 ] = yw - yz
+	near.m_normal[ 2 ] = zw - zz
+	near.m_dist        = ww - wz
+
+	far.m_normal[ 0 ] = xw + xz
+	far.m_normal[ 1 ] = yw + yz
+	far.m_normal[ 2 ] = zw + zz
+	far.m_dist        = ww + wz
+
+	Local xx:Float = _viewProj[  0 ]
+	Local yx:Float = _viewProj[  4 ]
+	Local zx:Float = _viewProj[  8 ]
+	Local wx:Float = _viewProj[ 12 ]
+
+	left.m_normal[ 0 ] = xw - xx
+	left.m_normal[ 1 ] = yw - yx
+	left.m_normal[ 2 ] = zw - zx
+	left.m_dist        = ww - wx
+
+	right.m_normal[ 0 ] = xw + xx
+	right.m_normal[ 1 ] = yw + yx
+	right.m_normal[ 2 ] = zw + zx
+	right.m_dist        = ww + wx
+
+	Local xy:Float = _viewProj[  1 ]
+	Local yy:Float = _viewProj[  5 ]
+	Local zy:Float = _viewProj[  9 ]
+	Local wy:Float = _viewProj[ 13 ]
+
+	top.m_normal[ 0 ] = xw + xy
+	top.m_normal[ 1 ] = yw + yy
+	top.m_normal[ 2 ] = zw + zy
+	top.m_dist        = ww + wy
+
+	bottom.m_normal[ 0 ] = xw - xy
+	bottom.m_normal[ 1 ] = yw - yy
+	bottom.m_normal[ 2 ] = zw - zy
+	bottom.m_dist        = ww - wy
+
+	Local planeCount:Int = _result.Length() ' <-- should be 6
+
+	For Local ii:Int = 0 Until planeCount
+		Local plane := _result[ ii ]
+		Local invLen:Float = 1.0 / bxVec3Norm( plane.m_normal, plane.m_normal )
+		plane.m_dist *= invLen
+	Next
+End
+
+' Returns point from 3 intersecting planes.
+Function BoundsIntersectPlanes:Void( _result:Float[], _pa:BoundsPlane, _pb:BoundsPlane, _pc:BoundsPlane )
+
+	Local axb:Float[ 3 ]
+	bxVec3Cross( axb, _pa.m_normal, _pb.m_normal )
+
+	Local bxc:Float[ 3 ]
+	bxVec3Cross( bxc, _pb.m_normal, _pc.m_normal )
+
+	Local cxa:Float[ 3 ]
+	bxVec3Cross( cxa, _pc.m_normal, _pa.m_normal )
+
+	Local tmp0:Float[ 3 ]
+	bxVec3Mul( tmp0, bxc, _pa.m_dist )
+
+	Local tmp1:Float[ 3 ]
+	bxVec3Mul( tmp1, cxa, _pb.m_dist )
+
+	Local tmp2:Float[ 3 ]
+	bxVec3Mul( tmp2, axb, _pc.m_dist )
+
+	Local tmp:Float[ 3 ]
+	bxVec3Add( tmp, tmp0, tmp1 )
+	bxVec3Add( tmp0, tmp, tmp2 )
+
+	Local denom:Float = bxVec3Dot( _pa.m_normal, bxc )
+	bxVec3Mul( _result, tmp0, -1.0 / denom )
+End
+
+' Make screen space ray from x, y coordinate and inverse view-projection matrix.
+Function BoundsMakeRay:BoundsRay( _x:Float, _y:Float, _invVp:Float[], ray:BoundsRay=Null )
+
+	If Not ray Then
+		ray = BoundsRayPool.Allocate()
+	Endif
+
+	Local near:Float[ 3 ]
+
+	near[ 0 ] = _x
+	near[ 1 ] = _y
+	near[ 2 ] = 0.0
+
+	bxVec3MulMtxH( ray.m_pos, near, _invVp )
+
+	Local tmp:Float[ 3 ]
+	Local far:Float[ 3 ]
+
+	far[ 0 ] = _x
+	far[ 1 ] = _y
+	far[ 2 ] = 1.0
+
+	bxVec3MulMtxH( tmp, far, _invVp )
+
+	Local dir:Float[ 3 ]
+
+	bxVec3Sub( dir, tmp, ray.m_pos )
+	bxVec3Norm( ray.m_dir, dir )
+
+	Return ray
+End
+
+Function BoundsGetPointAt:Void( _result:Float[], _ray:BoundsRay, _t:Float )
+
+	Local tmp:Float[ 3 ]
+
+	bxVec3Mul( tmp, _ray.m_dir, _t )
+	bxVec3Add( _result, _ray.m_pos, tmp )
+End
+
+' Intersect ray / AABB.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _aabb:BoundsAabb, _hit:BoundsHit=Null )
+
+	Local invDir:Float[ 3 ]
+	bxVec3Rcp( invDir, _ray.m_dir )
+
+	Local tmp:Float[ 3 ]
+
+	Local t0:Float[ 3 ]
+	bxVec3Sub( tmp, _aabb.m_min, _ray.m_pos )
+	bxVec3Mul( t0, tmp, invDir )
+
+	Local t1:Float[ 3 ]
+	bxVec3Sub( tmp, _aabb.m_max, _ray.m_pos )
+	bxVec3Mul( t1, tmp, invDir )
+
+	Local min:Float[ 3 ]
+	bxVec3Min( min, t0, t1 )
+
+	Local max:Float[ 3 ]
+	bxVec3Max( max, t0, t1 )
+
+	Local tmin:Float = bxMax( min[ 0 ], min[ 1 ], min[ 2 ] )
+	Local tmax:Float = bxMin( max[ 0 ], max[ 1 ], max[ 2 ] )
+
+	If tmax < 0.0 Or tmin > tmax Then
+		Return False
+	Endif
+
+	If _hit Then
+
+		Local t1x:Int = 0 ; If t1[ 0 ] = tmin Then t1x = 1
+		Local t1y:Int = 0 ; If t1[ 1 ] = tmin Then t1y = 1
+		Local t1z:Int = 0 ; If t1[ 2 ] = tmin Then t1z = 1
+
+		Local t0x:Int = 0 ; If t0[ 0 ] = tmin Then t0x = 1
+		Local t0y:Int = 0 ; If t0[ 1 ] = tmin Then t0y = 1
+		Local t0z:Int = 0 ; If t0[ 2 ] = tmin Then t0z = 1
+
+		_hit.m_normal[ 0 ] = Float( t1x - t0x )
+		_hit.m_normal[ 1 ] = Float( t1y - t0y )
+		_hit.m_normal[ 2 ] = Float( t1z - t0z )
+
+		_hit.m_dist = tmin
+
+		BoundsGetPointAt( _hit.m_pos, _ray, tmin )
+	Endif
+
+	Return True
+End
+
+Global s_kUnitAabb := New BoundsAabb(
+	-1.0, -1.0, -1.0,
+	 1.0,  1.0,  1.0 )
+
+' Intersect ray / OBB.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _obb:BoundsObb, _hit:BoundsHit=Null )
+
+	Local aabb := BoundsAabbPool.Allocate()
+	BoundsToAabb( aabb, _obb )
+	Local intersect:Bool = BoundsIntersect( _ray, aabb )
+	aabb.Free()
+
+	If Not intersect Then
+		Return False
+	Endif
+
+	Local mtxInv:Float[ 16 ]
+	bxMtxInverse( mtxInv, _obb.m_mtx )
+
+	Local obbRay := New BoundsRay()
+	bxVec3MulMtx( obbRay.m_pos, _ray.m_pos, mtxInv )
+	bxVec3MulMtxXyz0( obbRay.m_dir, _ray.m_dir, mtxInv )
+
+	If BoundsIntersect( obbRay, s_kUnitAabb, _hit ) Then
+
+		If _hit Then
+
+			Local tmp:Float[ 3 ]
+			bxVec3MulMtx( tmp, _hit.m_pos, _obb.m_mtx )
+			bxVec3Move( _hit.m_pos, tmp )
+
+			bxVec3MulMtxXyz0( tmp, _hit.m_normal, _obb.m_mtx )
+			bxVec3Norm( _hit.m_normal, tmp )
+		Endif
+
+		Return True
+	Endif
+
+	Return False
+End
+
+' Intersect ray / cylinder or ray / capsule.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _cylinder:BoundsCylinder, _capsule:Bool, _hit:BoundsHit=Null )
+
+	Local axis:Float[ 3 ]
+	bxVec3Sub( axis, _cylinder.m_end, _cylinder.m_pos )
+
+	Local rc:Float[ 3 ]
+	bxVec3Sub( rc, _ray.m_pos, _cylinder.m_pos )
+
+	Local normal:Float[ 3 ]
+	bxVec3Cross( normal, _ray.m_dir, axis )
+
+	Local len  :Float = bxVec3Norm( normal, normal )
+	Local dist :Float = Abs( bxVec3Dot( rc, normal ) )
+
+	If dist > _cylinder.m_radius Then
+		Return False
+	Endif
+
+	Local vo:Float[ 3 ]
+	bxVec3Cross( vo, rc, axis )
+	Local t0:Float = -bxVec3Dot( vo, normal ) / len
+
+	bxVec3Cross( vo, normal, axis )
+	bxVec3Norm( vo, vo )
+
+	Local rsq   :Float = bxSquare( _cylinder.m_radius )
+	Local ddoto :Float = bxVec3Dot( _ray.m_dir, vo )
+	Local ss    :Float = t0 - Abs( Sqrt( rsq - bxSquare( dist ) ) / ddoto )
+
+	If 0.0 > ss Then
+		Return False
+	Endif
+
+	Local point:Float[ 3 ]
+	BoundsGetPointAt( point, _ray, ss )
+
+	Local axisLen :Float = bxVec3Norm( axis, axis )
+	Local pdota   :Float = bxVec3Dot( _cylinder.m_pos, axis )
+	Local height  :Float = bxVec3Dot( point, axis ) - pdota
+
+	If height > 0.0 And height < axisLen Then
+
+		If _hit Then
+
+			Local t1:Float = height / axisLen
+			Local pointOnAxis:Float[ 3 ]
+			bxVec3Lerp( pointOnAxis, _cylinder.m_pos, _cylinder.m_end, t1 )
+
+			bxVec3Move( _hit.m_pos, point )
+
+			Local tmp:Float[ 3 ]
+			bxVec3Sub( tmp, point, pointOnAxis )
+			bxVec3Norm( _hit.m_normal, tmp )
+
+			_hit.m_dist = ss
+		Endif
+
+		Return True
+	Endif
+
+	If _capsule Then
+
+		Local rdota :Float = bxVec3Dot( _ray.m_pos, axis )
+		Local pp    :Float = rdota - pdota
+		Local t1    :Float = pp / axisLen
+
+		Local pointOnAxis:Float[ 3 ]
+		bxVec3Lerp( pointOnAxis, _cylinder.m_pos, _cylinder.m_end, t1 )
+
+		Local axisToRay:Float[ 3 ]
+		bxVec3Sub( axisToRay, _ray.m_pos, pointOnAxis )
+
+		If _cylinder.m_radius < bxVec3Length( axisToRay ) And 0.0 > ss Then
+			Return False
+		Endif
+
+		Local sphere := BoundsSpherePool.Allocate()
+
+		sphere.m_radius = _cylinder.m_radius
+
+		If 0.0 >= height Then
+			bxVec3Move( sphere.m_center, _cylinder.m_pos )
+		Else
+			bxVec3Move( sphere.m_center, _cylinder.m_end )
+		Endif
+
+		Local result:Bool = BoundsIntersect( _ray, sphere, _hit )
+
+		sphere.Free()
+
+		Return result
+	Endif
+
+	Local plane := BoundsPlanePool.Allocate()
+	Local pos:Float[ 3 ]
+
+	If 0.0 >= height Then
+		bxVec3Neg( plane.m_normal, axis )
+		bxVec3Move( pos, _cylinder.m_pos )
+	Else
+		bxVec3Move( plane.m_normal, axis )
+		bxVec3Move( pos, _cylinder.m_end )
+	Endif
+
+	plane.m_dist = -bxVec3Dot( pos, plane.m_normal )
+
+	Local tmpHit := BoundsHitPool.Allocate()
+	If Not _hit Then _hit = tmpHit
+
+	Local result:Bool = False
+
+	If BoundsIntersect( _ray, plane, _hit ) Then
+		Local tmp:Float[ 3 ]
+		bxVec3Sub( tmp, pos, _hit.m_pos )
+		result = bxVec3Dot(tmp, tmp) <= rsq
+	Endif
+
+	plane.Free()
+	tmpHit.Free()
+
+	Return result
+End
+
+' Intersect ray / cylinder.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _cylinder:BoundsCylinder, _hit:BoundsHit=Null )
+	Return BoundsIntersect( _ray, _cylinder, False, _hit )
+End
+
+' Intersect ray / capsule.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _capsule:BoundsCapsule, _hit:BoundsHit=Null )
+	' BX_STATIC_ASSERT(sizeof(Capsule) == sizeof(Cylinder) )
+	Return BoundsIntersect( _ray, _capsule, True, _hit )
+End
+
+' Intersect ray / cone.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _cone:BoundsCone, _hit:BoundsHit=Null )
+
+	Local axis   :Float[ 3 ]
+	bxVec3Sub( axis, _cone.m_pos, _cone.m_end )
+
+	Local normal :Float[ 3 ]
+	Local len    :Float = bxVec3Norm( normal, axis )
+
+	Local disk   := BoundsDiskPool.Allocate()
+
+	bxVec3Move( disk.m_center, _cone.m_pos )
+	bxVec3Move( disk.m_normal, normal )
+	disk.m_radius = _cone.m_radius
+
+	Local tmpHit := BoundsHitPool.Allocate()
+	Local out    := tmpHit ; If _hit Then out = _hit
+	Local hit    :Bool = BoundsIntersect( _ray, disk, out )
+
+	disk.Free()
+	tmpHit.Free()
+
+	Local ro     :Float[ 3 ]
+	bxVec3Sub( ro, _ray.m_pos, _cone.m_end )
+
+	Local hyp    :Float = Sqrt( bxSquare( _cone.m_radius ) + bxSquare( len ) )
+	Local cosaSq :Float = bxSquare( len / hyp )
+	Local ndoto  :Float = bxVec3Dot( normal, ro )
+	Local ndotd  :Float = bxVec3Dot( normal, _ray.m_dir )
+
+	Local aa     :Float = bxSquare( ndotd ) - cosaSq
+	Local bb     :Float = 2.0 * ( ndotd * ndoto - bxVec3Dot( _ray.m_dir, ro ) * cosaSq )
+	Local cc     :Float = bxSquare( ndoto ) - bxVec3Dot( ro, ro ) * cosaSq
+
+	Local det    :Float = bb * bb - 4.0 * aa * cc
+
+	If 0.0 > det Then
+		Return hit
+	Endif
+
+	det = Sqrt( det )
+	Local invA2  :Float = 1.0 / (2.0 * aa)
+	Local t1     :Float = (-bb - det) * invA2
+	Local t2     :Float = (-bb + det) * invA2
+	Local tt     :Float = t1
+
+	If 0.0 > t1 Or (0.0 < t2 And t2 < t1) Then
+		tt = t2
+	Endif
+
+	If 0.0 > tt Then
+		Return hit
+	Endif
+
+	Local hitPos :Float[ 3 ]
+	BoundsGetPointAt( hitPos, _ray, tt )
+
+	Local point  :Float[ 3 ]
+	bxVec3Sub( point, hitPos, _cone.m_end )
+
+	Local hh     :Float = bxVec3Dot( normal, point )
+
+	If 0.0 > hh Or len  < hh Then
+		Return hit
+	Endif
+
+	If _hit Then
+		If Not hit Or tt < _hit.m_dist Then
+
+			_hit.m_dist = tt
+			bxVec3Move( _hit.m_pos, hitPos )
+
+			Local scale:Float = hh / bxVec3Dot( point, point )
+			Local pointScaled:Float[ 3 ]
+			bxVec3Mul( pointScaled, point, scale )
+
+			Local tmp:Float[ 3 ]
+			bxVec3Sub( tmp, pointScaled, normal )
+			bxVec3Norm( _hit.m_normal, tmp )
+
+		Endif
+	Endif
+
+	Return True
+End
+
+' Intersect ray / disk.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _disk:BoundsDisk, _hit:BoundsHit=Null )
+
+	Local plane := BoundsPlanePool.Allocate()
+	bxVec3Move( plane.m_normal, _disk.m_normal )
+	plane.m_dist = -bxVec3Dot( _disk.m_center, _disk.m_normal )
+
+	Local tmpHit := BoundsHitPool.Allocate()
+	If Not _hit Then _hit = tmpHit
+
+	Local result:Bool = False
+
+	If BoundsIntersect( _ray, plane, _hit ) Then
+		Local tmp:Float[ 3 ]
+		bxVec3Sub( tmp, _disk.m_center, _hit.m_pos )
+		result = bxVec3Dot( tmp, tmp ) <= bxSquare( _disk.m_radius )
+	Endif
+
+	plane.Free()
+	tmpHit.Free()
+
+	Return result
+End
+
+' Intersect ray / plane.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _plane:BoundsPlane, _hit:BoundsHit=Null )
+
+	Local equation:Float = bxVec3Dot( _ray.m_pos, _plane.m_normal ) + _plane.m_dist
+
+	If 0.0 > equation Then
+		Return False
+	Endif
+
+	Local ndotd:Float = bxVec3Dot( _ray.m_dir, _plane.m_normal )
+
+	If 0.0 < ndotd Then
+		Return False
+	Endif
+
+	If _hit Then
+
+		bxVec3Move( _hit.m_normal, _plane.m_normal )
+
+		Local tt:Float = -equation / ndotd
+		_hit.m_dist = tt
+
+		BoundsGetPointAt( _hit.m_pos, _ray, tt )
+	Endif
+
+	Return True
+End
+
+' Intersect ray / sphere.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _sphere:BoundsSphere, _hit:BoundsHit=Null )
+
+	Local rs:Float[ 3 ]
+	bxVec3Sub( rs, _ray.m_pos, _sphere.m_center )
+
+	Local bb:Float = bxVec3Dot( rs, _ray.m_dir )
+
+	If 0.0 < bb Then
+		Return False
+	Endif
+
+	Local aa:Float = bxVec3Dot( _ray.m_dir, _ray.m_dir )
+	Local cc:Float = bxVec3Dot( rs, rs ) - bxSquare( _sphere.m_radius )
+
+	Local discriminant:Float = bb * bb - aa * cc
+
+	If 0.0 >= discriminant Then
+		Return False
+	Endif
+
+	Local sqrtDiscriminant:Float = Sqrt( discriminant )
+	Local invA:Float = 1.0 / aa
+	Local tt:Float = -(bb + sqrtDiscriminant) * invA
+
+	If 0.0 >= tt Then
+		Return False
+	Endif
+
+	If _hit Then
+
+		_hit.m_dist = tt
+
+		Local point:Float[ 3 ]
+		BoundsGetPointAt( point, _ray, tt )
+		bxVec3Move( _hit.m_pos, point )
+
+		Local tmp:Float[ 3 ]
+		bxVec3Sub( tmp, point, _sphere.m_center )
+		bxVec3Norm( _hit.m_normal, tmp )
+	Endif
+
+	Return True
+End
+
+' Intersect ray / triangle.
+Function BoundsIntersect:Bool( _ray:BoundsRay, _triangle:BoundsTris, _hit:BoundsHit=Null )
+
+	Local edge10:Float[ 3 ]
+	bxVec3Sub( edge10, _triangle.m_v1, _triangle.m_v0 )
+
+	Local edge02:Float[ 3 ]
+	bxVec3Sub( edge02, _triangle.m_v0, _triangle.m_v2 )
+
+	Local normal:Float[ 3 ]
+	bxVec3Cross( normal, edge02, edge10 )
+
+	Local vo:Float[ 3 ]
+	bxVec3Sub( vo, _triangle.m_v0, _ray.m_pos )
+
+	Local dxo:Float[ 3 ]
+	bxVec3Cross( dxo, _ray.m_dir, vo )
+
+	Local det:Float = bxVec3Dot( normal, _ray.m_dir )
+
+	If det > 0.0 Then
+		Return False
+	Endif
+
+	Local invDet :Float = 1.0 / det
+	Local bz     :Float = bxVec3Dot( dxo, edge02 ) * invDet
+	Local by     :Float = bxVec3Dot( dxo, edge10 ) * invDet
+	Local bx     :Float = 1.0 - by - bz
+
+	If bx < 0.0 Or by < 0.0 Or bz < 0.0 Then
+		Return False
+	Endif
+
+	If _hit Then
+
+		bxVec3Norm( _hit.m_normal, normal )
+
+		Local tt:Float = bxVec3Dot(normal, vo) * invDet
+		_hit.m_dist = tt
+
+		BoundsGetPointAt( _hit.m_pos, _ray, tt )
+	Endif
+
+	Return True
+End
+
+

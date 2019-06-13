@@ -1,0 +1,3468 @@
+
+Import bgfx
+Import bounds
+Import packrect
+
+Import vs_debugdraw_lines_bin
+Import fs_debugdraw_lines_bin
+Import vs_debugdraw_lines_stipple_bin
+Import fs_debugdraw_lines_stipple_bin
+Import vs_debugdraw_fill_bin
+Import vs_debugdraw_fill_mesh_bin
+Import fs_debugdraw_fill_bin
+Import vs_debugdraw_fill_lit_bin
+Import vs_debugdraw_fill_lit_mesh_bin
+Import fs_debugdraw_fill_lit_bin
+Import vs_debugdraw_fill_texture_bin
+Import fs_debugdraw_fill_texture_bin
+
+'-------------------------------------------------------------------------------
+' debug draw lines shaders
+'-------------------------------------------------------------------------------
+
+Global vs_debugdraw_lines:Int[][] = [
+	_shaderNoop,             ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_lines_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_lines_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_lines_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_lines_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_lines_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_lines_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_lines_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_lines_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global fs_debugdraw_lines:Int[][] = [
+	_shaderNoop,             ' BGFX_RENDERER_TYPE_NOOP
+	fs_debugdraw_lines_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	fs_debugdraw_lines_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	fs_debugdraw_lines_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' fs_debugdraw_lines_pssl, ' BGFX_RENDERER_TYPE_GNM
+	fs_debugdraw_lines_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	fs_debugdraw_lines_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	fs_debugdraw_lines_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	fs_debugdraw_lines_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+'-------------------------------------------------------------------------------
+' debug draw lines stipple shaders
+'-------------------------------------------------------------------------------
+
+Global vs_debugdraw_lines_stipple:Int[][] = [
+	_shaderNoop,                     ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_lines_stipple_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_lines_stipple_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_lines_stipple_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_lines_stipple_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_lines_stipple_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_lines_stipple_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_lines_stipple_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_lines_stipple_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global fs_debugdraw_lines_stipple:Int[][] = [
+	_shaderNoop,                     ' BGFX_RENDERER_TYPE_NOOP
+	fs_debugdraw_lines_stipple_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	fs_debugdraw_lines_stipple_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	fs_debugdraw_lines_stipple_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' fs_debugdraw_lines_stipple_pssl, ' BGFX_RENDERER_TYPE_GNM
+	fs_debugdraw_lines_stipple_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	fs_debugdraw_lines_stipple_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	fs_debugdraw_lines_stipple_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	fs_debugdraw_lines_stipple_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+'-------------------------------------------------------------------------------
+' debug draw fill shaders
+'-------------------------------------------------------------------------------
+
+Global vs_debugdraw_fill:Int[][] = [
+	_shaderNoop,       ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_fill_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_fill_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_fill_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_fill_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_fill_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_fill_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_fill_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_fill_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global vs_debugdraw_fill_mesh:Int[][] = [
+	_shaderNoop,       ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_fill_mesh_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_fill_mesh_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_fill_mesh_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_fill_mesh_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_fill_mesh_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_fill_mesh_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_fill_mesh_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_fill_mesh_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global fs_debugdraw_fill:Int[][] = [
+	_shaderNoop,       ' BGFX_RENDERER_TYPE_NOOP
+	fs_debugdraw_fill_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	fs_debugdraw_fill_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	fs_debugdraw_fill_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' fs_debugdraw_fill_pssl, ' BGFX_RENDERER_TYPE_GNM
+	fs_debugdraw_fill_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	fs_debugdraw_fill_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	fs_debugdraw_fill_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	fs_debugdraw_fill_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+'-------------------------------------------------------------------------------
+' debug draw fill lit shaders
+'-------------------------------------------------------------------------------
+
+Global vs_debugdraw_fill_lit:Int[][] = [
+	_shaderNoop,                ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_fill_lit_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_fill_lit_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_fill_lit_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_fill_lit_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_fill_lit_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_fill_lit_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_fill_lit_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_fill_lit_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global vs_debugdraw_fill_lit_mesh:Int[][] = [
+	_shaderNoop,                     ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_fill_lit_mesh_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_fill_lit_mesh_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_fill_lit_mesh_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_fill_lit_mesh_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_fill_lit_mesh_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_fill_lit_mesh_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_fill_lit_mesh_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_fill_lit_mesh_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global fs_debugdraw_fill_lit:Int[][] = [
+	_shaderNoop,                ' BGFX_RENDERER_TYPE_NOOP
+	fs_debugdraw_fill_lit_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	fs_debugdraw_fill_lit_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	fs_debugdraw_fill_lit_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' fs_debugdraw_fill_lit_pssl, ' BGFX_RENDERER_TYPE_GNM
+	fs_debugdraw_fill_lit_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	fs_debugdraw_fill_lit_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	fs_debugdraw_fill_lit_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	fs_debugdraw_fill_lit_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+'-------------------------------------------------------------------------------
+' debug draw fill texture shaders
+'-------------------------------------------------------------------------------
+
+Global vs_debugdraw_fill_texture:Int[][] = [
+	_shaderNoop,                    ' BGFX_RENDERER_TYPE_NOOP
+	vs_debugdraw_fill_texture_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_debugdraw_fill_texture_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_debugdraw_fill_texture_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_debugdraw_fill_texture_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_debugdraw_fill_texture_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_debugdraw_fill_texture_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_debugdraw_fill_texture_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_debugdraw_fill_texture_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global fs_debugdraw_fill_texture:Int[][] = [
+	_shaderNoop,       ' BGFX_RENDERER_TYPE_NOOP
+	fs_debugdraw_fill_texture_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	fs_debugdraw_fill_texture_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	fs_debugdraw_fill_texture_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' fs_debugdraw_fill_texture_pssl, ' BGFX_RENDERER_TYPE_GNM
+	fs_debugdraw_fill_texture_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	fs_debugdraw_fill_texture_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	fs_debugdraw_fill_texture_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	fs_debugdraw_fill_texture_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+
+
+
+
+
+Const DEBUG_DRAW_CONFIG_MAX_GEOMETRY:Int = 256
+
+Const AXIS_X     :Int = 0
+Const AXIS_Y     :Int = 1
+Const AXIS_Z     :Int = 2
+Const AXIS_COUNT :Int = 3
+
+'  Class Axis
+'  	Const X     :Int = 0
+'  	Const Y     :Int = 1
+'  	Const Z     :Int = 2
+'  	Const Count :Int = 3
+'  End
+
+Class DdVertex
+
+	Const SIZE_IN_BYTES:Int = 3 * 4
+
+	Field m_x:Float
+	Field m_y:Float
+	Field m_z:Float
+
+	Method New( _x:Float, _y:Float, _z:Float )
+		m_x = _x
+		m_y = _y
+		m_z = _z
+	End
+End
+
+Function DdVertexToDataBuffer:DataBuffer( _vertices:DdVertex[], _verticesDb:DataBuffer=Null )
+
+	If Not _verticesDb Then
+		_verticesDb = New DataBuffer( _vertices.Length() * DdVertex.SIZE_IN_BYTES )
+	Endif
+
+	Local address:Int = 0
+
+	For Local ii:Int = 0 Until _vertices.Length()
+
+		Local vertex := _vertices[ ii ]
+
+		_verticesDb.PokeFloat( address, vertex.m_x ) ; address += 4
+		_verticesDb.PokeFloat( address, vertex.m_y ) ; address += 4
+		_verticesDb.PokeFloat( address, vertex.m_z ) ; address += 4
+	Next
+
+	Return _verticesDb
+End
+
+Class DebugVertex
+
+	Const SIZE_IN_BYTES:Int = 5 * 4
+
+	Field m_x     :Float
+	Field m_y     :Float
+	Field m_z     :Float
+
+	Field m_len   :Float
+
+	Field m_abgr  :Int
+
+	Field m_array :Float[ 5 ]
+
+	Method New( _x:Float, _y:Float, _z:Float, _len:Float, _abgr:Int )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_len  = _len
+
+		Self.m_abgr = _abgr
+	End
+
+	Method CopyTo:Void( _dst:DebugVertex )
+		_dst.m_x    = Self.m_x
+		_dst.m_y    = Self.m_y
+		_dst.m_z    = Self.m_z
+		_dst.m_len  = Self.m_len
+		_dst.m_abgr = Self.m_abgr
+	End
+
+	Method ToArray:Float[]()
+
+		m_array[ 0 ] = m_x
+		m_array[ 1 ] = m_y
+		m_array[ 2 ] = m_z
+		m_array[ 3 ] = m_len
+		m_array[ 4 ] = CastIntToFloat( m_abgr )
+
+		Return m_array
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 1, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Class DebugUvVertex
+
+	Const SIZE_IN_BYTES:Int = 6 * 4
+
+	Field m_x     :Float
+	Field m_y     :Float
+	Field m_z     :Float
+
+	Field m_u     :Float
+	Field m_v     :Float
+
+	Field m_abgr  :Int
+
+	Field m_array :Float[ 6 ]
+
+	Method New( _x:Float, _y:Float, _z:Float, _u:Float, _v:Float, _abgr:Int )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_u    = _u
+		Self.m_v    = _v
+
+		Self.m_abgr = _abgr
+	End
+
+	Method CopyTo:Void( _dst:DebugUvVertex )
+		_dst.m_x    = Self.m_x
+		_dst.m_y    = Self.m_y
+		_dst.m_z    = Self.m_z
+		_dst.m_u    = Self.m_u
+		_dst.m_v    = Self.m_v
+		_dst.m_abgr = Self.m_abgr
+	End
+
+	Method ToArray:Float[]()
+
+		m_array[ 0 ] = m_x
+		m_array[ 1 ] = m_y
+		m_array[ 2 ] = m_z
+		m_array[ 3 ] = m_u
+		m_array[ 4 ] = m_v
+		m_array[ 5 ] = CastIntToFloat( m_abgr )
+
+		Return m_array
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 2, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Class DebugShapeVertex
+
+	Const X_ADDRESS        :Int =  0
+	Const Y_ADDRESS        :Int =  4
+	Const Z_ADDRESS        :Int =  8
+	Const INDICES0_ADDRESS :Int = 12
+	Const INDICES1_ADDRESS :Int = 13
+	Const INDICES2_ADDRESS :Int = 14
+	Const INDICES3_ADDRESS :Int = 15
+	Const TOTAL_SIZE       :Int = 16
+
+	Const SIZE_IN_BYTES:Int = 4 * 4
+
+	Field m_x       :Float
+	Field m_y       :Float
+	Field m_z       :Float
+
+	Field m_indices :Int[ 4 ]
+
+	Method New( _x:Float, _y:Float, _z:Float, _indices:Int[] )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+
+		Self.m_indices[ 0 ] = _indices[ 0 ]
+		Self.m_indices[ 1 ] = _indices[ 1 ]
+		Self.m_indices[ 2 ] = _indices[ 2 ]
+		Self.m_indices[ 3 ] = _indices[ 3 ]
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_INDICES,   4, BGFX_ATTRIB_TYPE_UINT8 )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+
+	Function ToDataBuffer:DataBuffer( _vertices:DebugShapeVertex[] )
+		Return ToDataBuffer( Null, _vertices )
+	End
+
+	Function ToDataBuffer:DataBuffer( _verticesDb:DataBuffer, _vertices:DebugShapeVertex[] )
+
+		If Not _verticesDb Then
+			_verticesDb = New DataBuffer( _vertices.Length() * TOTAL_SIZE )
+		Endif
+
+		Local address:Int = 0
+
+		For Local ii:Int = 0 Until _vertices.Length()
+
+			Local vertex := _vertices[ ii ]
+
+			_verticesDb.PokeFloat( address, vertex.m_x ) ; address += 4
+			_verticesDb.PokeFloat( address, vertex.m_y ) ; address += 4
+			_verticesDb.PokeFloat( address, vertex.m_z ) ; address += 4
+
+			_verticesDb.PokeByte( address, vertex.m_indices[ 0 ] ) ; address += 1
+			_verticesDb.PokeByte( address, vertex.m_indices[ 1 ] ) ; address += 1
+			_verticesDb.PokeByte( address, vertex.m_indices[ 2 ] ) ; address += 1
+			_verticesDb.PokeByte( address, vertex.m_indices[ 3 ] ) ; address += 1
+		Next
+
+		Return _verticesDb
+	End
+End
+
+Class DebugMeshVertex
+
+	Const SIZE_IN_BYTES:Int = 3 * 4
+
+	Field m_x       :Float
+	Field m_y       :Float
+	Field m_z       :Float
+
+	Method New( _x:Float, _y:Float, _z:Float )
+
+		Self.m_x    = _x
+		Self.m_y    = _y
+		Self.m_z    = _z
+	End
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Global s_quadVertices:DebugShapeVertex[] = [
+	New DebugShapeVertex( -1.0, 0.0,  1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex(  1.0, 0.0,  1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex( -1.0, 0.0, -1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex(  1.0, 0.0, -1.0, [ 0, 0, 0, 0 ] ) ]
+
+Global s_quadIndices:Int[] = [
+	0, 1, 2,
+	1, 3, 2 ]
+
+Global s_cubeVertices:DebugShapeVertex[] = [
+	New DebugShapeVertex( -1.0,  1.0,  1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex(  1.0,  1.0,  1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex( -1.0, -1.0,  1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex(  1.0, -1.0,  1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex( -1.0,  1.0, -1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex(  1.0,  1.0, -1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex( -1.0, -1.0, -1.0, [ 0, 0, 0, 0 ] ),
+	New DebugShapeVertex(  1.0, -1.0, -1.0, [ 0, 0, 0, 0 ] ) ]
+
+Global s_cubeIndices:Int[] = [
+	0, 1, 2, ' 0
+	1, 3, 2,
+	4, 6, 5, ' 2
+	5, 6, 7,
+	0, 2, 4, ' 4
+	4, 2, 6,
+	1, 5, 3, ' 6
+	5, 7, 3,
+	0, 4, 1, ' 8
+	4, 5, 1,
+	2, 3, 6, ' 10
+	6, 3, 7 ]
+
+Global s_circleLod:Int[] = [
+	37,
+	29,
+	23,
+	17,
+	11 ]
+
+Function GetCircleLod:Int( _lod:Int )
+
+	Local maxCircleLod:Int = s_circleLod.Length() -1
+
+	If _lod > maxCircleLod Then _lod = maxCircleLod
+
+	Return s_circleLod[ _lod ]
+End
+
+Function Circle:Void( _out:Float[], _angle:Float )
+
+	Local sa:Float = Sinr( _angle )
+	Local ca:Float = Cosr( _angle )
+
+	_out[ 0 ] = sa
+	_out[ 1 ] = ca
+End
+
+Function Squircle:Void( _out:Float[], _angle:Float )
+
+	Local sa:Float = Sinr( _angle )
+	Local ca:Float = Cosr( _angle )
+
+	_out[ 0 ] = Sqrt( Abs( sa ) ) * Sgn( sa )
+	_out[ 1 ] = Sqrt( Abs( ca ) ) * Sgn( ca )
+End
+
+Global SphereGenPool := New Pool< SphereGen >()
+
+Class SphereGen
+
+	Method Free:Void()
+		SphereGenPool.Free( Self )
+	End
+
+'  	Gen(void* _pos, uint16_t _posStride, void* _normals, uint16_t _normalStride, uint8_t _subdiv)
+'  		: m_pos( (uint8_t*)_pos)
+'  		, m_normals( (uint8_t*)_normals)
+'  		, m_posStride(_posStride)
+'  		, m_normalStride(_normalStride)
+	Method Update:Void( _pos:DataBuffer, _posStride:Int, _normals:DataBuffer, _normalStride:Int, _subdiv:Int )
+
+		Local scale  :Float = 1.0
+		Local golden :Float = 1.6180339887
+		Local len    :Float = Sqrt( golden * golden + 1.0 )
+		Local ss     :Float = 1.0 / len * scale
+		Local ll     :Float = ss * golden
+
+		Local vv     :Float[][] = [ ' [12][4] =
+			[ -ll, 0.0, -ss, 0.0 ],
+			[  ll, 0.0, -ss, 0.0 ],
+			[  ll, 0.0,  ss, 0.0 ],
+			[ -ll, 0.0,  ss, 0.0 ],
+
+			[ -ss,  ll, 0.0, 0.0 ],
+			[  ss,  ll, 0.0, 0.0 ],
+			[  ss, -ll, 0.0, 0.0 ],
+			[ -ss, -ll, 0.0, 0.0 ],
+
+			[ 0.0, -ss,  ll, 0.0 ],
+			[ 0.0,  ss,  ll, 0.0 ],
+			[ 0.0,  ss, -ll, 0.0 ],
+			[ 0.0, -ss, -ll, 0.0 ] ]
+
+		m_pos           = _pos
+		m_normals       = _normals
+		m_posAddress    = 0
+		m_posStride     = _posStride
+		m_normalAddress = 0
+		m_normalStride  = _normalStride
+		m_numVertices   = 0
+
+		Triangle( vv[  0 ], vv[  4 ], vv[  3 ], scale, _subdiv )
+		Triangle( vv[  0 ], vv[ 10 ], vv[  4 ], scale, _subdiv )
+		Triangle( vv[  4 ], vv[ 10 ], vv[  5 ], scale, _subdiv )
+		Triangle( vv[  5 ], vv[ 10 ], vv[  1 ], scale, _subdiv )
+		Triangle( vv[  5 ], vv[  1 ], vv[  2 ], scale, _subdiv )
+		Triangle( vv[  5 ], vv[  2 ], vv[  9 ], scale, _subdiv )
+		Triangle( vv[  5 ], vv[  9 ], vv[  4 ], scale, _subdiv )
+		Triangle( vv[  3 ], vv[  4 ], vv[  9 ], scale, _subdiv )
+
+		Triangle( vv[  0 ], vv[  3 ], vv[  7 ], scale, _subdiv )
+		Triangle( vv[  0 ], vv[  7 ], vv[ 11 ], scale, _subdiv )
+		Triangle( vv[ 11 ], vv[  7 ], vv[  6 ], scale, _subdiv )
+		Triangle( vv[ 11 ], vv[  6 ], vv[  1 ], scale, _subdiv )
+		Triangle( vv[  1 ], vv[  6 ], vv[  2 ], scale, _subdiv )
+		Triangle( vv[  2 ], vv[  6 ], vv[  8 ], scale, _subdiv )
+		Triangle( vv[  8 ], vv[  6 ], vv[  7 ], scale, _subdiv )
+		Triangle( vv[  8 ], vv[  7 ], vv[  3 ], scale, _subdiv )
+
+		Triangle( vv[  0 ], vv[ 11 ], vv[ 10 ], scale, _subdiv )
+		Triangle( vv[  1 ], vv[ 10 ], vv[ 11 ], scale, _subdiv )
+		Triangle( vv[  2 ], vv[  8 ], vv[  9 ], scale, _subdiv )
+		Triangle( vv[  3 ], vv[  9 ], vv[  8 ], scale, _subdiv )
+	End
+
+	Method AddVert:Void( _v:Float[] )
+
+'  		float* verts = (float*)m_pos;
+'  		verts[0] = _v[0];
+'  		verts[1] = _v[1];
+'  		verts[2] = _v[2];
+'  		m_pos += m_posStride;
+
+		m_pos.PokeFloat( m_posAddress + 0, _v[ 0 ] )
+		m_pos.PokeFloat( m_posAddress + 4, _v[ 1 ] )
+		m_pos.PokeFloat( m_posAddress + 8, _v[ 2 ] )
+
+		m_posAddress += m_posStride
+
+		If m_normals Then
+
+'  			float* normals = (float*)m_normals;
+'  			bx::vec3Norm(normals, _v);
+'  			m_normals += m_normalStride;
+
+			Local normals:Float[ 3 ]
+
+			normals[ 0 ] = m_normals.PeekFloat( m_normalAddress + 0 )
+			normals[ 1 ] = m_normals.PeekFloat( m_normalAddress + 4 )
+			normals[ 2 ] = m_normals.PeekFloat( m_normalAddress + 8 )
+
+			bxVec3Norm( normals, _v )
+
+			m_normals.PokeFloat( m_normalAddress + 0, normals[ 0 ] )
+			m_normals.PokeFloat( m_normalAddress + 4, normals[ 1 ] )
+			m_normals.PokeFloat( m_normalAddress + 8, normals[ 2 ] )
+
+			m_normalAddress += m_normalStride
+		Endif
+
+		m_numVertices += 1
+	End
+
+	Method Triangle:Void( _v0:Float[], _v1:Float[], _v2:Float[], _scale:Float, _subdiv:Int )
+
+		If 0 = _subdiv Then
+
+			AddVert( _v0 )
+			AddVert( _v1 )
+			AddVert( _v2 )
+		Else
+
+			Local tmp0:Float[ 4 ]
+			Local tmp1:Float[ 4 ]
+
+			Local v01:Float[ 4 ]
+			bxVec3Add( tmp0, _v0, _v1 )
+			bxVec3Norm( tmp1, tmp0 )
+			bxVec3Mul( v01, tmp1, _scale )
+
+			Local v12:Float[ 4 ]
+			bxVec3Add( tmp0, _v1, _v2 )
+			bxVec3Norm( tmp1, tmp0 )
+			bxVec3Mul( v12, tmp1, _scale )
+
+			Local v20:Float[ 4 ]
+			bxVec3Add( tmp0, _v2, _v0 )
+			bxVec3Norm( tmp1, tmp0 )
+			bxVec3Mul( v20, tmp1, _scale )
+
+			_subdiv -= 1
+			Triangle( _v0, v01, v20, _scale, _subdiv )
+			Triangle( _v1, v12, v01, _scale, _subdiv )
+			Triangle( _v2, v20, v12, _scale, _subdiv )
+			Triangle( v01, v12, v20, _scale, _subdiv )
+		Endif
+	End
+
+	Field m_pos           :DataBuffer
+	Field m_normals       :DataBuffer
+	Field m_posAddress    :Int
+	Field m_normalAddress :Int
+	Field m_posStride     :Int
+	Field m_normalStride  :Int
+	Field m_numVertices   :Int
+End
+
+'  uint32_t genSphere(uint8_t _subdiv0, void* _pos0 = NULL, uint16_t _posStride0 = 0, void* _normals0 = NULL, uint16_t _normalStride0 = 0)
+Function GenSphere:Int( _subdiv0:Int, _pos0:DataBuffer=Null, _posStride0:Int=0, _normals0:DataBuffer=Null, _normalStride0:Int=0 )
+
+	If _pos0 Then
+		Local sphereGen := SphereGenPool.Allocate()
+		sphereGen.Update( _pos0, _posStride0, _normals0, _normalStride0, _subdiv0 )
+		sphereGen.Free()
+	Endif
+
+	' uint32_t numVertices = 20*3*bx::uint32_max(1, (uint32_t)bx::pow(4.0f, _subdiv0) );
+	Local numVertices:Int = 20 * 3 * Max( 1, Int( Pow( 4.0, _subdiv0 ) ) )
+
+	Return numVertices
+End
+
+' void getPoint(float* _result, Axis::Enum _axis, float _x, float _y)
+Function GetPoint:Void( _result:Float[], _axis:Int, _x:Float, _y:Float )
+
+	Select _axis
+
+	Case AXIS_X
+		_result[ 0 ] = 0.0
+		_result[ 1 ] = _x
+		_result[ 2 ] = _y
+
+	case AXIS_Y
+		_result[ 0 ] = _y
+		_result[ 1 ] = 0.0
+		_result[ 2 ] = _x
+
+	Default
+		_result[ 0 ] = _x
+		_result[ 1 ] = _y
+		_result[ 2 ] = 0.0
+	End
+End
+
+'-------------------------------------------------------------------------------
+' Sprite Texture
+'-------------------------------------------------------------------------------
+
+Const SPRITE_TEXTURE_SIZE:Int = 1024
+
+'  struct SpriteHandle { uint16_t idx; };
+'  inline bool isValid(SpriteHandle _handle) { return _handle.idx != UINT16_MAX; }
+Function SpriteHandleIsValid:Bool( _handle:Int )
+	Return _handle <> UINT16_MAX
+End
+
+Const MAX_HANDLES :Int = 256
+'  Const MaxHandlesT  :Int = 256
+'  Const TextureSizeT :Int = 1024
+
+Global RectPack2DT256Pool := New Pool< RectPack2DT256 >()
+
+Class RectPack2DT256 Extends RectPack2DT
+
+	Method Free:Void()
+		RectPack2DT256Pool.Free( Self )
+	End
+
+	Method New( _width:Int, _height:Int )
+		Super.New( _width, _height, MAX_HANDLES )
+	End
+End
+
+' Class SpriteT< TextureSizeT > ' < MaxHandlesT, TextureSizeT >
+Class Sprite ' put TextureSizeT in New instead
+
+'  	bx::Mutex                     m_lock;
+'  	bx::HandleAllocT<MaxHandlesT> m_handleAlloc;
+'  	Field m_pack :Pack2D[ MaxHandlesT ]
+
+	Field m_freeHandles := New IntStack()
+	Field m_pack        := New Stack<Pack2D>()
+	Field m_ra          :RectPack2DT256
+
+	Method New( TextureSizeT:Int=1024 )
+		m_ra = New RectPack2DT256( TextureSizeT, TextureSizeT )
+	End
+
+	Method Create:Int( _width:Int, _height:Int )
+
+		Local handle :Int = BX_INVALID_HANDLE
+		Local pack   := Pack2DPool.Allocate()
+
+		If m_ra.Find( _width, _height, pack ) Then
+
+			If m_freeHandles.Length() > 0 Then
+				handle = m_freeHandles.Pop()
+				Local oldPack := m_pack.Get( handle )
+				m_pack.Set( handle, pack )
+				oldPack.Free()
+			Else
+				handle = m_pack.Length()
+				m_pack.Push( pack )
+			Endif
+
+			' since there are unlimited handles m_ra.Clear is never executed
+			' m_ra.Clear( pack )
+		Else
+
+			pack.Free()
+		Endif
+
+		Return handle
+	End
+
+	Method Destroy:Void( _sprite:Int )
+		Local pack := m_pack[ _sprite ]
+		m_ra.Clear( pack )
+		m_freeHandles.Push( _sprite )
+		' m_handleAlloc.free(_sprite.idx);
+	End
+
+	Method Get:Pack2D( _sprite:Int )
+		Return m_pack.Get( _sprite )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' Geometry
+'-------------------------------------------------------------------------------
+
+'  struct GeometryHandle { uint16_t idx; };
+'  inline bool isValid(GeometryHandle _handle) { return _handle.idx != UINT16_MAX; }
+Function GeometryHandleIsValid:Bool( _handle:Int )
+	Return _handle <> UINT16_MAX
+End
+
+'  Global GeometryDataPool := New Pool< GeometryData >()
+
+Class GeometryData
+
+'  	Method Free:Void()
+'  		GeometryDataPool.Free( Self )
+'  	End
+
+	Method New()
+
+		m_vbh = BGFX_INVALID_HANDLE
+		m_ibh = BGFX_INVALID_HANDLE
+
+		m_topologyNumIndices[ 0 ] = 0
+		m_topologyNumIndices[ 1 ] = 0
+	End
+
+	Field m_vbh:Int ' bgfx::VertexBufferHandle
+	Field m_ibh:Int ' bgfx::IndexBufferHandle
+
+	Field m_topologyNumIndices:Int[ 2 ]
+End
+
+'  Class GeometryT
+Class Geometry ' MaxHandlesT is unlimited since we are using class Stack
+
+	' bx::Mutex m_lock;
+	' bx::HandleAllocT<MaxHandlesT> m_handleAlloc;
+
+	Field m_freeHandles := New IntStack()
+	Field m_geometry    :GeometryData[ MAX_HANDLES ]
+
+	Field m_bgfxMemory  := New BgfxMemory()
+
+	Method New()
+		For Local ii:Int = MAX_HANDLES-1 To 0 Step -1
+			m_geometry[ ii ] = New GeometryData()
+			m_freeHandles.Push( ii )
+		Next
+	End
+
+	' GeometryHandle create(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices, const void* _indices, bool _index32)
+	Method Create:Int( _numVertices:Int, _vertices:DdVertex[], _numIndices:Int, _indices:Int[], _index32:Bool )
+
+		' BX_UNUSED(_numVertices, _vertices, _numIndices, _indices, _index32);
+
+		' GeometryHandle handle;
+		' {
+		'	bx::MutexScope lock(m_lock);
+		'	handle = { m_handleAlloc.alloc() };
+		' }
+
+		Local handle:Int = BX_INVALID_HANDLE
+
+		If m_freeHandles.Length() > 0 Then
+			handle = m_freeHandles.Pop()
+		Endif
+
+		If GeometryHandleIsValid( handle ) Then
+
+			Local geometry := m_geometry[ handle ]
+			bgfxCopy( m_bgfxMemory, DdVertexToDataBuffer( _vertices ) )
+			geometry.m_vbh = bgfxCreateVertexBuffer( m_bgfxMemory, DebugMeshVertex.ms_decl )
+
+			Print "BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST=" + BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST
+
+			Local indicesDb := ShortsToDataBuffer( _indices )
+			geometry.m_topologyNumIndices[ 0 ] = _numIndices
+			geometry.m_topologyNumIndices[ 1 ] = bgfxTopologyConvert(
+				BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST,
+				Null,
+				0,
+				indicesDb,
+				_numIndices,
+				_index32 )
+
+			Local indexSize:Int = SHORT_SIZE ; If _index32 Then indexSize = INT_SIZE
+
+			Local numIndices :Int = 0 + 
+				geometry.m_topologyNumIndices[ 0 ] +
+				geometry.m_topologyNumIndices[ 1 ]
+
+			' Local mem:= bgfxAlloc( numIndices * indexSize )
+			' uint8_t* indexData = mem->data;
+			Local mem := New BgfxMemory()
+			bgfxAlloc( mem, numIndices * indexSize )
+
+			Local indexData := New DataBuffer( numIndices * indexSize )
+
+			' bx::memCopy(indexData, _indices, _numIndices*indexSize );
+			Local address:Int = 0
+			If _index32 Then
+				For Local ii:Int = 0 Until _numIndices
+					indexData.PokeInt( address, _indices[ ii ] ) ; address += INT_SIZE
+				Next
+			Else
+				For Local ii:Int = 0 Until _numIndices
+					indexData.PokeShort( address, _indices[ ii ] ) ; address += SHORT_SIZE
+				Next
+			Endif
+
+			bgfxTopologyConvert(
+				BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST,
+				indexData,
+				geometry.m_topologyNumIndices[ 0 ] * indexSize,
+				geometry.m_topologyNumIndices[ 1 ] * indexSize,
+				indicesDb,
+				0,
+				_numIndices,
+				_index32 )
+
+			address = 0
+			For Local ii:Int = 0 Until numIndices
+				mem.PokeShort( address, indexData.PeekShort( address ) ) ; address += 2
+			Next
+
+			Local _flags:Int = BGFX_BUFFER_NONE ; If _index32 Then _flags = BGFX_BUFFER_INDEX32
+			geometry.m_ibh = bgfxCreateIndexBuffer( mem, _flags )
+
+			indexData.Discard()
+			indicesDb.Discard()
+		End
+
+		Return handle
+	End
+
+	Method Destroy:Void( _handle:Int )
+		' bx::MutexScope lock(m_lock);
+		' Geometry& geometry = m_geometry[_handle.idx];
+
+		Local geometry := m_geometry.Get( _handle )
+
+		bgfxDestroyVertexBuffer( geometry.m_vbh )
+		bgfxDestroyIndexBuffer( geometry.m_ibh )
+
+		' m_handleAlloc.free(_handle.idx);
+		m_freeHandles.Push( _handle )
+	End
+End
+
+Global AttribPool := New Pool< Attrib >()
+
+Class Attrib
+
+	Method Free:Void()
+		AttribPool.Free( Self )
+	End
+
+	Method New()
+	End
+
+	Method CopyTo:Void( result:Attrib )
+		result.m_state[ 0 ] = Self.m_state[ 0 ]
+		result.m_state[ 1 ] = Self.m_state[ 1 ]
+		result.m_offset     = Self.m_offset
+		result.m_scale      = Self.m_scale
+		result.m_spin       = Self.m_spin
+		result.m_abgr       = Self.m_abgr
+		result.m_stipple    = Self.m_stipple
+		result.m_wireframe  = Self.m_wireframe
+		result.m_lod        = Self.m_lod
+	End
+
+	Field m_state     :Int[ 2 ]
+	Field m_offset    :Float
+	Field m_scale     :Float
+	Field m_spin      :Float
+	Field m_abgr      :Int
+	Field m_stipple   :Bool
+	Field m_wireframe :Bool
+	Field m_lod       :Int
+End
+
+Class Program
+	Const Lines        :Int = 0
+	Const LinesStipple :Int = 1
+	Const Fill         :Int = 2
+	Const FillMesh     :Int = 3
+	Const FillLit      :Int = 4
+	Const FillLitMesh  :Int = 5
+	Const FillTexture  :Int = 6
+	Const Count        :Int = 7
+End
+
+Class Mesh
+
+	Const Sphere0        :Int =  0
+	Const Sphere1        :Int =  1
+	Const Sphere2        :Int =  2
+	Const Sphere3        :Int =  3
+	Const Cone0          :Int =  4
+	Const Cone1          :Int =  5
+	Const Cone2          :Int =  6
+	Const Cone3          :Int =  7
+	Const Cylinder0      :Int =  8
+	Const Cylinder1      :Int =  9
+	Const Cylinder2      :Int = 10
+	Const Cylinder3      :Int = 11
+	Const Capsule0       :Int = 12
+	Const Capsule1       :Int = 13
+	Const Capsule2       :Int = 14
+	Const Capsule3       :Int = 15
+	Const Quad           :Int = 16
+	Const Cube           :Int = 17
+	Const Count          :Int = 18
+	Const SphereMaxLod   :Int = Sphere3   - Sphere0
+	Const ConeMaxLod     :Int = Cone3     - Cone0
+	Const CylinderMaxLod :Int = Cylinder3 - Cylinder0
+	Const CapsuleMaxLod  :Int = Capsule3  - Capsule0
+
+	Field m_startVertex  :Int
+	Field m_numVertices  :Int
+
+	Field m_startIndex   :Int[ 2 ]
+	Field m_numIndices   :Int[ 2 ]
+End
+
+' typedef SpriteT<256, SPRITE_TEXTURE_SIZE> Sprite;
+'  Class Sprite Extends SpriteT< SPRITE_TEXTURE_SIZE >
+'  	Method New()
+'  		Super.New()
+'  	End
+'  End
+
+' typedef GeometryT<DEBUG_DRAW_CONFIG_MAX_GEOMETRY> Geometry;
+'  Class Geometry Extends GeometryT
+'  	Method New()
+'  		Super.New()
+'  	End
+'  End
+
+Class DebugDrawShared
+
+'  	bx::AllocatorI* m_allocator;
+
+	Field m_sprite    := New Sprite()
+	Field m_geometry  := New Geometry()
+
+	Field m_mesh      :Mesh[ Mesh.Count ]
+
+	Field m_program   :Int[ Program.Count ] ' bgfx::ProgramHandle 
+
+	Field u_params    :Int ' bgfx::UniformHandle
+	Field s_texColor  :Int ' bgfx::UniformHandle
+	Field m_texture   :Int ' bgfx::TextureHandle
+
+	Field m_vbh       :Int ' bgfx::VertexBufferHandle
+	Field m_ibh       :Int ' bgfx::IndexBufferHandle
+
+	Method Init:Void() ' (bx::AllocatorI* _allocator)
+
+'  		if (NULL == _allocator)
+'  		{
+'  			static bx::DefaultAllocator allocator;
+'  			m_allocator = &allocator;
+'  		}
+'  		else
+'  		{
+'  			m_allocator = _allocator;
+'  		}
+
+		DebugVertex.Init()
+		DebugUvVertex.Init()
+		DebugShapeVertex.Init()
+		DebugMeshVertex.Init()
+
+		Local type:Int = bgfxGetRendererType()
+
+		m_program[ Program.Lines        ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_lines[ type ],
+			fs_debugdraw_lines[ type ] )
+
+		m_program[ Program.LinesStipple ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_lines_stipple[ type ],
+			fs_debugdraw_lines_stipple[ type ] )
+
+		m_program[ Program.Fill         ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_fill[ type ],
+			fs_debugdraw_fill[ type ] )
+
+		m_program[ Program.FillMesh     ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_fill_mesh[ type ],
+			fs_debugdraw_fill[ type ] )
+
+		m_program[ Program.FillLit      ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_fill_lit[ type ],
+			fs_debugdraw_fill_lit[ type ] )
+
+		m_program[ Program.FillLitMesh  ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_fill_lit_mesh[ type ],
+			fs_debugdraw_fill_lit[ type ] )
+
+		m_program[ Program.FillTexture  ] = bgfxUtilsCreateProgram(
+			vs_debugdraw_fill_texture[ type ],
+			fs_debugdraw_fill_texture[ type ] )
+
+		u_params   = bgfxCreateUniform( "u_params",   BGFX_UNIFORM_TYPE_VEC4, 4 )
+		s_texColor = bgfxCreateUniform( "s_texColor", BGFX_UNIFORM_TYPE_INT1 )
+		m_texture  = bgfxCreateTexture2D(
+			SPRITE_TEXTURE_SIZE,
+			SPRITE_TEXTURE_SIZE,
+			False,
+			1,
+			BGFX_TEXTURE_FORMAT_BGRA8 )
+
+		Local vertices    :DataBuffer[ Mesh.Count ]
+		Local indices     :DataBuffer[ Mesh.Count ]
+		Local stride      :Int = DebugShapeVertex.ms_decl.GetStride()
+
+		Local startVertex :Int = 0
+		Local startIndex  :Int = 0
+
+		For Local mesh:Int = 0 Until 4
+
+			Local id:Int = Mesh.Sphere0 + mesh
+
+			Local tess        :Int = 3 - mesh
+			Local numVertices :Int = GenSphere( tess )
+			Local numIndices  :Int = numVertices
+
+			' vertices[ id ] = BX_ALLOC(m_allocator, numVertices*stride);
+			' bx::memSet(vertices[id], 0, numVertices*stride);
+			vertices[ id ] = New DataBuffer( numVertices * stride )
+			bxMemSet( vertices[ id ], 0, numVertices * stride )
+
+			GenSphere( tess, vertices[ id ], stride )
+
+			' uint16_t* trilist = (uint16_t*)BX_ALLOC(m_allocator, numIndices*sizeof(uint16_t) );
+			Local trilist := New DataBuffer( numIndices * SHORT_SIZE )
+			Local address :Int = 0
+			For Local ii:Int = 0 Until numIndices
+				trilist.PokeShort( address, ii ) ; address += 2
+			Next
+
+			Local numLineListIndices:Int = bgfxTopologyConvert(
+				BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST,
+				Null,
+				0,
+				trilist,
+				numIndices,
+				False )
+
+			' indices[id] = (uint16_t*)BX_ALLOC(m_allocator, (numIndices + numLineListIndices)*sizeof(uint16_t) );
+			indices[ id ] = New DataBuffer( (numIndices + numLineListIndices) * SHORT_SIZE )
+			Local indicesOut := indices[ id ]
+			' bxMemCopy(indicesOut, trilist, numIndices*sizeof(uint16_t) );
+			trilist.CopyBytes( 0, indicesOut, 0, numIndices * SHORT_SIZE )
+
+			bgfxTopologyConvert(
+				BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST,
+				indicesOut,
+				numIndices * SHORT_SIZE,
+				numLineListIndices * SHORT_SIZE,
+				trilist,
+				0,
+				numIndices,
+				False )
+
+			m_mesh[ id ] = New Mesh()
+			m_mesh[ id ].m_startVertex     = startVertex
+			m_mesh[ id ].m_numVertices     = numVertices
+			m_mesh[ id ].m_startIndex[ 0 ] = startIndex
+			m_mesh[ id ].m_numIndices[ 0 ] = numIndices
+			m_mesh[ id ].m_startIndex[ 1 ] = startIndex + numIndices
+			m_mesh[ id ].m_numIndices[ 1 ] = numLineListIndices
+
+			startVertex += numVertices
+			startIndex  += numIndices + numLineListIndices
+
+			' BX_FREE(m_allocator, trilist);
+			trilist.Discard()
+		Next
+
+		For Local mesh:Int = 0 Until 4
+
+			Local id                 :Int = Mesh.Cone0 + mesh 
+
+			Local num                :Int = GetCircleLod( mesh )
+			Local angleStep          :Float = TWOPI / num
+
+			Local numVertices        :Int = num + 1
+			Local numIndices         :Int = num * 6
+			Local numLineListIndices :Int = num * 4
+
+			' vertices[id] = BX_ALLOC(m_allocator, numVertices*stride);
+			vertices[ id ] = New DataBuffer( numVertices * stride )
+			' indices[id]  = (uint16_t*)BX_ALLOC(m_allocator, (numIndices + numLineListIndices)*sizeof(uint16_t) );
+			indices[ id ]  = New DataBuffer( (numIndices + numLineListIndices) * SHORT_SIZE )
+			bxMemSet( indices[ id ], 0, (numIndices + numLineListIndices) * SHORT_SIZE )
+
+			' DebugShapeVertex* vertex = (DebugShapeVertex*)vertices[id];
+			' uint16_t* index = indices[id];
+			Local vertex  := vertices[ id ]
+			Local index   := indices[ id ]
+			Local address :Int = num * DebugShapeVertex.TOTAL_SIZE
+
+			vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, 0.0 )
+			vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, 0.0 ) ; address += 4
+			vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, 0.0 ) ; address += 4
+			vertex.PokeByte( address + DebugShapeVertex.X_ADDRESS, 1 )
+
+			For Local ii:Int = 0 Until num
+
+				Local angle :Float = angleStep * ii
+				Local xy    :Float[ 2 ]
+
+				Circle( xy, angle )
+
+				address = ii * DebugShapeVertex.TOTAL_SIZE
+				vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, xy[ 1 ] )
+				vertex.PokeFloat( address + DebugShapeVertex.Y_ADDRESS, 0.0     )
+				vertex.PokeFloat( address + DebugShapeVertex.Z_ADDRESS, xy[ 0 ] )
+				vertex.PokeByte( address + DebugShapeVertex.INDICES0_ADDRESS, 0 )
+
+				index.PokeShort( 2 * (ii * 3 + 0), num )
+				index.PokeShort( 2 * (ii * 3 + 1), (ii + 1) Mod num )
+				index.PokeShort( 2 * (ii * 3 + 2), ii )
+
+				index.PokeShort( 2 * (num * 3 + ii * 3 + 0), 0 )
+				index.PokeShort( 2 * (num * 3 + ii * 3 + 1), ii )
+				index.PokeShort( 2 * (num * 3 + ii * 3 + 2), (ii + 1) Mod num )
+
+				index.PokeShort( 2 * (numIndices + ii * 2 + 0), ii  )
+				index.PokeShort( 2 * (numIndices + ii * 2 + 1), num )
+
+				index.PokeShort( 2 * (numIndices + num * 2 + ii * 2 + 0), ii )
+				index.PokeShort( 2 * (numIndices + num * 2 + ii * 2 + 1), (ii + 1) Mod num )
+			Next
+
+			m_mesh[ id ] = New Mesh()
+			m_mesh[ id ].m_startVertex     = startVertex
+			m_mesh[ id ].m_numVertices     = numVertices
+			m_mesh[ id ].m_startIndex[ 0 ] = startIndex
+			m_mesh[ id ].m_numIndices[ 0 ] = numIndices
+			m_mesh[ id ].m_startIndex[ 1 ] = startIndex + numIndices
+			m_mesh[ id ].m_numIndices[ 1 ] = numLineListIndices
+
+			startVertex += numVertices
+			startIndex  += numIndices + numLineListIndices
+		Next
+
+		For Local mesh:Int = 0 Until 4
+
+			Local id                 :Int = Mesh.Cylinder0 + mesh
+
+			Local num                :Int = GetCircleLod( mesh )
+			Local angleStep          :Float = TWOPI / num
+
+			Local numVertices        :Int = num * 2
+			Local numIndices         :Int = num * 12
+			Local numLineListIndices :Int = num * 6
+
+			' vertices[id] = BX_ALLOC(m_allocator, numVertices*stride);
+			vertices[ id ] = New DataBuffer( numVertices * stride )
+			' indices[id]  = (uint16_t*)BX_ALLOC(m_allocator, (numIndices + numLineListIndices)*sizeof(uint16_t) );
+			indices[ id ]  = New DataBuffer( (numIndices + numLineListIndices) * SHORT_SIZE )
+			bxMemSet( indices[ id ], 0, (numIndices + numLineListIndices) * SHORT_SIZE )
+
+			Local vertex  := vertices[ id ]
+			Local index   := indices[ id ]
+			Local address :Int
+
+			For Local ii:Int = 0 Until num
+
+				Local angle :Float = angleStep * ii
+				Local xy    :Float[ 2 ]
+
+				Circle( xy, angle )
+
+				address = ii * DebugShapeVertex.TOTAL_SIZE
+				vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, xy[ 1 ] )
+				vertex.PokeFloat( address + DebugShapeVertex.Y_ADDRESS, 0.0     )
+				vertex.PokeFloat( address + DebugShapeVertex.Z_ADDRESS, xy[ 0 ] )
+				vertex.PokeByte( address + DebugShapeVertex.INDICES0_ADDRESS, 0 )
+
+				address = (ii + num) * DebugShapeVertex.TOTAL_SIZE
+				vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, xy[ 1 ] )
+				vertex.PokeFloat( address + DebugShapeVertex.Y_ADDRESS, 0.0     )
+				vertex.PokeFloat( address + DebugShapeVertex.Z_ADDRESS, xy[ 0 ] )
+				vertex.PokeByte( address + DebugShapeVertex.INDICES0_ADDRESS, 1 )
+
+				index.PokeShort( 2 * (ii * 6 + 0), ii + num )
+				index.PokeShort( 2 * (ii * 6 + 1), (ii + 1) Mod num )
+				index.PokeShort( 2 * (ii * 6 + 2), ii )
+				index.PokeShort( 2 * (ii * 6 + 3), ii + num )
+				index.PokeShort( 2 * (ii * 6 + 4), ((ii + 1) Mod num) + num )
+				index.PokeShort( 2 * (ii * 6 + 5), (ii + 1) Mod num )
+
+				index.PokeShort( 2 * (num * 6 + ii * 6 + 0), 0 )
+				index.PokeShort( 2 * (num * 6 + ii * 6 + 1), ii )
+				index.PokeShort( 2 * (num * 6 + ii * 6 + 2), (ii + 1) Mod num )
+				index.PokeShort( 2 * (num * 6 + ii * 6 + 3), num )
+				index.PokeShort( 2 * (num * 6 + ii * 6 + 4), (ii + 1) Mod num + num )
+				index.PokeShort( 2 * (num * 6 + ii * 6 + 5), ii + num )
+
+				index.PokeShort( 2 * (numIndices + ii * 2 + 0), ii )
+				index.PokeShort( 2 * (numIndices + ii * 2 + 1), ii + num )
+
+				index.PokeShort( 2 * (numIndices + num * 2 + ii * 2 + 0), ii);
+				index.PokeShort( 2 * (numIndices + num * 2 + ii * 2 + 1), (ii + 1) Mod num )
+
+				index.PokeShort( 2 * (numIndices + num * 4 + ii * 2 + 0), num + ii )
+				index.PokeShort( 2 * (numIndices + num * 4 + ii * 2 + 1), num + (ii + 1) Mod num )
+			Next
+
+			m_mesh[ id ] = New Mesh()
+			m_mesh[ id ].m_startVertex     = startVertex
+			m_mesh[ id ].m_numVertices     = numVertices
+			m_mesh[ id ].m_startIndex[ 0 ] = startIndex
+			m_mesh[ id ].m_numIndices[ 0 ] = numIndices
+			m_mesh[ id ].m_startIndex[ 1 ] = startIndex + numIndices
+			m_mesh[ id ].m_numIndices[ 1 ] = numLineListIndices
+
+			startVertex += numVertices
+			startIndex  += numIndices + numLineListIndices
+		Next
+
+		For Local mesh:Int = 0 Until 4
+
+			Local id                 :Int = Mesh.Capsule0 + mesh
+
+			Local num                :Int = GetCircleLod( mesh )
+			Local angleStep          :Float = TWOPI / num
+
+			Local numVertices        :Int = num * 2
+			Local numIndices         :Int = num * 6
+			Local numLineListIndices :Int = num * 6
+
+			' vertices[id] = BX_ALLOC(m_allocator, numVertices*stride);
+			vertices[ id ] = New DataBuffer( numVertices * stride )
+			' indices[id]  = (uint16_t*)BX_ALLOC(m_allocator, (numIndices + numLineListIndices)*sizeof(uint16_t) );
+			indices[ id ]  = New DataBuffer( (numIndices + numLineListIndices) * SHORT_SIZE )
+			bxMemSet( indices[ id ], 0, (numIndices + numLineListIndices) * SHORT_SIZE )
+
+			Local vertex  := vertices[ id ]
+			Local index   := indices[ id ]
+			Local address :Int = 0
+
+			For Local ii:Int = 0 Until num
+
+				Local angle :Float = angleStep * ii
+				Local xy    :Float[ 2 ]
+
+				Circle( xy, angle )
+
+				address = ii * DebugShapeVertex.TOTAL_SIZE
+				vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, xy[ 1 ] )
+				vertex.PokeFloat( address + DebugShapeVertex.Y_ADDRESS, 0.0     )
+				vertex.PokeFloat( address + DebugShapeVertex.Z_ADDRESS, xy[ 0 ] )
+				vertex.PokeByte( address + DebugShapeVertex.INDICES0_ADDRESS, 0 )
+
+				address = (ii + num) * DebugShapeVertex.TOTAL_SIZE
+				vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, xy[ 1 ] )
+				vertex.PokeFloat( address + DebugShapeVertex.Y_ADDRESS, 0.0     )
+				vertex.PokeFloat( address + DebugShapeVertex.Z_ADDRESS, xy[ 0 ] )
+				vertex.PokeByte( address + DebugShapeVertex.INDICES0_ADDRESS, 1 )
+
+				index.PokeShort( 2 * (ii * 6 + 0), ii + num )
+				index.PokeShort( 2 * (ii * 6 + 1), (ii + 1) Mod num )
+				index.PokeShort( 2 * (ii * 6 + 2), ii )
+				index.PokeShort( 2 * (ii * 6 + 3), ii + num )
+				index.PokeShort( 2 * (ii * 6 + 4), (ii + 1) Mod num + num )
+				index.PokeShort( 2 * (ii * 6 + 5), (ii + 1) Mod num )
+
+'  				index.PokeShort( 2 * (num * 6 + ii * 6 + 0), 0 )
+'  				index.PokeShort( 2 * (num * 6 + ii * 6 + 1), ii )
+'  				index.PokeShort( 2 * (num * 6 + ii * 6 + 2), (ii + 1) Mod num )
+'  				index.PokeShort( 2 * (num * 6 + ii * 6 + 3), num )
+'  				index.PokeShort( 2 * (num * 6 + ii * 6 + 4), ((ii + 1) Mod num) + num )
+'  				index.PokeShort( 2 * (num * 6 + ii * 6 + 5), ii + num )
+
+				index.PokeShort( 2 * (numIndices + ii * 2 + 0), ii )
+				index.PokeShort( 2 * (numIndices + ii * 2 + 1), ii + num)
+
+				index.PokeShort( 2 * (numIndices + num * 2 + ii * 2 + 0), ii )
+				index.PokeShort( 2 * (numIndices + num * 2 + ii * 2 + 1), (ii + 1) Mod num )
+
+				index.PokeShort( 2 * (numIndices + num * 4 + ii * 2 + 0), num + ii )
+				index.PokeShort( 2 * (numIndices + num * 4 + ii * 2 + 1), num + (ii + 1) Mod num )
+			Next
+
+			m_mesh[ id ] = New Mesh()
+			m_mesh[ id ].m_startVertex     = startVertex
+			m_mesh[ id ].m_numVertices     = numVertices
+			m_mesh[ id ].m_startIndex[ 0 ] = startIndex
+			m_mesh[ id ].m_numIndices[ 0 ] = numIndices
+			m_mesh[ id ].m_startIndex[ 1 ] = startIndex + numIndices
+			m_mesh[ id ].m_numIndices[ 1 ] = numLineListIndices
+
+			startVertex += numVertices
+			startIndex  += numIndices + numLineListIndices
+		Next
+
+		m_mesh[ Mesh.Quad ] = New Mesh()
+		m_mesh[ Mesh.Quad ].m_startVertex     = startVertex
+		m_mesh[ Mesh.Quad ].m_numVertices     = s_quadVertices.Length()
+		m_mesh[ Mesh.Quad ].m_startIndex[ 0 ] = startIndex
+		m_mesh[ Mesh.Quad ].m_numIndices[ 0 ] = s_quadIndices.Length()
+		m_mesh[ Mesh.Quad ].m_startIndex[ 1 ] = 0
+		m_mesh[ Mesh.Quad ].m_numIndices[ 1 ] = 0
+		startVertex += s_quadVertices.Length()
+		startIndex  += s_quadIndices.Length()
+
+		m_mesh[ Mesh.Cube ] = New Mesh()
+		m_mesh[ Mesh.Cube ].m_startVertex     = startVertex
+		m_mesh[ Mesh.Cube ].m_numVertices     = s_cubeVertices.Length()
+		m_mesh[ Mesh.Cube ].m_startIndex[ 0 ] = startIndex
+		m_mesh[ Mesh.Cube ].m_numIndices[ 0 ] = s_cubeIndices.Length()
+		m_mesh[ Mesh.Cube ].m_startIndex[ 1 ] = 0
+		m_mesh[ Mesh.Cube ].m_numIndices[ 1 ] = 0
+		startVertex += m_mesh[ Mesh.Cube ].m_numVertices
+		startIndex  += m_mesh[ Mesh.Cube ].m_numIndices[ 0 ]
+
+		' const bgfx::Memory* vb = bgfx::alloc(startVertex*stride);
+		' const bgfx::Memory* ib = bgfx::alloc(startIndex*sizeof(uint16_t) );
+		Local vb := New DataBuffer( startVertex * stride )
+		Local ib := New DataBuffer( startIndex * SHORT_SIZE )
+
+		For Local mesh:Int = Mesh.Sphere0 Until Mesh.Quad
+
+			Local id:Int = mesh
+
+'  			bx::memCopy(&vb->data[m_mesh[id].m_startVertex * stride]
+'  				 , vertices[id]
+'  				 , m_mesh[id].m_numVertices*stride );
+			vertices[ id ].CopyBytes(
+				0,
+				vb,
+				m_mesh[ id ].m_startVertex * stride,
+				m_mesh[ id ].m_numVertices * stride )
+
+'  			bx::memCopy(&ib->data[m_mesh[id].m_startIndex[0] * sizeof(uint16_t)]
+'  				 , indices[id]
+'  				 , (m_mesh[id].m_numIndices[0]+m_mesh[id].m_numIndices[1])*sizeof(uint16_t) );
+			indices[ id ].CopyBytes(
+				0,
+				ib,
+				m_mesh[ id ].m_startIndex[ 0 ] * SHORT_SIZE,
+				(m_mesh[ id ].m_numIndices[ 0 ] + m_mesh[ id ].m_numIndices[ 1 ]) * stride )
+
+'  			BX_FREE(m_allocator, vertices[id]);
+'  			BX_FREE(m_allocator, indices[id]);
+			vertices[ id ].Discard()
+			indices[ id ].Discard()
+		Next
+
+'  		bx::memCopy(&vb->data[m_mesh[Mesh::Quad].m_startVertex * stride]
+'  			, s_quadVertices
+'  			, sizeof(s_quadVertices) );
+		Local quadVerticesDb := DebugShapeVertex.ToDataBuffer( s_quadVertices )
+		quadVerticesDb.CopyBytes(
+			0,
+			vb,
+			m_mesh[ Mesh.Quad ].m_startVertex * stride,
+			quadVerticesDb.Length() )
+		quadVerticesDb.Discard()
+
+'  		bx::memCopy(&ib->data[m_mesh[Mesh::Quad].m_startIndex[0] * sizeof(uint16_t)]
+'  			, s_quadIndices
+'  			, sizeof(s_quadIndices) );
+		Local quadIndicesDb := ShortsToDataBuffer( s_quadIndices )
+		quadIndicesDb.CopyBytes(
+			0,
+			ib,
+			m_mesh[ Mesh.Quad ].m_startIndex[ 0 ] * SHORT_SIZE,
+			quadIndicesDb.Length() )
+		quadIndicesDb.Discard()
+
+'  		bx::memCopy(&vb->data[m_mesh[Mesh::Cube].m_startVertex * stride]
+'  			, s_cubeVertices
+'  			, sizeof(s_cubeVertices) );
+		Local cubeVerticesDb := DebugShapeVertex.ToDataBuffer( s_cubeVertices )
+		cubeVerticesDb.CopyBytes(
+			0,
+			vb,
+			m_mesh[ Mesh.Cube ].m_startVertex * stride,
+			cubeVerticesDb.Length() )
+		cubeVerticesDb.Discard()
+
+'  		bx::memCopy(&ib->data[m_mesh[Mesh::Cube].m_startIndex[0] * sizeof(uint16_t)]
+'  			, s_cubeIndices
+'  			, sizeof(s_cubeIndices) );
+		Local cubeIndicesDb := ShortsToDataBuffer( s_cubeIndices )
+		cubeIndicesDb.CopyBytes(
+			0,
+			ib,
+			m_mesh[ Mesh.Cube ].m_startIndex[ 0 ] * stride,
+			cubeIndicesDb.Length() )
+		cubeIndicesDb.Discard()
+
+		m_vbh = bgfxCreateVertexBuffer( bgfxUtilsMakeRef( vb ), DebugShapeVertex.ms_decl )
+		m_ibh = bgfxCreateIndexBuffer( bgfxUtilsMakeRef( ib ) )
+	End
+
+	Method Shutdown:Void()
+
+		bgfxDestroyIndexBuffer( m_ibh )
+		bgfxDestroyVertexBuffer( m_vbh )
+
+		For Local ii:Int = 0 Until Program.Count
+			bgfxDestroyProgram( m_program[ ii ] )
+		Next
+
+		bgfxDestroyUniform( u_params )
+		bgfxDestroyUniform( s_texColor )
+		bgfxDestroyTexture( m_texture )
+	End
+
+	'SpriteHandle createSprite(uint16_t _width, uint16_t _height, const void* _data)
+	Method CreateSprite:Int( _width:Int, _height:Int, _data:DataBuffer )
+
+		' SpriteHandle handle = m_sprite.create(_width, _height);
+		Local handle:Int = m_sprite.Create( _width, _height )
+
+		If SpriteHandleIsValid( handle ) Then
+
+			Local pack:Pack2D = m_sprite.Get( handle )
+
+			bgfxUpdateTexture2D(
+				m_texture,
+				0,
+				0,
+				pack.m_x,
+				pack.m_y,
+				pack.m_width,
+				pack.m_height,
+				bgfxUtilsCopy( _data, pack.m_width * pack.m_height * 4 ) )
+		Endif
+
+		Return handle
+	End
+
+	Method DestroySprite:Void( _handle:Int )
+		m_sprite.Destroy( _handle )
+	End
+
+	' GeometryHandle createGeometry(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices, const void* _indices, bool _index32)
+	Method CreateGeometry:Int( _numVertices:Int, _vertices:DdVertex[], _numIndices:Int, _indices:Int[], _index32:Bool )
+		Return m_geometry.Create( _numVertices, _vertices, _numIndices, _indices, _index32 )
+	End
+
+	Method DestroyGeometry:Void( _handle:Int )
+		m_geometry.Destroy( _handle )
+	End
+End
+
+Global s_dds := New DebugDrawShared()
+
+Class MatrixStack
+
+	Method Reset:Void()
+		mtx     = 0
+		num     = 1
+		hasData = False
+	End
+
+	Field mtx     :Int
+	Field num     :Int
+
+	Field hasData :Bool
+	Field data    :Float[ 8 * 16 ]
+End
+
+Function BX_CHECK:Void( _condition:Bool, _format:String="" )
+	If Not _condition Then
+		Print "CHECK " + _format
+		DebugStop()
+	Endif
+End
+
+Class DebugDrawEncoderImpl
+
+	Const kCacheSize     :Int = 1024
+	Const kStackSize     :Int = 16
+	Const kCacheQuadSize :Int = 1024
+	' BX_STATIC_ASSERT(kCacheSize >= 3, "Cache must be at least 3 elements.");
+
+	' DebugVertex   m_cache[kCacheSize+1];
+	' DebugUvVertex m_cacheQuad[kCacheQuadSize];
+	Field m_cache     :DebugVertex[ kCacheSize + 1 ]
+	Field m_cacheQuad :DebugUvVertex[ kCacheQuadSize ]
+
+	' uint16_t m_indices[kCacheSize*2];
+	' Field m_indices   := New DataBuffer( kCacheSize * 2 )
+	Field m_indices   :Int[ kCacheSize * 2 ]
+
+	' uint16_t m_pos;
+	' uint16_t m_posQuad;
+	' uint16_t m_indexPos;
+	' uint16_t m_vertexPos;
+	' uint32_t m_mtxStackCurrent;
+	Field m_pos             :Int
+	Field m_posQuad         :Int
+	Field m_indexPos        :Int
+	Field m_vertexPos       :Int
+	Field m_mtxStackCurrent :Int
+
+	' MatrixStack m_mtxStack[32];
+	Field m_mtxStack:MatrixStack[ 32 ]
+
+	' bgfx::ViewId m_viewId;
+	' uint8_t m_stack;
+	' bool    m_depthTestLess;
+	Field m_viewId        :Int
+	Field m_stack         :Int
+	Field m_depthTestLess :Bool
+
+	' Attrib m_attrib[kStackSize];
+	Field m_attrib:Attrib[ kStackSize ]
+
+	' State::Enum m_state;
+	Field m_state:Int
+
+	' bgfx::Encoder* m_encoder;
+	' bgfx::Encoder* m_defaultEncoder;
+	Field m_encoder        :BgfxEncoder
+	Field m_defaultEncoder :BgfxEncoder
+
+	Method New()
+
+		m_depthTestLess = True
+		m_state = STATE_COUNT
+		m_defaultEncoder = Null
+
+		For Local ii:Int = 0 Until m_cache.Length()
+			m_cache[ ii ] = New DebugVertex()
+		Next
+
+		For Local ii:Int = 0 Until m_cacheQuad.Length()
+			m_cacheQuad[ ii ] = New DebugUvVertex()
+		Next
+
+		For Local ii:Int = 0 Until m_mtxStack.Length()
+			m_mtxStack[ ii ] = New MatrixStack()
+		Next
+
+		For Local ii:Int = 0 Until m_attrib.Length()
+			m_attrib[ ii ] = New Attrib()
+		Next
+	End
+
+	Method Init:Void( _encoder:BgfxEncoder )
+		m_defaultEncoder = _encoder
+	End
+
+	Method Shutdown:Void()
+	End
+
+	Method Begin:Void( _viewId:Int, _depthTestLess:Bool, _encoder:BgfxEncoder=Null )
+
+		BX_CHECK( STATE_COUNT = m_state )
+
+		m_viewId        = _viewId
+		m_encoder       = _encoder ; If Not _encoder Then m_encoder = m_defaultEncoder
+		m_state         = STATE_NONE
+		m_stack         = 0
+		m_depthTestLess = _depthTestLess
+
+		m_pos       = 0
+		m_indexPos  = 0
+		m_vertexPos = 0
+		m_posQuad   = 0
+
+		Local attrib := m_attrib[ 0 ]
+
+		Clear64( attrib.m_state )
+		Or64( attrib.m_state, BGFX_STATE_WRITE_RGB )
+		If m_depthTestLess Then
+			Or64( attrib.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+		Else
+			Or64( attrib.m_state, BGFX_STATE_DEPTH_TEST_GREATER )
+		Endif
+		Or64( attrib.m_state, BGFX_STATE_CULL_CW )
+		Or64( attrib.m_state, BGFX_STATE_WRITE_Z )
+
+		attrib.m_scale     = 1.0
+		attrib.m_spin      = 0.0
+		attrib.m_offset    = 0.0
+		attrib.m_abgr      = $ffffffff ' UINT32_MAX
+		attrib.m_stipple   = False
+		attrib.m_wireframe = False
+		attrib.m_lod       = 0
+
+		m_mtxStackCurrent = 0
+		m_mtxStack[ m_mtxStackCurrent ].Reset()
+	End
+
+	' void end()
+	Method Finish:Void()
+
+		BX_CHECK( 0 = m_stack, "Invalid stack " + m_stack + "." )
+
+		FlushQuad()
+		Flush()
+
+		m_encoder = Null
+		m_state   = STATE_COUNT
+	End
+
+	Method Push:Void()
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		m_stack += 1
+		m_attrib[ m_stack -1 ].CopyTo( m_attrib[ m_stack ] )
+	End
+
+	Method Pop:Void()
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		Local curr := m_attrib[ m_stack    ]
+		Local prev := m_attrib[ m_stack -1 ]
+
+		If curr.m_stipple <> prev.m_stipple Or Not Equals64( curr.m_state, prev.m_state ) Then
+			Flush()
+		Endif
+
+		m_stack -= 1
+	End
+
+	Method SetDepthTestLess:Void( _depthTestLess:Bool )
+
+		BX_CHECK( STATE_COUNT <> m_state )
+		
+		If m_depthTestLess <> _depthTestLess Then
+
+			m_depthTestLess = _depthTestLess
+			Local attrib := m_attrib[ m_stack ]
+
+			Local state:Int[ 2 ]
+
+			Set64( state, attrib.m_state )
+			And64( state, BGFX_STATE_DEPTH_TEST_MASK )
+
+			If Not IsZero64( state ) Then
+
+				Flush()
+
+				Set64( state, BGFX_STATE_DEPTH_TEST_MASK )
+				Xor64( state )
+				And64( attrib.m_state, state )
+				
+				If _depthTestLess Then
+					Or64( attrib.m_state, BGFX_STATE_DEPTH_TEST_LESS )
+				Else
+					Or64( attrib.m_state, BGFX_STATE_DEPTH_TEST_GREATER )
+				Endif
+			Endif
+
+		Endif
+	End
+
+	Field m_transform := New BgfxTransform()
+
+	Method SetTransform:Void( _mtx:Float[]=[], _num:Int = 1, _flush:Bool = True )
+
+		' BX_CHECK(State::Count != m_state);
+		If Not (STATE_COUNT <> m_state) Then DebugStop()
+
+		If _flush Then
+			Flush()
+		Endif
+
+		Local mtxStack := m_mtxStack[ m_mtxStackCurrent ]
+
+		If Not _mtx Then
+		' If _mtx = [] Then
+			mtxStack.Reset()
+			Return
+		Endif
+
+'
+' @Cleanup: not sure how to transform this code:
+'
+		' Local transform:BgfxTransform
+		' mtxStack.mtx  = m_encoder->allocTransform(&transform, _num)
+		' mtxStack.num  = _num;
+		' mtxStack.data = transform.data;
+		' bx::memCopy(transform.data, _mtx, _num*64);
+
+		mtxStack.mtx  = bgfxEncoderAllocTransform( m_encoder, m_transform, _num )
+		mtxStack.num  = _num
+
+		mtxStack.hasData = True
+
+		' Local address:Int = 0
+		' For Local ii:Int = 0 Until 16
+		'	mtxStack.data[ ii ] = m_transform.PeekFloat( address ) ; address += 4
+		' Next
+
+		' bxMemCopy( m_transform.Data(), _mtx, _num * 64 )
+		Local address:Int = 0
+		For Local ii:Int = 0 Until _num * 16
+			m_transform.PokeFloat( address, _mtx[ ii ] ) ; address += 4
+			mtxStack.data[ ii ] = _mtx[ ii ]
+		Next
+	End
+
+	Method SetTranslate:Void( _x:Float, _y:Float, _z:Float )
+		Local mtx:Float[ 16 ]
+		bxMtxTranslate( mtx, _x, _y, _z )
+		SetTransform( mtx )
+	End
+
+	Method SetTranslate:Void( _pos:Float[] )
+		SetTranslate( _pos[ 0 ], _pos[ 1 ], _pos[ 2 ] )
+	End
+
+	Method PushTransform:Void( _mtx:Float[], _num:Int, _flush:Bool = True )
+
+		BX_CHECK( m_mtxStackCurrent < m_mtxStack.Length(), "Out of matrix stack!" )
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		If _flush Then
+			Flush()
+		Endif
+
+'  		Local float* mtx = NULL;
+'  
+'  		const MatrixStack& stack = m_mtxStack[m_mtxStackCurrent];
+'  
+'  		if (NULL == stack.data)
+'  		{
+'  			mtx = (float*)_mtx;
+'  		}
+'  		else
+'  		{
+'  			mtx = (float*)alloca(_num*64);
+'  			for (uint16_t ii = 0; ii < _num; ++ii)
+'  			{
+'  				const float* mtxTransform = (const float*)_mtx;
+'  				bx::mtxMul(&mtx[ii*16], &mtxTransform[ii*16], stack.data);
+'  			}
+'  		}
+'  
+'  		m_mtxStackCurrent++;
+
+		Local mtxStack:MatrixStack = m_mtxStack[ m_mtxStackCurrent ]
+
+		If Not mtxStack.hasData Then
+
+			m_mtxStackCurrent += 1
+			SetTransform( _mtx, _num, _flush )
+		Else
+
+			Local mtx:Float[ _num * 16 ]
+
+			Local matrixResult :Float[ 16 ]
+			Local mtxTransform :Float[ 16 ]
+
+			For Local ii:Int = 0 Until _num
+
+				For Local jj:Int = 0 Until 16
+					mtxTransform[ jj ] = _mtx[ ii * 16 + jj ]
+				Next
+
+				bxMtxMul( matrixResult, mtxTransform, mtxStack.data )
+
+				For Local jj:Int = 0 Until 16
+					mtx[ ii * 16 + jj ] = matrixResult[ jj ]
+				Next
+			Next
+
+			m_mtxStackCurrent += 1
+			SetTransform( mtx, _num, _flush )
+		Endif
+	End
+
+	Method PopTransform:Void( _flush:Bool = True )
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		If _flush Then
+			Flush()
+		Endif
+
+		m_mtxStackCurrent -= 1
+	End
+
+	Method PushTranslate:Void( _x:Float, _y:Float, _z:Float )
+		Local mtx:Float[ 16 ]
+		bxMtxTranslate( mtx, _x, _y, _z )
+		PushTransform( mtx, 1 )
+	End
+
+	Method PushTranslate:Void( _pos:Float[] )
+		PushTranslate( _pos[ 0 ], _pos[ 1 ], _pos[ 2 ] )
+	End
+
+	Method SetState:Void( _depthTest:Bool, _depthWrite:Bool, _clockwise:Bool )
+
+		Local mask  :Int[ 2 ]
+		Local state :Int[ 2 ] 
+
+		Clear64( mask )
+		Or64( mask, BGFX_STATE_DEPTH_TEST_MASK )
+		Or64( mask, BGFX_STATE_WRITE_Z )
+		Or64( mask, BGFX_STATE_CULL_CW )
+		Or64( mask, BGFX_STATE_CULL_CCW )
+		Xor64( mask )
+
+		Set64( state, m_attrib[ m_stack ].m_state )
+		And64( state, mask )
+
+		If _depthTest Then
+			If m_depthTestLess Then
+				Or64( state, BGFX_STATE_DEPTH_TEST_LESS )
+			Else
+				Or64( state, BGFX_STATE_DEPTH_TEST_GREATER )
+			Endif
+		Endif
+			
+		If _depthWrite Then
+			Or64( state, BGFX_STATE_WRITE_Z )
+		Endif
+
+		If _clockwise Then
+			Or64( state, BGFX_STATE_CULL_CW )
+		Else
+			Or64( state, BGFX_STATE_CULL_CCW )
+		Endif
+
+		If Not Equals64( m_attrib[ m_stack ].m_state, state ) Then
+			Flush()
+		Endif
+
+		Set64( m_attrib[ m_stack ].m_state, state )
+	End
+
+	Method SetColor:Void( _abgr:Int )
+		BX_CHECK( STATE_COUNT <> m_state )
+		m_attrib[ m_stack ].m_abgr = _abgr
+	End
+
+	Method SetLod:Void( _lod:Int )
+		BX_CHECK( STATE_COUNT <> m_state )
+		m_attrib[ m_stack ].m_lod = _lod
+	End
+
+	Method SetWireframe:Void( _wireframe:Bool )
+		BX_CHECK( STATE_COUNT <> m_state )
+		m_attrib[ m_stack ].m_wireframe = _wireframe
+	End
+
+	Method SetStipple:Void( _stipple:Bool, _scale:Float = 1.0, _offset:Float = 0.0 )
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		Local attrib := m_attrib[ m_stack ]
+
+		If attrib.m_stipple <> _stipple Then
+			Flush()
+		Endif
+
+		attrib.m_stipple = _stipple
+		attrib.m_offset  = _offset
+		attrib.m_scale   = _scale
+	End
+
+	Method SetSpin:Void( _spin:Float )
+		Local attrib := m_attrib[ m_stack ]
+		attrib.m_spin = _spin
+	End
+
+	Method MoveTo:Void( _x:Float, _y:Float, _z:Float = 0.0 )
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		SoftFlush()
+
+		m_state = STATE_MOVE_TO
+
+		Local vertex := m_cache[ m_pos ]
+		vertex.m_x = _x
+		vertex.m_y = _y
+		vertex.m_z = _z
+
+		Local attrib := m_attrib[ m_stack ]
+		vertex.m_abgr = attrib.m_abgr
+		vertex.m_len  = attrib.m_offset
+
+		m_vertexPos = m_pos
+	End
+
+	Method MoveTo:Void( _pos:Float[] )
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		' const float* pos = (const float*)_pos;
+		MoveTo( _pos[ 0 ], _pos[ 1 ], _pos[ 2 ] )
+	End
+
+	Method MoveTo:Void( _axis:Int, _x:Float, _y:Float )
+		Local pos:Float[ 3 ]
+		GetPoint( pos, _axis, _x, _y )
+		MoveTo( pos )
+	End
+
+	Method LineTo:Void( _x:Float, _y:Float, _z:Float = 0.0 )
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		If STATE_NONE = m_state Then
+			MoveTo( _x, _y, _z )
+			Return
+		Endif
+
+		If m_pos + 2 > m_cache.Length() Then
+
+			Local pos       :Int = m_pos
+			Local vertexPos :Int = m_vertexPos
+
+			Flush()
+
+			' bxMemCopy( m_cache[ 0 ], m_cache[ vertexPos ], DebugVertex.SIZE_IN_BYTES )
+			m_cache[ vertexPos ].CopyTo( m_cache[ 0 ] )
+			If vertexPos = pos Then
+				m_pos = 1
+			Else
+				' bxMemCopy( m_cache[ 1 ], m_cache[ pos - 1 ], DebugVertex.SIZE_IN_BYTES )
+				m_cache[ pos - 1 ].CopyTo( m_cache[ 1 ] )
+				m_pos = 2
+			Endif
+
+			m_state = STATE_LINE_TO
+
+		Else If STATE_MOVE_TO = m_state Then
+
+			m_pos += 1
+			m_state = STATE_LINE_TO
+		Endif
+
+		Local prev   :Int = m_pos - 1
+		Local curr   :Int = m_pos ; m_pos += 1
+		Local vertex := m_cache[ curr ]
+
+		vertex.m_x = _x
+		vertex.m_y = _y
+		vertex.m_z = _z
+
+		Local attrib := m_attrib[ m_stack ]
+
+		vertex.m_abgr = attrib.m_abgr
+		vertex.m_len  = attrib.m_offset
+
+		Local tmp:Float[ 3 ]
+		bxVec3Sub( tmp, vertex.ToArray(), m_cache[ prev ].ToArray() )
+		Local len:Float = bxVec3Length(tmp) * attrib.m_scale;
+		vertex.m_len = m_cache[prev].m_len + len;
+
+		m_indices[ m_indexPos ] = prev ; m_indexPos += 1
+		m_indices[ m_indexPos ] = curr ; m_indexPos += 1
+	End
+
+	Method LineTo:Void( _pos:Float[] )
+		BX_CHECK( STATE_COUNT <> m_state )
+		LineTo( _pos[ 0 ], _pos[ 1 ], _pos[ 2 ] )
+	End
+
+	Method LineTo:Void( _axis:Int, _x:Float, _y:Float )
+		Local pos:Float[ 3 ];
+		GetPoint( pos, _axis, _x, _y )
+		LineTo( pos )
+	End
+
+	Method Close:Void()
+
+		BX_CHECK( STATE_COUNT <> m_state )
+
+		' DebugVertex& vertex = m_cache[m_vertexPos];
+		Local vertex := m_cache[ m_vertexPos ]
+		LineTo(vertex.m_x, vertex.m_y, vertex.m_z);
+
+		m_state = STATE_NONE
+	End
+
+	Method Draw:Void( _aabb:BoundsAabb )
+
+		Local attrib := m_attrib[ m_stack ]
+
+		If attrib.m_wireframe Then
+
+			MoveTo( _aabb.m_min[ 0 ], _aabb.m_min[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_max[ 0 ], _aabb.m_min[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_max[ 0 ], _aabb.m_max[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_min[ 0 ], _aabb.m_max[ 1 ], _aabb.m_min[ 2 ] )
+			Close()
+
+			MoveTo( _aabb.m_min[ 0 ], _aabb.m_min[ 1 ], _aabb.m_max[ 2 ] )
+			LineTo( _aabb.m_max[ 0 ], _aabb.m_min[ 1 ], _aabb.m_max[ 2 ] )
+			LineTo( _aabb.m_max[ 0 ], _aabb.m_max[ 1 ], _aabb.m_max[ 2 ] )
+			LineTo( _aabb.m_min[ 0 ], _aabb.m_max[ 1 ], _aabb.m_max[ 2 ] )
+			Close()
+
+			MoveTo( _aabb.m_min[ 0 ], _aabb.m_min[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_min[ 0 ], _aabb.m_min[ 1 ], _aabb.m_max[ 2 ] )
+
+			MoveTo( _aabb.m_max[ 0 ], _aabb.m_min[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_max[ 0 ], _aabb.m_min[ 1 ], _aabb.m_max[ 2 ] )
+
+			MoveTo( _aabb.m_min[ 0 ], _aabb.m_max[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_min[ 0 ], _aabb.m_max[ 1 ], _aabb.m_max[ 2 ] )
+
+			MoveTo( _aabb.m_max[ 0 ], _aabb.m_max[ 1 ], _aabb.m_min[ 2 ] )
+			LineTo( _aabb.m_max[ 0 ], _aabb.m_max[ 1 ], _aabb.m_max[ 2 ] )
+
+		Else
+
+			Local obb := BoundsObbPool.Allocate()
+			BoundsAabbToObb( obb, _aabb )
+			Draw( Mesh.Cube, obb.m_mtx, 1, False )
+			obb.Free()
+		End
+	End
+
+	Method Draw:Void( _cylinder:BoundsCylinder, _capsule:Bool )
+		DrawCylinder( _cylinder.m_pos, _cylinder.m_end, _cylinder.m_radius, _capsule )
+	End
+
+	Method Draw:Void( _disk:BoundsDisk )
+		DrawCircle( _disk.m_normal, _disk.m_center, _disk.m_radius, 0.0 )
+	End
+
+	Method Draw:Void( _obb:BoundsObb )
+
+		Local attrib := m_attrib[ m_stack ]
+
+		If attrib.m_wireframe Then
+
+			PushTransform( _obb.m_mtx, 1 )
+
+			MoveTo( -1.0, -1.0, -1.0 )
+			LineTo(  1.0, -1.0, -1.0 )
+			LineTo(  1.0,  1.0, -1.0 )
+			LineTo( -1.0,  1.0, -1.0 )
+			Close()
+
+			MoveTo( -1.0,  1.0,  1.0 )
+			LineTo(  1.0,  1.0,  1.0 )
+			LineTo(  1.0, -1.0,  1.0 )
+			LineTo( -1.0, -1.0,  1.0 )
+			Close()
+
+			MoveTo(  1.0, -1.0, -1.0 )
+			LineTo(  1.0, -1.0,  1.0 )
+
+			MoveTo(  1.0,  1.0, -1.0 )
+			LineTo(  1.0,  1.0,  1.0 )
+
+			MoveTo( -1.0,  1.0, -1.0 )
+			LineTo( -1.0,  1.0,  1.0 )
+
+			MoveTo( -1.0, -1.0, -1.0 )
+			LineTo( -1.0, -1.0,  1.0 )
+
+			PopTransform()
+		Else
+
+			Draw( Mesh.Cube, _obb.m_mtx, 1, False )
+		Endif
+	End
+
+	Method Draw:Void( _sphere:BoundsSphere )
+
+		Local attrib := m_attrib[ m_stack ]
+		Local mtx    :Float[ 16 ]
+
+		bxMtxSRT( mtx,
+			_sphere.m_radius,
+			_sphere.m_radius,
+			_sphere.m_radius,
+			0.0,
+			0.0,
+			0.0,
+			_sphere.m_center[ 0 ],
+			_sphere.m_center[ 1 ],
+			_sphere.m_center[ 2 ] )
+
+		Local lod:Int = attrib.m_lod
+		If attrib.m_lod > Mesh.SphereMaxLod Then lod = Mesh.SphereMaxLod
+
+		Draw( Mesh.Sphere0 + lod, mtx, 1, attrib.m_wireframe )
+	End
+
+	Method SetUParams:Void( _attrib:Attrib, _wireframe:Bool )
+
+		Local state :Int[ 2 ]
+		Local flip  :Float
+
+		Set64( state, _attrib.m_state )
+		And64( state, BGFX_STATE_CULL_CCW )
+
+		If IsZero64( state ) Then
+			flip = 1.0
+		Else
+			flip = -1.0
+		Endif
+
+		Local alpha :Int = _attrib.m_abgr Shr 24
+
+		' Local params:Float[][] = [ [
+		Local params:Float[] = [
+
+			' lightDir
+			 0.0 * flip,
+			-1.0 * flip,
+			 0.0 * flip,
+			 3.0, ' ], [ ' shininess
+
+			' skyColor
+			1.0,
+			0.9,
+			0.8,
+			0.0, ' ], [ ' unused
+
+			' groundColor.xyz0
+			0.2,
+			0.22,
+			0.5,
+			0.0, ' ], [ ' unused
+
+			' matColor
+			(( _attrib.m_abgr        ) & $ff) / 255.0,
+			(( _attrib.m_abgr Shr  8 ) & $ff) / 255.0,
+			(( _attrib.m_abgr Shr 16 ) & $ff) / 255.0,
+			(alpha) / 255.0 ] ' ]
+
+		' bxVec3Norm( params[0], params[0] )
+		bxVec3Norm( params, params )
+		' m_encoder->setUniform(s_dds.u_params, params, 4);
+		bgfxEncoderSetUniform( m_encoder, s_dds.u_params, params, 4 )
+
+'  		m_encoder->setState(0
+'  			| _attrib.m_state
+'  			| (_wireframe ? BGFX_STATE_PT_LINES | BGFX_STATE_LINEAA | BGFX_STATE_BLEND_ALPHA
+'  			: (alpha < 0xff) ? BGFX_STATE_BLEND_ALPHA : 0)
+'  			);
+'  		Local state:Int[ 2 ]
+
+		' Clear64( state )
+		' Or64( state, _attrib.m_state )
+		Set64( state, _attrib.m_state )
+
+		If _wireframe Then
+
+			Or64( state, BGFX_STATE_PT_LINES )
+			Or64( state, BGFX_STATE_LINEAA )
+			Or64( state, BGFX_STATE_BLEND_ALPHA )
+		Else ' If Not _wireframe Then
+
+			If alpha < $ff Then
+				Or64( state, BGFX_STATE_BLEND_ALPHA )
+			Endif
+		Endif
+
+		bgfxEncoderSetState( m_encoder, state )
+	End
+
+	' Method Draw:Void( _handle:GeometryHandle )
+	Method Draw:Void( _handle:Int )
+
+		' const Geometry::Geometry& geometry = s_dds.m_geometry.m_geometry[_handle.idx];
+		Local geometry := s_dds.m_geometry.m_geometry[ _handle ]
+
+		bgfxEncoderSetVertexBuffer( m_encoder, 0, geometry.m_vbh )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib    := m_attrib[ m_stack ]
+		Local wireframe :Bool = attrib.m_wireframe
+		SetUParams( attrib, wireframe )
+
+		If wireframe Then
+
+			bgfxEncoderSetIndexBuffer( m_encoder, geometry.m_ibh, geometry.m_topologyNumIndices[ 0 ], geometry.m_topologyNumIndices[ 1 ] )
+
+		Else If 0 <> geometry.m_topologyNumIndices[ 0 ] Then
+
+			bgfxEncoderSetIndexBuffer( m_encoder, geometry.m_ibh, 0, geometry.m_topologyNumIndices[0] )
+		Endif
+
+		bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+		' bgfxEncoderSetTransform( m_encoder, m_mtxStack[ m_mtxStackCurrent ].data )
+
+		' bgfx::ProgramHandle program = s_dds.m_program[wireframe ? Program::FillMesh : Program::FillLitMesh];
+		Local program:Int
+
+		If wireframe Then 
+			program = s_dds.m_program[ Program.FillMesh ]
+		Else
+			program = s_dds.m_program[ Program.FillLitMesh ]
+		Endif
+
+		bgfxEncoderSubmit( m_encoder, m_viewId, program )
+	End
+
+	' void draw(bool _lineList, uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices, const uint16_t* _indices)
+	Method Draw:Void( _lineList:Bool, _numVertices:Int, _vertices:DdVertex[], _numIndices:Int, _indices:Int[] )
+
+		Flush()
+
+		If _numVertices = bgfxGetAvailTransientVertexBuffer( _numVertices, DebugMeshVertex.ms_decl ) Then
+
+			Local tvb:BgfxTransientVertexBuffer
+			bgfxAllocTransientVertexBuffer( tvb, _numVertices, DebugMeshVertex.ms_decl )
+
+			' bxMemCopy( tvb.data, _vertices, _numVertices * DebugMeshVertex.ms_decl.m_stride )
+			Local address:Int = 0
+			For Local ii:Int = 0 Until _numVertices
+				Local vertex := _vertices[ ii ]
+				tvb.PokeFloat( address, vertex.m_x ) ; address += 4
+				tvb.PokeFloat( address, vertex.m_y ) ; address += 4
+				tvb.PokeFloat( address, vertex.m_z ) ; address += 4
+			Next
+
+			bgfxEncoderSetTransientVertexBuffer( m_encoder, 0, tvb )
+
+			' const Attrib& attrib = m_attrib[m_stack];
+			Local attrib    := m_attrib[ m_stack ]
+			Local wireframe :Bool = _lineList Or attrib.m_wireframe
+			SetUParams( attrib, wireframe )
+
+			If 0 < _numIndices Then
+
+				Local numIndices:Int = _numIndices
+				Local tib:BgfxTransientIndexBuffer
+
+				If Not _lineList And wireframe Then
+
+					Local indicesDb   := ShortsToDataBuffer( _indices )
+					Local tempDataBuf := New DataBuffer( numIndices * SHORT_SIZE )
+
+					numIndices = bgfxTopologyConvert( BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST, Null, 0, indicesDb, _numIndices, False )
+
+					bgfxAllocTransientIndexBuffer( tib, numIndices )
+
+					'
+					' TODO: need to see how bgfxTopologyConvert works
+					'
+					bgfxTopologyConvert( BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST, tempDataBuf, numIndices * SHORT_SIZE, indicesDb, _numIndices, False )
+					address = 0
+					For Local ii:Int = 0 Until numIndices
+						tib.PokeShort( address, tempDataBuf.PeekShort( address ) ) ; address += 2
+					Next
+
+					tempDataBuf.Discard()
+					indicesDb.Discard()
+				Else
+
+					bgfxAllocTransientIndexBuffer( tib, numIndices )
+					' bx::memCopy(tib.data, _indices, numIndices * sizeof(uint16_t) );
+					address = 0
+					For Local ii:Int = 0 Until numIndices
+						tib.PokeShort( address, _indices[ ii ] ) ; address += 2
+					Next
+				Endif
+
+				bgfxEncoderSetTransientIndexBuffer( m_encoder, tib )
+			Endif
+
+			bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+
+			Local program:Int
+
+			If wireframe Then
+				program = s_dds.m_program[ Program.FillMesh ]
+			Else
+				program = s_dds.m_program[ Program.FillLitMesh ]
+			Endif
+
+			bgfxEncoderSubmit( m_encoder, m_viewId, program )
+		Endif
+	End
+
+	Method DrawFrustum:Void( _viewProj:Float[] )
+
+		Local planes:BoundsPlane[ 6 ]
+
+		For Local ii:Int = 0 Until 6
+			planes[ ii ] = BoundsPlanePool.Allocate()
+		Next
+
+		BoundsBuildFrustumPlanes( planes, _viewProj )
+
+		Local points00:Float[ 3 ]
+		Local points03:Float[ 3 ]
+		Local points06:Float[ 3 ]
+		Local points09:Float[ 3 ]
+		Local points12:Float[ 3 ]
+		Local points15:Float[ 3 ]
+		Local points18:Float[ 3 ]
+		Local points21:Float[ 3 ]
+
+		BoundsIntersectPlanes( points00, planes[ 0 ], planes[ 2 ], planes[ 4 ] )
+		BoundsIntersectPlanes( points03, planes[ 0 ], planes[ 3 ], planes[ 4 ] )
+		BoundsIntersectPlanes( points06, planes[ 0 ], planes[ 3 ], planes[ 5 ] )
+		BoundsIntersectPlanes( points09, planes[ 0 ], planes[ 2 ], planes[ 5 ] )
+		BoundsIntersectPlanes( points12, planes[ 1 ], planes[ 2 ], planes[ 4 ] )
+		BoundsIntersectPlanes( points15, planes[ 1 ], planes[ 3 ], planes[ 4 ] )
+		BoundsIntersectPlanes( points18, planes[ 1 ], planes[ 3 ], planes[ 5 ] )
+		BoundsIntersectPlanes( points21, planes[ 1 ], planes[ 2 ], planes[ 5 ] )
+
+		MoveTo( points00 )
+		LineTo( points03 )
+		LineTo( points06 )
+		LineTo( points09 )
+		Close()
+
+		MoveTo( points12 )
+		LineTo( points15 )
+		LineTo( points18 )
+		LineTo( points21 )
+		Close()
+
+		MoveTo( points00 )
+		LineTo( points12 )
+
+		MoveTo( points03 )
+		LineTo( points15 )
+
+		MoveTo( points06 )
+		LineTo( points18 )
+
+		MoveTo( points09 )
+		LineTo( points21 )
+
+		For Local ii:Int = 0 Until 6
+			planes[ ii ].Free()
+		Next
+	End
+
+'  	void drawFrustum(const void* _viewProj)
+'  	{
+'  		drawFrustum( (const float*)_viewProj);
+'  	}
+
+	Method DrawArc:Void( _axis:Int, _x:Float, _y:Float, _z:Float, _radius:Float, _degrees:Float )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib  := m_attrib[ m_stack ]
+		Local num     :Int = GetCircleLod( attrib.m_lod )
+		Local arcStep :Float = 360.0 / num
+
+		_degrees = bxWrap( _degrees, 360.0 )
+
+		Local pos:Float[ 3 ]
+		GetPoint( pos, _axis, Sin( arcStep * 0 ) * _radius, Cos( arcStep * 0 ) * _radius )
+
+		MoveTo( pos[ 0 ] + _x, pos[ 1 ] + _y, pos[ 2 ] + _z )
+
+		Local n:Int = Int( num * _degrees / 360.0 )
+
+		For Local ii:Int = 1 Until n + 1
+			GetPoint( pos, _axis, Sin( arcStep * ii ) * _radius, Cos( arcStep * ii ) * _radius )
+			LineTo( pos[ 0 ] + _x, pos[ 1 ] + _y, pos[ 2 ] + _z )
+		Next
+
+		MoveTo( _x, _y, _z )
+		GetPoint( pos, _axis, Sin( arcStep * 0 )*_radius, Cos( arcStep * 0 ) * _radius )
+		LineTo( pos[ 0 ] + _x, pos[ 1 ] + _y, pos[ 2 ] + _z )
+
+		GetPoint( pos, _axis, Sin( arcStep * n )*_radius, Cos( arcStep * n ) * _radius )
+		MoveTo( pos[ 0 ] + _x, pos[ 1 ] + _y, pos[ 2 ] + _z )
+		LineTo( _x, _y, _z )
+	End
+
+	Method DrawCircle:Void( _normal:Float[], _center:Float[], _radius:Float, _weight:Float )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib     := m_attrib[ m_stack ]
+		Local num        :Int = GetCircleLod( attrib.m_lod )
+		Local circleStep :Float = 360.0 / num
+		_weight = bxClamp( _weight, 0.0, 2.0 )
+
+		Local udir :Float[ 3 ]
+		Local vdir :Float[ 3 ]
+		bxVec3TangentFrame( _normal, udir, vdir, attrib.m_spin )
+
+		Local pos  :Float[ 3 ]
+		Local tmp0 :Float[ 3 ]
+		Local tmp1 :Float[ 3 ]
+
+		Local xy0  :Float[ 2 ]
+		Local xy1  :Float[ 2 ]
+
+		Circle( xy0, 0.0 )
+		Squircle( xy1, 0.0 )
+
+		bxVec3Mul( pos,  udir, bxLerp( xy0[ 0 ], xy1[ 0 ], _weight ) * _radius )
+		bxVec3Mul( tmp0, vdir, bxLerp( xy0[ 1 ], xy1[ 1 ], _weight ) * _radius )
+		bxVec3Add( tmp1, pos,  tmp0 )
+		bxVec3Add( pos,  tmp1, _center )
+		MoveTo( pos )
+
+		For Local ii:Int = 1 Until num
+
+			Local angle:Float = circleStep * ii
+			Circle( xy0, angle )
+			Squircle( xy1, angle )
+
+			bxVec3Mul( pos,  udir, bxLerp( xy0[ 0 ], xy1[ 0 ], _weight ) * _radius )
+			bxVec3Mul( tmp0, vdir, bxLerp( xy0[ 1 ], xy1[ 1 ], _weight ) * _radius )
+			bxVec3Add( tmp1, pos,  tmp0 )
+			bxVec3Add( pos,  tmp1, _center )
+			LineTo( pos )
+		Next
+
+		Close()
+	End
+
+'  	void drawCircle(const void* _normal, const void* _center, float _radius, float _weight)
+'  	{
+'  		drawCircle( (const float*)_normal, (const float*)_center, _radius, _weight);
+'  	}
+
+	Method DrawCircle:Void( _axis:Int, _x:Float, _y:Float, _z:Float, _radius:Float, _weight:Float )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib     := m_attrib[ m_stack ]
+		Local num        :Int= GetCircleLod( attrib.m_lod )
+		Local circleStep :Float = 360.0 / num
+		_weight = bxClamp( _weight, 0.0, 2.0 )
+
+		Local xy0 :Float[ 2 ]
+		Local xy1 :Float[ 2 ]
+		Circle( xy0, 0.0 )
+		Squircle( xy1, 0.0 )
+
+		Local pos :Float[ 3 ]
+		GetPoint( pos, _axis, bxLerp( xy0[ 0 ], xy1[ 0 ], _weight ) * _radius, bxLerp( xy0[ 1 ], xy1[ 1 ], _weight ) * _radius )
+		MoveTo( pos[ 0 ] + _x, pos[ 1 ] + _y, pos[ 2 ] + _z )
+
+		For Local ii:Int = 1 Until num
+
+			Local angle:Float = circleStep * ii
+			Circle( xy0, angle )
+			Squircle( xy1, angle )
+
+			GetPoint( pos, _axis, bxLerp( xy0[ 0 ], xy1[ 0 ], _weight ) * _radius, bxLerp( xy0[ 1 ], xy1[ 1 ], _weight ) * _radius )
+			LineTo( pos[ 0 ] + _x, pos[ 1 ] + _y, pos[ 2 ] + _z )
+		Next
+
+		Close()
+	End
+
+	Method DrawQuad:Void( _normal:Float[], _center:Float[], _size:Float )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib := m_attrib[ m_stack ]
+
+		If attrib.m_wireframe Then
+
+			Local udir :Float[ 3 ]
+			Local vdir :Float[ 3 ]
+
+			bxVec3TangentFrame( _normal, udir, vdir, attrib.m_spin )
+
+			Local halfExtent:Float = _size * 0.5
+
+			Local umin :Float[ 3 ]
+			Local umax :Float[ 3 ]
+			Local vmin :Float[ 3 ]
+			Local vmax :Float[ 3 ]
+
+			bxVec3Mul( umin, udir, -halfExtent )
+			bxVec3Mul( umax, udir,  halfExtent )
+			bxVec3Mul( vmin, vdir, -halfExtent )
+			bxVec3Mul( vmax, vdir,  halfExtent )
+
+			Local pt   :Float[ 3 ]
+			Local tmp  :Float[ 3 ]
+
+			bxVec3Add( tmp, umin, vmin )
+			bxVec3Add( pt, _center, tmp )
+			MoveTo( pt )
+
+			bxVec3Add( tmp, umax, vmin )
+			bxVec3Add( pt, _center, tmp )
+			LineTo( pt )
+
+			bxVec3Add( tmp, umax, vmax )
+			bxVec3Add( pt, _center, tmp )
+			LineTo( pt )
+
+			bxVec3Add( tmp, umin, vmax )
+			bxVec3Add( pt, _center, tmp )
+			LineTo( pt )
+
+			Close()
+		Else
+
+			Local mtx:Float[ 16 ]
+			bxMtxFromNormal( mtx, _normal, _size * 0.5, _center, attrib.m_spin )
+			Draw( Mesh.Quad, mtx, 1, False )
+		Endif
+	End
+
+	Method DrawSprite:Void( _handle:Int, _normal:Float[], _center:Float[], _size:Float )
+
+		If Not SpriteHandleIsValid( _handle ) Then
+			DrawQuad( _normal, _center, _size )
+			Return
+		Endif
+
+		If m_posQuad = m_cacheQuad.Length() Then
+			FlushQuad()
+		Endif
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib := m_attrib[ m_stack ]
+		Local udir:Float[ 3 ]
+		Local vdir:Float[ 3 ]
+
+		bxVec3TangentFrame( _normal, udir, vdir, attrib.m_spin )
+
+		' const Pack2D& pack = s_dds.m_sprite.get(_handle);
+		Local pack := s_dds.m_sprite.Get( _handle )
+		Local invTextureSize :Float = 1.0 / SPRITE_TEXTURE_SIZE
+		Local us:Float =  pack.m_x                  * invTextureSize
+		Local vs:Float =  pack.m_y                  * invTextureSize
+		Local ue:Float = (pack.m_x + pack.m_width ) * invTextureSize
+		Local ve:Float = (pack.m_y + pack.m_height) * invTextureSize
+
+		Local aspectRatio :Float = Float( pack.m_width ) / Float( pack.m_height )
+		Local halfExtentU :Float =       aspectRatio * _size * 0.5
+		Local halfExtentV :Float = 1.0 / aspectRatio * _size * 0.5
+
+		Local umin:Float[ 3 ]
+		Local umax:Float[ 3 ]
+		Local vmin:Float[ 3 ]
+		Local vmax:Float[ 3 ]
+
+		bxVec3Mul( umin, udir, -halfExtentU )
+		bxVec3Mul( umax, udir,  halfExtentU )
+		bxVec3Mul( vmin, vdir, -halfExtentV )
+		bxVec3Mul( vmax, vdir,  halfExtentV )
+
+		' DebugUvVertex* vertex = &m_cacheQuad[m_posQuad];
+      ' m_posQuad += 4
+
+		Local vertex :DebugUvVertex
+		Local pt     :Float[ 3 ]
+		Local tmp    :Float[ 3 ]
+
+		bxVec3Add( tmp, umin, vmin )
+		bxVec3Add( pt, _center, tmp )
+		vertex = m_cacheQuad[ m_posQuad ] ; m_posQuad += 1
+		vertex.m_x = pt[ 0 ]
+		vertex.m_y = pt[ 1 ]
+		vertex.m_z = pt[ 2 ]
+		vertex.m_u = us
+		vertex.m_v = vs
+		vertex.m_abgr = attrib.m_abgr
+
+		bxVec3Add( tmp, umax, vmin )
+		bxVec3Add( pt, _center, tmp )
+		vertex = m_cacheQuad[ m_posQuad ] ; m_posQuad += 1
+		vertex.m_x = pt[ 0 ]
+		vertex.m_y = pt[ 1 ]
+		vertex.m_z = pt[ 2 ]
+		vertex.m_u = ue
+		vertex.m_v = vs
+		vertex.m_abgr = attrib.m_abgr
+
+		bxVec3Add( tmp, umin, vmax )
+		bxVec3Add( pt, _center, tmp )
+		vertex = m_cacheQuad[ m_posQuad ] ; m_posQuad += 1
+		vertex.m_x = pt[ 0 ]
+		vertex.m_y = pt[ 1 ]
+		vertex.m_z = pt[ 2 ]
+		vertex.m_u = us
+		vertex.m_v = ve
+		vertex.m_abgr = attrib.m_abgr
+
+		bxVec3Add( tmp, umax, vmax )
+		bxVec3Add( pt, _center, tmp )
+		vertex = m_cacheQuad[ m_posQuad ] ; m_posQuad += 1
+		vertex.m_x = pt[ 0 ]
+		vertex.m_y = pt[ 1 ]
+		vertex.m_z = pt[ 2 ]
+		vertex.m_u = ue
+		vertex.m_v = ve
+		vertex.m_abgr = attrib.m_abgr
+	End
+
+	' void drawQuad(bgfx::TextureHandle _handle, const float* _normal, const float* _center, float _size)
+	Method DrawTexture:Void( _handle:Int, _normal:Float[], _center:Float[], _size:Float )
+		' BX_UNUSED(_handle, _normal, _center, _size);
+	End
+
+	Method DrawCone( _from:Float[], _to:Float[], _radius:Float )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib := m_attrib[ m_stack ]
+
+		Local tmp0   :Float[ 3 ]
+		Local normal :Float[ 3 ]
+
+		' float mtx[2][16];
+		' Local mtx0   :Float[ 16 ]
+		' Local mtx1   :Float[ 16 ]
+		Local mtx    :Float[ 32 ]
+
+		bxVec3Sub( tmp0, _from, _to )
+		bxVec3Norm( normal, tmp0 )
+		bxMtxFromNormal( mtx, normal, _radius, _from, attrib.m_spin )
+
+		' bxMemCopy( mtx1, mtx0, 64 )
+		For Local ii:Int = 0 Until 12
+			mtx[ 16 + ii ] = mtx[ ii ]
+		Next
+		mtx[ 16 + 12 ] = _to[ 0 ]
+		mtx[ 16 + 13 ] = _to[ 1 ]
+		mtx[ 16 + 14 ] = _to[ 2 ]
+		mtx[ 16 + 15 ] = mtx[ 15 ]
+
+		Local lod:Int
+
+		If attrib.m_lod > Mesh.ConeMaxLod Then
+			lod = Mesh.ConeMaxLod
+		Else
+			lod = attrib.m_lod
+		Endif
+
+		Draw( Mesh.Cone0 + lod, mtx, 2, attrib.m_wireframe )
+	End
+
+'  	void drawCone(const void* _from, const void* _to, float _radius)
+'  	{
+'  		drawCone( (const float*)_from, (const float*)_to, _radius);
+'  	}
+
+	Method DrawCylinder:Void( _from:Float[], _to:Float[], _radius:Float, _capsule:Bool )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib := m_attrib[ m_stack ]
+
+		Local tmp0   :Float[ 3 ]
+		Local normal :Float[ 3 ]
+		Local mtx    :Float[ 32 ]
+
+		bxVec3Sub( tmp0, _from, _to )
+		bxVec3Norm( normal, tmp0 )
+		bxMtxFromNormal( mtx, normal, _radius, _from, attrib.m_spin )
+
+		' bxMemCopy( mtx1, mtx0, 64 )
+		For Local ii:Int = 0 Until 16
+			mtx[ 16 + ii ] = mtx[ ii ]
+		Next
+		mtx[ 16 + 12 ] = _to[ 0 ]
+		mtx[ 16 + 13 ] = _to[ 1 ]
+		mtx[ 16 + 14 ] = _to[ 2 ]
+		mtx[ 16 + 15 ] = mtx[ 15 ]
+
+		If _capsule Then
+
+			Local lod:Int
+
+			If attrib.m_lod > Mesh.CapsuleMaxLod Then
+				lod = Mesh.CapsuleMaxLod
+			Else
+				lod = attrib.m_lod
+			Endif
+
+			Draw( Mesh.Capsule0 + lod, mtx, 2, attrib.m_wireframe )
+
+			Local sphere := BoundsSpherePool.Allocate()
+
+			bxVec3Move( sphere.m_center, _from )
+			sphere.m_radius = _radius;
+			Draw( sphere )
+
+			bxVec3Move( sphere.m_center, _to )
+			Draw( sphere )
+
+			sphere.Free()
+		Else
+
+			Local lod:Int
+
+			If attrib.m_lod > Mesh.CylinderMaxLod Then
+				lod = Mesh.CylinderMaxLod
+			Else
+				lod = attrib.m_lod
+			Endif
+
+			Draw( Mesh.Cylinder0 + lod, mtx, 2, attrib.m_wireframe )
+		Endif
+	End
+
+'  	void drawCylinder(const void* _from, const void* _to, float _radius, bool _capsule)
+'  	{
+'  		drawCylinder( (const float*)_from, (const float*)_to, _radius, _capsule);
+'  	}
+
+	' void drawAxis(float _x, float _y, float _z, float _len, Axis::Enum _highlight, float _thickness)
+	Method DrawAxis:Void( _x:Float, _y:Float, _z:Float, _len:Float, _highlight:Int, _thickness:Float )
+
+		Push()
+
+		If _thickness > 0.0 Then
+
+			Local from :Float[] = [ _x, _y, _z ]
+			Local mid  :Float[ 3 ]
+			Local to_  :Float[ 3 ]
+
+			If AXIS_X = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ff0000ff )
+
+			mid[ 0 ] = _x + _len - _thickness
+			mid[ 1 ] = _y
+			mid[ 2 ] = _z
+			to_[ 0 ] = _x + _len
+			to_[ 1 ] = _y
+			to_[ 2 ] = _z
+			DrawCylinder( from, mid, _thickness, False )
+			DrawCone( mid, to_, _thickness )
+
+			If AXIS_Y = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ff00ff00 )
+
+			mid[ 0 ] = _x
+			mid[ 1 ] = _y + _len - _thickness
+			mid[ 2 ] = _z
+			to_[ 0 ] = _x
+			to_[ 1 ] = _y + _len
+			to_[ 2 ] = _z
+			DrawCylinder( from, mid, _thickness, False )
+			DrawCone( mid, to_, _thickness )
+
+			If AXIS_Z = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ffff0000 )
+
+			mid[ 0 ] = _x
+			mid[ 1 ] = _y
+			mid[ 2 ] = _z + _len - _thickness
+			to_[ 0 ] = _x
+			to_[ 1 ] = _y
+			to_[ 2 ] = _z + _len
+			DrawCylinder( from, mid, _thickness, False )
+			DrawCone( mid, to_, _thickness )
+		Else
+
+			If AXIS_X = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ff0000ff )
+
+			MoveTo( _x, _y, _z )
+			LineTo( _x + _len, _y, _z )
+
+			If AXIS_Y = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ff00ff00 )
+
+			MoveTo( _x, _y, _z )
+			LineTo( _x, _y + _len, _z )
+
+			If AXIS_Z = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ffff0000 )
+
+			MoveTo( _x, _y, _z )
+			LineTo( _x, _y, _z + _len )
+		Endif
+
+		Pop()
+	End
+
+	Method DrawGrid:Void( _normal:Float[], _center:Float[], _size:Int, _step:Float )
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib := m_attrib[ m_stack ]
+
+		Local udir:Float[ 3 ]
+		Local vdir:Float[ 3 ]
+
+		bxVec3TangentFrame( _normal, udir, vdir, attrib.m_spin )
+
+		bxVec3Mul( udir, udir, _step )
+		bxVec3Mul( vdir, vdir, _step )
+
+		Local num:Int = ( _size / 2 ) * 2 + 1
+		Local halfExtent:Float = Float( _size / 2 )
+
+		Local umin :Float[ 3 ]
+		Local umax :Float[ 3 ]
+
+		Local vmin :Float[ 3 ]
+		Local vmax :Float[ 3 ]
+
+		Local tmp  :Float[ 3 ]
+
+		Local xs   :Float[ 3 ]
+		Local xe   :Float[ 3 ]
+
+		Local ys   :Float[ 3 ]
+		Local ye   :Float[ 3 ]
+
+		bxVec3Mul( umin, udir, -halfExtent )
+		bxVec3Mul( umax, udir,  halfExtent )
+
+		bxVec3Mul( vmin, vdir, -halfExtent )
+		bxVec3Mul( vmax, vdir,  halfExtent )
+
+		bxVec3Add( tmp, umin, vmin )
+		bxVec3Add( xs, _center, tmp )
+
+		bxVec3Add( tmp, umax, vmin )
+		bxVec3Add( xe, _center, tmp )
+
+		bxVec3Add( tmp, umin, vmin )
+		bxVec3Add( ys, _center, tmp )
+
+		bxVec3Add( tmp, umin, vmax )
+		bxVec3Add( ye, _center, tmp )
+
+		For Local ii:Int = 0 Until num
+
+			MoveTo( xs )
+			LineTo( xe )
+			bxVec3Add( xs, xs, vdir )
+			bxVec3Add( xe, xe, vdir )
+
+			MoveTo( ys )
+			LineTo( ye )
+			bxVec3Add( ys, ys, udir )
+			bxVec3Add( ye, ye, udir )
+		Next
+	End
+
+'  	void drawGrid(const void* _normal, const void* _center, uint32_t _size, float _step)
+'  	{
+'  		drawGrid( (const float*)_normal, (const float*)_center, _size, _step);
+'  	}
+
+	' void drawGrid(Axis::Enum _axis, const float* _center, uint32_t _size, float _step)
+	Method DrawGrid:Void( _axis:Int, _center:Float[], _size:Int, _step:Float )
+
+		Push()
+		PushTranslate( _center )
+
+		Local num:Int = ( _size / 2 ) * 2 - 1
+		Local halfExtent:Float = Float( _size / 2 ) * _step
+
+		SetColor( $ff606060 )
+
+		Local yy:Float = -halfExtent + _step
+
+		For Local ii:Int = 0 Until num
+
+			MoveTo( _axis, -halfExtent, yy )
+			LineTo( _axis,  halfExtent, yy )
+
+			MoveTo( _axis, yy, -halfExtent )
+			LineTo( _axis, yy,  halfExtent )
+
+			yy += _step
+		Next
+
+		SetColor( $ff101010 )
+		MoveTo( _axis, -halfExtent, -halfExtent )
+		LineTo( _axis, -halfExtent,  halfExtent )
+		LineTo( _axis,  halfExtent,  halfExtent )
+		LineTo( _axis,  halfExtent, -halfExtent )
+		Close()
+
+		MoveTo( _axis, -halfExtent, 0.0 )
+		LineTo( _axis,  halfExtent, 0.0 )
+
+		MoveTo( _axis, 0.0, -halfExtent )
+		LineTo( _axis, 0.0,  halfExtent )
+
+		PopTransform()
+		Pop()
+	End
+
+'  	void drawGrid(Axis::Enum _axis, const void* _center, uint32_t _size, float _step)
+'  	{
+'  		drawGrid(_axis, (const float*)_center, _size, _step);
+'  	}
+
+	Method DrawOrb:Void( _x:Float, _y:Float, _z:Float, _radius:Float, _highlight:Int )
+
+		Push()
+
+		If AXIS_X = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ff0000ff )
+		DrawCircle( AXIS_X, _x, _y, _z, _radius, 0.0 )
+
+		If AXIS_Y = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ff00ff00 )
+		DrawCircle( AXIS_Y, _x, _y, _z, _radius, 0.0 )
+
+		If AXIS_Z = _highlight Then SetColor( $ff00ffff ) Else SetColor( $ffff0000 )
+		DrawCircle( AXIS_Z, _x, _y, _z, _radius, 0.0 )
+
+		Pop()
+	End
+
+	' void draw(Mesh::Enum _mesh, const float* _mtx, uint16_t _num, bool _wireframe)
+	Method Draw:Void( _mesh:Int, _mtx:Float[], _num:Int, _wireframe:Bool )
+
+		' pushTransform(_mtx, _num, false /* flush */);
+		PushTransform( _mtx, _num, False )
+
+		' const Mesh& mesh = s_dds.m_mesh[_mesh];
+		Local mesh := s_dds.m_mesh[ _mesh ]
+
+		If 0 <> mesh.m_numIndices[ _wireframe ] Then
+
+			bgfxEncoderSetIndexBuffer( m_encoder, s_dds.m_ibh,
+				mesh.m_startIndex[ _wireframe ],
+				mesh.m_numIndices[ _wireframe ] )
+		Endif
+
+		' const Attrib& attrib = m_attrib[m_stack];
+		Local attrib := m_attrib[ m_stack ]
+
+		SetUParams( attrib, _wireframe )
+
+		' MatrixStack& stack = m_mtxStack[m_mtxStackCurrent];
+		Local mtxStack := m_mtxStack[ m_mtxStackCurrent ]
+		bgfxEncoderSetTransformCached( m_encoder, mtxStack.mtx, mtxStack.num )
+
+		bgfxEncoderSetVertexBuffer( m_encoder, 0, s_dds.m_vbh, mesh.m_startVertex, mesh.m_numVertices )
+
+		If _wireframe Then
+			bgfxEncoderSubmit( m_encoder, m_viewId, s_dds.m_program[ Program.Fill ] )
+		Else
+			bgfxEncoderSubmit( m_encoder, m_viewId, s_dds.m_program[ Program.FillLit ] )
+		Endif
+
+		' popTransform(false /* flush */);
+		PopTransform( False )
+	End
+
+	Method SoftFlush:Void()
+		If m_pos = m_cache.Length() Then
+			Flush()
+		Endif
+	End
+
+	Field tvb := New BgfxTransientVertexBuffer()
+	Field tib := New BgfxTransientIndexBuffer()
+
+	Method Flush:Void()
+
+		If 0 <> m_pos Then
+
+			If bgfxUtilsCheckAvailTransientBuffers( m_pos, DebugVertex.ms_decl, m_indexPos ) Then
+
+				' bgfx::TransientVertexBuffer tvb;
+				' Local tvb := BgfxTransientVertexBufferPool.Allocate()
+				bgfxAllocTransientVertexBuffer( tvb, m_pos, DebugVertex.ms_decl )
+				' bxMemCopy( tvb.data, m_cache, m_pos * DebugVertex.ms_decl.m_stride )
+				Local address:Int = 0
+				For Local ii:Int = 0 Until m_pos
+					Local vertex := m_cache[ ii ]
+					tvb.PokeFloat( address, vertex.m_x ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_y ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_z ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_len ) ; address += 4
+					tvb.PokeInt( address, vertex.m_abgr ) ; address += 4
+				Next
+
+				' bgfx::TransientIndexBuffer tib;
+				' Local tib := BgfxTransientIndexBufferPool.Allocate()
+				bgfxAllocTransientIndexBuffer( tib, m_indexPos )
+				' bxMemCopy( tib.data, m_indices, m_indexPos * SHORT_SIZE )
+				address = 0
+				For Local ii:Int = 0 Until m_indexPos
+					tib.PokeShort( address, m_indices[ ii ] ) ; address += 2
+				Next
+
+				' const Attrib& attrib = m_attrib[m_stack];
+				Local attrib := m_attrib[ m_stack ]
+
+				bgfxEncoderSetTransientVertexBuffer( m_encoder, 0, tvb )
+				bgfxEncoderSetTransientIndexBuffer( m_encoder, tib )
+
+				Local state:Int[ 2 ]
+
+				Clear64( state )
+				Set64( state, attrib.m_state )
+				Or64( state, BGFX_STATE_WRITE_RGB )
+				Or64( state, BGFX_STATE_PT_LINES )
+				Or64( state, BGFX_STATE_LINEAA )
+				Or64( state, BGFX_STATE_BLEND_ALPHA )
+				bgfxEncoderSetState( m_encoder, state )
+
+				bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+
+				' bgfx::ProgramHandle program = s_dds.m_program[attrib.m_stipple ? 1 : 0];
+				Local program:Int
+				If attrib.m_stipple Then
+					program = s_dds.m_program[ 1 ]
+				Else
+					program = s_dds.m_program[ 0 ]
+				Endif
+
+				bgfxEncoderSubmit( m_encoder, m_viewId, program )
+			Endif
+
+			m_state     = STATE_NONE
+			m_pos       = 0
+			m_indexPos  = 0
+			m_vertexPos = 0
+		Endif
+	End
+
+	Method FlushQuad:Void()
+
+		If 0 <> m_posQuad Then
+
+			Local numIndices:Int = m_posQuad / 4 * 6
+
+			If bgfxUtilsCheckAvailTransientBuffers( m_posQuad, DebugUvVertex.ms_decl, numIndices ) Then
+
+				' bgfx::TransientVertexBuffer tvb;
+				' Local tvb := BgfxTransientVertexBufferPool.Allocate()
+				bgfxAllocTransientVertexBuffer( tvb, m_posQuad, DebugUvVertex.ms_decl )
+				' bxMemCopy( tvb.data, m_cacheQuad, m_posQuad * DebugUvVertex.ms_decl.m_stride )
+				Local address:Int = 0
+				For Local ii:Int = 0 Until m_posQuad
+					Local vertex := m_cacheQuad[ ii ]
+					tvb.PokeFloat( address, vertex.m_x ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_y ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_z ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_u ) ; address += 4
+					tvb.PokeFloat( address, vertex.m_v ) ; address += 4
+					tvb.PokeInt( address, vertex.m_abgr ) ; address += 4
+				Next
+
+				' bgfx::TransientIndexBuffer tib;
+				' Local tib := BgfxTransientIndexBufferPool.Allocate()
+				bgfxAllocTransientIndexBuffer( tib, numIndices )
+				' Local uint16_t* indices = (uint16_t*)tib.data;
+				Local num:Int = m_posQuad / 4
+				address = 0
+				For Local ii:Int = 0 Until num
+					Local startVertex:Int = ii * 4
+					tib.PokeShort( address, startVertex + 0 ) ; address += 2
+					tib.PokeShort( address, startVertex + 1 ) ; address += 2
+					tib.PokeShort( address, startVertex + 2 ) ; address += 2
+					tib.PokeShort( address, startVertex + 1 ) ; address += 2
+					tib.PokeShort( address, startVertex + 3 ) ; address += 2
+					tib.PokeShort( address, startVertex + 2 ) ; address += 2
+				Next
+
+				' const Attrib& attrib = m_attrib[m_stack];
+				Local attrib := m_attrib[ m_stack ]
+
+				bgfxEncoderSetTransientVertexBuffer( m_encoder, 0, tvb )
+				bgfxEncoderSetTransientIndexBuffer( m_encoder, tib )
+
+				Local mask  :Int[ 2 ]
+				Local state :Int[ 2 ]
+
+				Set64( mask, BGFX_STATE_CULL_MASK )
+				Xor64( mask )
+				Set64( state, attrib.m_state )
+				And64( state, mask )
+
+				bgfxEncoderSetState( m_encoder, state )
+
+				bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+				bgfxEncoderSetTexture( m_encoder, 0, s_dds.s_texColor, s_dds.m_texture )
+				bgfxEncoderSubmit( m_encoder, m_viewId, s_dds.m_program[ Program.FillTexture ] )
+			Endif
+
+			m_posQuad = 0
+		Endif
+	End
+
+	Const STATE_NONE    :Int = 0
+	Const STATE_MOVE_TO :Int = 1
+	Const STATE_LINE_TO :Int = 2
+	Const STATE_COUNT   :Int = 3
+
+'  	struct State
+'  	{
+'  		enum Enum
+'  		{
+'  			None,
+'  			MoveTo,
+'  			LineTo,
+'  
+'  			Count
+'  		};
+'  	};
+
+End
+
+' static DebugDrawEncoderImpl s_dde;
+' BX_STATIC_ASSERT(sizeof(DebugDrawEncoderImpl) <= sizeof(DebugDrawEncoder), "Size must match");
+Global s_dde := New DebugDrawEncoderImpl()
+
+'
+Function ddInit:Void() ' (bx::AllocatorI* _allocator = NULL);
+
+	s_dds.Init()
+
+	Local bgfxEncoder := New BgfxEncoder()
+	bgfxBegin( bgfxEncoder )
+	s_dde.Init( bgfxEncoder )
+End
+
+'
+Function ddShutdown:Void()
+	s_dde.Shutdown()
+	s_dds.Shutdown()
+End
+
+'
+' Function SpriteHandle ddCreateSprite(uint16_t _width, uint16_t _height, const void* _data);
+Function ddCreateSprite:Int( _width:Int, _height:Int, _data:DataBuffer )
+	Return s_dds.CreateSprite( _width, _height, _data )
+End
+
+'
+' Function ddDestroy:Void(SpriteHandle _handle);
+Function ddDestroySprite:Void( _handle:Int )
+	s_dds.DestroySprite( _handle )
+End
+
+'
+' Function GeometryHandle ddCreateGeometry(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices = 0, const void* _indices = NULL, bool _index32 = false);
+' Function ddCreateGeometry:Int( _numVertices:Int, _vertices:DdVertex[], _numIndices:Int=0, _indices:DataBuffer=NULL, _index32:Bool=False )
+Function ddCreateGeometry:Int( _numVertices:Int, _vertices:DdVertex[], _numIndices:Int=0, _indices:Int[]=[], _index32:Bool=False )
+	Return s_dds.CreateGeometry( _numVertices, _vertices, _numIndices, _indices, _index32 )
+End
+
+'
+' Function void ddDestroy(GeometryHandle _handle)
+Function ddDestroyGeometry:Void( _handle:Int )
+	s_dds.DestroyGeometry( _handle )
+End
+
+Class DebugDrawEncoder
+
+	'
+	' DebugDrawEncoder();
+	Method New()
+		s_dde.Init( s_dde.m_defaultEncoder )
+	End
+
+	'
+	' ~DebugDrawEncoder();
+	Method Discard:Void()
+		s_dde.Shutdown()
+	End
+
+	'
+	Method Begin:Void( _viewId:Int, _depthTestLess:Bool=True, _encoder:BgfxEncoder=Null )
+		s_dde.Begin( _viewId, _depthTestLess, _encoder )
+	End
+
+	'
+	' void end(); <-- cannot be end so rename to Finish
+	Method Finish:Void()
+		s_dde.Finish()
+	End
+
+	'
+	Method Push:Void()
+		s_dde.Push()
+	End
+
+	'
+	Method Pop:Void()
+		s_dde.Pop()
+	End
+
+	'
+	Method SetDepthTestLess:Void( _depthTestLess:Bool )
+		s_dde.SetDepthTestLess( _depthTestLess )
+	End
+
+	'
+	Method SetState:Void( _depthTest:Bool, _depthWrite:Bool, _clockwise:Bool )
+		s_dde.SetState( _depthTest, _depthWrite, _clockwise )
+	End
+
+	'
+	Method SetColor:Void( _abgr:Int )
+		s_dde.SetColor( _abgr )
+	End
+
+	'
+	Method SetLod:Void( _lod:Int )
+		s_dde.SetLod( _lod )
+	End
+
+	'
+	Method SetWireframe:Void( _wireframe:Bool )
+		s_dde.SetWireframe( _wireframe )
+	End
+
+	'
+	Method SetStipple:Void( _stipple:Bool, _scale:Float=1.0, _offset:Float=0.0 )
+		s_dde.SetStipple( _stipple, _scale, _offset )
+	End
+
+	'
+	Method SetSpin:Void( _spin:Float )
+		s_dde.SetSpin( _spin )
+	End
+
+	'
+	Method SetTransform:Void( _mtx:Float[] )
+		s_dde.SetTransform( _mtx )
+	End
+	Method SetTransform:Void() ' _mtx:Float[]=Null )
+		s_dde.SetTransform()
+	End
+
+	'
+	Method SetTranslate:Void( _x:Float, _y:Float, _z:Float )
+		s_dde.SetTranslate( _x, _y, _z )
+	End
+
+	'
+	Method PushTransform:Void( _mtx:Float[] )
+		s_dde.PushTransform( _mtx, 1 )
+	End
+
+	'
+	Method PopTransform:Void()
+		s_dde.PopTransform()
+	End
+
+	'
+	Method MoveTo:Void( _x:Float, _y:Float, _z:Float=0.0 )
+		s_dde.MoveTo( _x, _y, _z )
+	End
+
+	'
+	Method MoveTo:Void( _pos:Float[] )
+		s_dde.MoveTo( _pos )
+	End
+
+	'
+	Method LineTo:Void( _x:Float, _y:Float, _z:Float=0.0 )
+		s_dde.LineTo( _x, _y, _z )
+	End
+
+	'
+	Method LineTo:Void( _pos:Float[] )
+		s_dde.LineTo( _pos )
+	End
+
+	'
+	Method Close:Void()
+		s_dde.Close()
+	End
+
+	'
+	Method Draw:Void( _aabb:BoundsAabb )
+		s_dde.Draw( _aabb )
+	End
+
+	'
+	Method Draw:Void( _cylinder:BoundsCylinder )
+		s_dde.Draw( _cylinder, False )
+	End
+
+	'
+	Method Draw:Void( _capsule:BoundsCapsule )
+		s_dde.Draw( BoundsCylinder( _capsule ), True )
+	End
+
+	'
+	Method Draw:Void( _disk:BoundsDisk )
+		s_dde.Draw( _disk )
+	End
+
+	'
+	Method Draw:Void( _obb:BoundsObb )
+		s_dde.Draw( _obb )
+	End
+
+	'
+	Method Draw:Void( _sphere:BoundsSphere )
+		s_dde.Draw( _sphere )
+	End
+
+	'
+	Method Draw:Void( _cone:BoundsCone )
+		s_dde.DrawCone( _cone.m_pos, _cone.m_end, _cone.m_radius )
+	End
+
+	'
+	' Method Draw:Void(GeometryHandle _handle);
+	Method Draw:Void( _handle:Int )
+		s_dde.Draw( _handle )
+	End
+
+	'
+	' Method DrawLineList:Void(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices = 0, const uint16_t* _indices = NULL)
+	Method DrawLineList:Void( _numVertices:Int, _vertices:DdVertex[], _numIndices:Int=0, _indices:DataBuffer=Null )
+		s_dde.DrawLineList( True, _numVertices, _vertices, _numIndices, _indices )
+	End
+
+	'
+	' Method DrawTriList:Void(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices = 0, const uint16_t* _indices = NULL)
+	Method DrawTriList:Void( _numVertices:Int, _vertices:DdVertex[], _numIndices:Int=0, _indices:DataBuffer=Null )
+		s_dde.DrawTriList( False, _numVertices, _vertices, _numIndices, _indices )
+	End
+
+	'
+	Method DrawFrustum:Void( _viewProj:Float[] )
+		s_dde.DrawFrustum( _viewProj )
+	End
+
+	'
+	Method DrawArc:Void( _axis:Int, _x:Float, _y:Float, _z:Float, _radius:Float, _degrees:Float )
+		s_dde.DrawArc( _axis, _x, _y, _z, _radius, _degrees )
+	End
+
+	'
+	Method DrawCircle:Void( _normal:Float[], _center:Float[], _radius:Float, _weight:Float=0.0 )
+		s_dde.DrawCircle( _normal, _center, _radius, _weight )
+	End
+
+	'
+	Method DrawCircle:Void( _axis:Int, _x:Float, _y:Float, _z:Float, _radius:Float, _weight:Float=0.0 )
+		s_dde.DrawCircle( _axis, _x, _y, _z, _radius, _weight )
+	End
+
+	'
+	Method DrawQuad:Void( _normal:Float[], _center:Float[], _size:Float )
+		s_dde.DrawQuad( _normal, _center, _size )
+	End
+
+	'
+	' Method DrawQuad:Void(SpriteHandle _handle, const float* _normal, const float* _center, float _size)
+	Method DrawSprite:Void( _handle:Int, _normal:Float[], _center:Float[], _size:Float )
+		s_dde.DrawSprite( _handle, _normal, _center, _size )
+	End
+
+	'
+	' Method DrawQuad:Void(bgfx::TextureHandle _handle, const float* _normal, const float* _center, float _size)
+	Method DrawTexture:Void( _handle:Int, _normal:Float[], _center:Float[], _size:Float )
+		s_dde.DrawTexture( _handle, _normal, _center, _size )
+	End
+
+	'
+	Method DrawCone:Void( _from:Float[], _to:Float[], _radius:Float )
+		s_dde.DrawCone( _from, _to, _radius )
+	End
+
+	'
+	Method DrawCylinder:Void( _from:Float[], _to:Float[], _radius:Float )
+		s_dde.DrawCylinder( _from, _to, _radius, False )
+	End
+
+	'
+	Method DrawCapsule:Void( _from:Float[], _to:Float[], _radius:Float )
+		s_dde.DrawCylinder( _from, _to, _radius, True )
+	End
+
+	'
+	' Method DrawAxis:Void( _x:Float, _y:Float, _z:Float, _len:Float=1.0, Axis::Enum _highlight = Axis::Count, float _thickness = 0.0f);
+	Method DrawAxis:Void( _x:Float, _y:Float, _z:Float, _len:Float=1.0, _highlight:Int=AXIS_COUNT, _thickness:Float=0.0 )
+		s_dde.DrawAxis( _x, _y, _z, _len, _highlight, _thickness )
+	End
+
+	'
+	Method DrawGrid:Void( _normal:Float[], _center:Float[], _size:Int=20, _step:Float=1.0 )
+		s_dde.DrawGrid( _normal, _center, _size, _step )
+	End
+
+	'
+	' Method DrawGrid:Void(Axis::Enum _axis, const void* _center, uint32_t _size = 20, float _step = 1.0f);
+	Method DrawGrid:Void( _axis:Int, _center:Float[], _size:Int=20, _step:Float=1.0 )
+		s_dde.DrawGrid( _axis, _center, _size, _step )
+	End
+
+	'
+	' Method DrawOrb:Void( _x:Float, _y:Float, _z:Float, _radius:Float, Axis::Enum _highlight = Axis::Count);
+	Method DrawOrb:Void( _x:Float, _y:Float, _z:Float, _radius:Float, _highlight:Int=AXIS_COUNT )
+		s_dde.DrawOrb( _x, _y, _z, _radius, _highlight )
+	End
+
+'  	BX_ALIGN_DECL_CACHE_LINE(uint8_t) m_internal[50<<10];
+End

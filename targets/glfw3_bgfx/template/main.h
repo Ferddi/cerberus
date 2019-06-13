@@ -62,6 +62,8 @@
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
 #include <bgfx/c99/bgfx.h>
+// #include <bgfx/embedded_shader.h>
+
 // #include "logo.h"
 #include "common.h"
 #include "bgfx_utils.h"

@@ -1,0 +1,191 @@
+
+Import brl.pool
+Import bgfx
+
+Global Pack2DPool := New Pool< Pack2D >()
+
+Class Pack2D
+
+	Method Free:Void()
+		Pack2DPool.Free( Self )
+	End
+
+	Field m_x      :Int
+	Field m_y      :Int
+	Field m_width  :Int
+	Field m_height :Int
+
+	Method Copy:Void( result:Pack2D )
+		result.m_x = m_x
+		result.m_y = m_x
+		result.m_width = m_x
+		result.m_height = m_x
+	End
+End
+
+Global PackCubePool := New Pool< PackCube >()
+
+Class PackCube
+
+	Method Free:Void()
+		PackCubePool.Free( Self )
+	End
+
+	Field m_rect := New Pack2D()
+	Field m_side :Int
+End
+
+' template <uint16_t numBlocks>
+' class RectPackCubeT;
+
+Class RectPack2DT
+
+	Field m_numBlocks :Int
+	Field m_mem       :Int[]
+	Field m_bw        :Int
+	Field m_bh        :Int
+
+	Method New( _width:Int, _height:Int, _numBlocks:Int )
+
+		m_numBlocks = _numBlocks
+		m_mem = New Int[ m_numBlocks ]
+
+		Reset( _width, _height )
+	End
+
+	Method Reset:Void( _width:Int, _height:Int )
+
+		m_bw = _width  / 32
+		m_bh = _height / m_numBlocks
+
+		' bx::memSet(m_mem, 0xff, sizeof(m_mem) );
+		For Local ii:Int = 0 Until m_mem.Length()
+			m_mem[ ii ] = $ff
+		Next
+	End
+
+	Method Find:Bool( _width:Int, _height:Int, _pack:Pack2D )
+
+		Local width  :Int = Min( 32, (_width  + m_bw - 1) / m_bw )
+		Local height :Int = Min( m_numBlocks, (_height + m_bh - 1) / m_bh )
+		Local numx   :Int = 32 - width
+		Local numy   :Int = m_numBlocks - height
+
+		Local scan   :Int = (1 Shl width) -1 ; If width = 32 Then scan = $ffffffff ' UINT32_MAX
+
+		For Local starty:Int = 0 To numy
+
+			Local mem  :Int = m_mem[ starty ]
+			Local ntz  :Int = bxCntTZ( mem )
+			Local mask :Int = scan Shl ntz
+
+			' for (uint16_t xx = ntz; xx <= numx; ++xx, mask <<= 1)
+			For Local xx:Int = ntz To numx
+
+				Local yy:Int = starty
+
+				If (mem & mask) = mask Then
+
+					Local endy:Int = starty + height
+
+					While yy < endy And (m_mem[ yy ] & mask) = mask
+						yy += 1
+					Wend
+
+					If yy = endy Then
+
+						Local cmask:Int = ~mask
+
+						For Local yy:Int = starty Until endy
+							m_mem[ yy ] &= cmask
+						Next
+
+						_pack.m_x      = xx     * m_bw
+						_pack.m_y      = starty * m_bh
+						_pack.m_width  = width  * m_bw
+						_pack.m_height = height * m_bh
+
+						Return True
+					Endif
+				Endif
+
+			Next
+		Next
+
+		Return False
+	End
+
+	Method Clear:Void( _pack:Pack2D )
+
+		Local startx :Int = Min( 31, _pack.m_x / m_bw )
+		Local starty :Int = Min( m_numBlocks -1, _pack.m_y / m_bh )
+		Local endx   :Int = Min( 32, (_pack.m_width + m_bw - 1) / m_bw + startx )
+		Local endy   :Int = Min( m_numBlocks, (_pack.m_height + m_bh - 1) / m_bh + starty )
+		Local width  :Int = endx - startx
+
+		Local mask:Int = ( 1 Shl width ) -1 ; If width = 32 Then mask = UINT32_MAX
+
+		mask Shl= startx
+
+		For Local yy:Int = starty Until endy
+			m_mem[ yy ] |= mask
+		Next
+	End
+End
+
+Class RectPackCubeT< numBlocks >
+
+	Const TOTAL_SIDES:Int = 6
+
+	Field m_ra  :RectPack2DT< numBlocks >[ TOTAL_SIDES ]
+	Field m_mru :Int[ TOTAL_SIDES ]
+
+	Method New( _side:Int )
+		Reset( _side )
+	End
+
+	Method Reset:Void( _side:Int )
+		For Local ii:Int = 0 Until TOTAL_SIDES
+			m_mru[ ii ] = ii
+			m_ra[ ii ].Reset( _side, _side )
+		Next
+	End
+
+	Method Find:Bool( _width:Int, _height:Int, _pack:PackCube )
+
+		Local found:Bool = False
+
+		For Local ii:Int = 0 Until TOTAL_SIDES
+
+			Local side:Int = m_mru[ ii ]
+			found = m_ra[ side ].Find( _width, _height, _pack.m_rect )
+
+			If found Then
+				_pack.m_side = side
+				m_mru[ ii ] = m_mru[ 0 ]
+				m_mru[ 0 ] = side
+				Return True
+			Endif
+		Next
+
+		Return False
+	End
+
+	Function Clear:Void( _pack:PackCube )
+
+		Local side :Int = _pack.m_side
+		Local ii   :Int = 0 ' uint32_t ii = 0;
+
+		' for (; ii < TOTAL_SIDES && m_mru[ii] != side; ++ii) {};
+		While ii < TOTAL_SIDES And m_mru[ ii ] <> side
+			ii += 1
+		Wend
+
+		m_mru[ ii ] = m_mru[ 0 ]
+		m_mru[ 0 ] = side
+
+		m_ra[ side ].Clear( _pack.m_rect )
+	End
+End
+
+

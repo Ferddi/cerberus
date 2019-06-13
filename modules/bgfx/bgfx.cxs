@@ -19,9 +19,16 @@ Import defines
 ' constants
 '-------------------------------------------------------------------------------
 
-Const UINT8_MAX  :Int = $FF
-Const UINT16_MAX :Int = $FFFF
-Const INT32_MAX  :Int = 2147483647
+Const BYTE_SIZE  :Int = 1
+Const SHORT_SIZE :Int = 2
+Const INT_SIZE   :Int = 4
+Const FLOAT_SIZE :Int = 4
+
+Const UINT8_MAX  :Int = $ff
+Const UINT16_MAX :Int = $ffff
+' Const INT32_MAX  :Int = 2147483647
+Const INT32_MAX  :Int = $7fffffff
+Const UINT32_MAX :Int = $ffffffff
 
 Const BGFX_INVALID_HANDLE :Int = UINT16_MAX
 Const BX_INVALID_HANDLE   :Int = UINT16_MAX
@@ -373,6 +380,9 @@ Enumerate
 '  Const BGFX_BUFFER_ALLOW_RESIZE:Int =         $0800 '!< Allow dynamic index/vertex buffer resize during update.
 '  Const BGFX_BUFFER_INDEX32:Int =              $1000 '!< Index buffer contains 32-bit indices.
 
+'  Global BgfxTransientIndexBufferPool := New Pool< BgfxTransientIndexBuffer >()
+'  Global BgfxTransientVertexBufferPool := New Pool< BgfxTransientVertexBuffer >()
+
 Extern
 
 '-------------------------------------------------------------------------------
@@ -450,6 +460,16 @@ Class BgfxMemory="bgfx_memory_object"
 End
 
 Class BgfxTransform="bgfx_transform_object"
+
+	Method PokeByte  :Void( addr:Int, value:Int )
+	Method PokeShort :Void( addr:Int, value:Int )
+	Method PokeInt   :Void( addr:Int, value:Int )
+	Method PokeFloat :Void( addr:Int, value:Float )
+
+	Method PeekByte  :Int( addr:Int )
+	Method PeekShort :Int( addr:Int )
+	Method PeekInt   :Int( addr:Int )
+	Method PeekFloat :Float( addr:Int )
 End
 
 '  typedef uint16_t bgfx_view_id_t;		' just use int
@@ -475,6 +495,10 @@ End
 
 Class BgfxTransientIndexBuffer="bgfx_transient_index_buffer_object"
 
+'  	Method Free:Void()
+'  		BgfxTransientIndexBufferPool.Free( Self )
+'  	End
+
 	Method PokeByte:Void( addr:Int, value:Int )
 	Method PokeShort:Void( addr:Int, value:Int )
 	Method PokeInt:Void( addr:Int, value:Int )
@@ -487,6 +511,10 @@ Class BgfxTransientIndexBuffer="bgfx_transient_index_buffer_object"
 End
 
 Class BgfxTransientVertexBuffer="bgfx_transient_vertex_buffer_object"
+
+'  	Method Free:Void()
+'  		BgfxTransientVertexBufferPool.Free( Self )
+'  	End
 
 	Method PokeByte:Void( addr:Int, value:Int )
 	Method PokeShort:Void( addr:Int, value:Int )
@@ -564,46 +592,632 @@ End
 Class BgfxNativeWindowHandle="bgfx_native_window_handle_object"
 End
 
+'  Class BgfxEmbeddedShader="bgfx_embedded_shader_object"
+'  	Method SetName:Void( name:String )
+'  	Method SetData:Void( type:Int, data:DataBuffer )
+'  	Method SetData:Void( index:Int, type:Int, data:DataBuffer )
+'  End
+
 '-------------------------------------------------------------------------------
 ' functions
 '-------------------------------------------------------------------------------
 
 '  Function bgfxUtilsLoadProgram:Int( _vsName:String, _fsName:String )="_bgfx_utils_load_program"
 
-Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[] )="_bx_mtx_look_at"
-Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] )="_bx_mtx_look_at"
-Function bxMtxProj:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj"
-Function bxMtxRotateXY:Void( _result:Float[], _ax:Float, _ay:Float )="_bx_mtx_rotate_x_y"
-Function bxMtxOrtho:Void( _result:Float[], _left:Float, _right:Float, bottom:Float, _top:Float, _near:Float, _far:Float, _offset:Float, _oglNdc:Bool )="_bx_mtx_ortho"
-Function bxVec3Norm:Void( _result:Float[], _a:Float[] )="_bx_vec3_norm"
-Function bxMtxMul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_mtx_mul"
-Function bxMtxInverse:Void( _result:Float[], _a:Float[] )="_bx_mtx_inverse"
-Function bxVec4MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec4_mul_mtx"
-Function bxCntTZ:Int( _value:Int )="_bx_cnt_t_z"
-Function bxMtxSRT:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float, _ax:Float, _ay:Float, _az:Float, _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_s_r_t"
-Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_translate"
-Function bxVec3MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx"
-Function bxSquare:Float( _a:Float )="_bx_square"
-Function bxMtxScale:Float( _result:Float[], _sx:Float, _sy:Float, _sz:Float )="_bx_mtx_scale"
-Function bxVec3Cross:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_cross"
-Function bxVec3Move:Void( _result:Float[], _a:Float[] )="_bx_vec3_move"
-Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_mul"
-Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_mul"
-Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_add"
-Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_add"
-Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_sub"
-Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_sub"
-Function bxVec3Dot:Float( _a:Float[], _b:Float[] )="_bx_vec3_dot"
-Function bxMtxIdentity:Float( _result:Float[] )="_bx_mtx_identity"
-Function bxToRad:Float( _deg:Float )="_bx_to_rad"
-Function bxMtxTranspose:Void( _result:Float[], _a:Float[] )="_bx_mtx_transpose"
-Function bxVec3MulMtxH:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx_h"
-Function bxVec3Length:Float( _a:Float[] )="_bx_vec3_length"
-Function bxLerp:Float( _a:Float, _b:Float, _t:Float )="_bx_lerp"
-Function bxMtxRotateX:Float( _result:Float[], _ay:Float )="_bx_mtx_rotate_x"
-Function bxMtxRotateY:Float( _result:Float[], _ay:Float )="_bx_mtx_rotate_y"
-Function bxMtxRotateZ:Float( _result:Float[], _az:Float )="_bx_mtx_rotate_z"
+Function CastIntToFloat:Float( _ii:Int )="_cast_int_to_float"
+Function CastFloatToInt:Int( _ii:Float )="_cast_float_to_int"
 
+'  Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[] )="_bx_mtx_look_at"
+'  Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] )="_bx_mtx_look_at"
+'  Function bxMtxProj:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj"
+'  Function bxMtxRotateXY:Void( _result:Float[], _ax:Float, _ay:Float )="_bx_mtx_rotate_x_y"
+'  Function bxMtxOrtho:Void( _result:Float[], _left:Float, _right:Float, bottom:Float, _top:Float, _near:Float, _far:Float, _offset:Float, _oglNdc:Bool )="_bx_mtx_ortho"
+'  Function bxVec3Norm:Float( _result:Float[], _a:Float[] )="_bx_vec3_norm"
+'  Function bxMtxMul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_mtx_mul"
+'  Function bxMtxInverse:Void( _result:Float[], _a:Float[] )="_bx_mtx_inverse"
+'  Function bxVec4MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec4_mul_mtx"
+'  Function bxMtxSRT:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float, _ax:Float, _ay:Float, _az:Float, _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_s_r_t"
+'  Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_translate"
+'  Function bxVec3MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx"
+'  Function bxSquare:Float( _a:Float )="_bx_square"
+'  Function bxMtxScale:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float )="_bx_mtx_scale"
+'  Function bxVec3Cross:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_cross"
+'  Function bxVec3Move:Void( _result:Float[], _a:Float[] )="_bx_vec3_move"
+'  Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_mul"
+'  Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_mul"
+'  Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_add"
+'  Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_add"
+'  Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_sub"
+'  Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_sub"
+'  Function bxVec3Dot:Float( _a:Float[], _b:Float[] )="_bx_vec3_dot"
+'  Function bxMtxIdentity:Void( _result:Float[] )="_bx_mtx_identity"
+'  Function bxToRad:Float( _deg:Float )="_bx_to_rad"
+'  Function bxMtxTranspose:Void( _result:Float[], _a:Float[] )="_bx_mtx_transpose"
+'  Function bxVec3MulMtxH:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx_h"
+'  Function bxVec3Length:Float( _a:Float[] )="_bx_vec3_length"
+'  Function bxLerp:Float( _a:Float, _b:Float, _t:Float )="_bx_lerp"
+'  Function bxMtxRotateX:Void( _result:Float[], _ax:Float )="_bx_mtx_rotate_x"
+'  Function bxMtxRotateY:Void( _result:Float[], _ay:Float )="_bx_mtx_rotate_y"
+'  Function bxMtxRotateZ:Void( _result:Float[], _az:Float )="_bx_mtx_rotate_z"
+'  Function bxVec3Rcp:Void( _result:Float[], _a:Float[] )="_bx_vec3_rcp"
+'  Function bxVec3Min:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_min"
+'  Function bxVec3Max:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_max"
+'  Function bxVec3Lerp:Void( _result:Float[], _a:Float[], _b:Float[], _t:Float )="_bx_vec3_lerp"
+'  Function bxVec3Lerp:Void( _result:Float[], _a:Float[], _b:Float[], _c:Float[] )="_bx_vec3_lerp"
+'  Function bxVec3Neg:Void( _result:Float[], _a:Float[] )="_bx_vec3_neg"
+
+
+' Returns converted the argument _deg to radians.
+Function bxToRad:Float( _deg:Float )="bx::toRad"
+
+' Returns converted the argument _rad to degrees.
+Function bxToDeg:Float( _rad:Float )="bx::toDeg"
+
+' Reinterprets the bit pattern of _a as uint32_t.
+Function bxFloatToBits:Int( _a:Float )="bx::floatToBits"
+
+' Reinterprets the bit pattern of _a as Float.
+Function bxBitsToFloat:Float( _a:Int )="bx::bitsToFloat"
+
+' Reinterprets the bit pattern of _a as uint64_t.
+'  Function uint64_t doubleToBits(double _a);
+
+' Reinterprets the bit pattern of _a as double.
+'  Function double bitsToDouble(uint64_t _a);
+
+' Returns sortable Floating point value.
+Function bxFloatFlip:Int( _value:Int )="bx::floatFlip"
+
+' Returns true if _f is a number that is NaN.
+Function bxIsNan:Bool( _f:Float )="bx::isNan"
+
+' Returns true if _f is a number that is NaN.
+'  Function bxIsNan:Bool(double _f)="bx::isNan"
+
+' Returns true if _f is not infinite and is not a NaN.
+Function bxIsFinite:Bool( _f:Float )="bx::isFinite"
+
+' Returns true if _f is not infinite and is not a NaN.
+'  Function bxIsFinite:Bool(double _f)="bx::isFinite"
+
+' Returns true if _f is infinite and is not a NaN.
+Function bxIsInfinite:Bool( _f:Float )="bx::isInfinite"
+
+' Returns true if _f is infinite and is not a NaN.
+'  Function bxIsInfinite:Bool(double _f)="bx::isInfinite"
+
+' Returns the largest integer value not greater than _f.
+Function bxFloor:Float( _f:Float )="bx::floor"
+
+' Returns the smallest integer value not less than _f.
+Function bxCeil:Float( _f:Float )="bx::ceil"
+
+' Returns the nearest integer value to _f, rounding halfway cases away from zero,
+Function bxRound:Float( _f:Float )="bx::round"
+
+' Returns linear interpolation between two values _a and _b.
+Function bxLerp:Float( _a:Float, _b:Float, _t:Float )="bx::lerp"
+
+' Returns the sign of _a.
+Function bxSign:Float( _a:Float )="bx::sign"
+
+' Returns the absolute of _a.
+Function bxAbs:Float( _a:Float )="bx::abs"
+
+' Returns the square of _a.
+Function bxSquare:Float( _a:Float )="bx::square"
+
+' Returns the cosine of the argument _a.
+Function bxSin:Float( _a:Float )="bx::sin"
+
+' Returns hyperbolic sine of the argument _a.
+Function bxSinh:Float( _a:Float )="bx::sinh"
+
+' Returns radian angle between -pi/2 and +pi/2 whose sine is _a.
+Function bxAsin:Float( _a:Float )="bx::asin"
+
+' Returns the cosine of the argument _a.
+Function bxCos:Float( _a:Float )="bx::cos"
+
+' Returns hyperbolic cosine of the argument _a.
+Function bxCosh:Float( _a:Float )="bx::cosh"
+
+' Returns radian angle between 0 and pi whose cosine is _a.
+Function bxAcos:Float( _a:Float )="bx::acos"
+
+' Returns the circular tangent of the radian argument _a.
+Function bxTan:Float( _a:Float )="bx::tan"
+
+' Returns hyperbolic tangent of the argument _a.
+Function bxTanh:Float( _a:Float )="bx::tanh"
+
+' Returns radian angle between -pi/2 and +pi/2 whose tangent is _a.
+Function bxAtan:Float( _a:Float )="bx::atan"
+
+' Retruns the inverse tangent of _y/_x.
+Function bxAtan2:Float( _y:Float, _x:Float )="bx::atan2"
+
+' Computes _a raised to the _b power.
+Function bxPow:Float( _a:Float, _b:Float )="bx::pow"
+
+' Returns the result of multiplying _a by 2 raised to the power of the exponent.
+Function bxLdexp:Float( _a:Float, _b:Int )="bx::ldexp"
+
+' Returns decomposed given Floating point value _a into a normalized fraction and
+' an integral power of two.
+Function bxFrexp:Float( _a:Float, _outExp:Int[] )="_bx_frexp"
+
+' Returns e (2.71828...) raised to the _a power.
+Function bxExp:Float( _a:Float )="bx::exp"
+
+' Returns 2 raised to the _a power.
+Function bxExp2:Float( _a:Float )="bx::exp2"
+
+' Returns the base e (2.71828...) logarithm of _a.
+Function bxLog:Float( _a:Float )="bx::log"
+
+' Returns the base 2 logarithm of _a.
+Function bxLog2:Float( _a:Float )="bx::log2"
+
+' Returns the square root of _a.
+Function bxSqrt:Float( _a:Float )="bx::sqrt"
+
+' Returns reciprocal square root of _a.
+Function bxRsqrt:Float( _a:Float )="bx::rsqrt"
+
+' Returns the nearest integer not greater in magnitude than _a.
+Function bxTrunc:Float( _a:Float )="bx::trunc"
+
+' Returns the fractional (or decimal) part of _a, which is greater than or equal to 0
+' and less than 1.
+Function bxFract:Float( _a:Float )="bx::fract"
+
+' Returns result of multipla and add (_a * _b + _c).
+Function bxMad:Float( _a:Float, _b:Float, _c:Float )="bx::mad"
+
+' Returns the Floating-point remainder of the division operation _a/_b.
+Function bxMod:Float( _a:Float, _b:Float )="bx::mod"
+
+'
+Function bxEqual:Bool( _a:Float, _b:Float, _epsilon:Float )="bx::equal"
+
+'
+Function bxEqual:Bool( _a:Float[], _b:Float[], _num:Int, _epsilon:Float )="_bx_equal"
+
+'
+Function bxWrap:Float( _a:Float , _wrap:Float )="bx::wrap"
+
+'
+Function bxStep:Float( _edge:Float, _a:Float )="bx::step"
+
+'
+Function bxPulse:Float( _a:Float, _start:Float, _end:Float )="bx::pulse"
+
+'
+Function bxSmoothStep:Float( _a:Float )="bx::smoothStep"
+
+' References:
+'  - Bias And Gain Are Your Friend
+'    http://blog.demofox.org/2012/09/24/bias-and-gain-are-your-friend/
+'  - http://demofox.org/biasgain.html
+Function bxBias:Float( _time:Float, _bias:Float )="bx::bias"
+
+'
+Function bxGain:Float( _time:Float, _gain:Float )="bx::gain"
+
+'
+Function bxAngleDiff:Float( _a:Float, _b:Float )="bx::angleDiff"
+
+' Returns shortest distance linear interpolation between two angles.
+Function bxAngleLerp:Float( _a:Float, _b:Float, _t:Float )="bx::angleLerp"
+
+'
+Function bxVec3Move:Void( _result:Float[], _a:Float[] )="_bx_vec3_move"
+
+'
+Function bxVec3Abs:Void( _result:Float[], _a:Float[] )="_bx_vec3_abs"
+
+'
+Function bxVec3Neg:Void( _result:Float[], _a:Float[] )="_bx_vec3_neg"
+
+'
+Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_add"
+
+'
+Function bxVec3Add:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_add"
+
+'
+Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_sub"
+
+'
+Function bxVec3Sub:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_sub"
+
+'
+Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_mul"
+
+'
+Function bxVec3Mul:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec3_mul"
+
+'
+Function bxVec3Dot( _a:Float[], _b:Float[] )="_bx_vec3_dot"
+
+'
+Function bxVec3Cross:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_cross"
+
+'
+Function bxVec3Length:Float( _a:Float[] )="_bx_vec3_length"
+
+'
+Function bxVec3Lerp:Void( _result:Float[], _a:Float[], _b:Float[], _t:Float )="_bx_vec3_lerp"
+
+'
+Function bxVec3Lerp:Void( _result:Float[], _a:Float[], _b:Float[], _c:Float[] )="_bx_vec3_lerp"
+
+'
+Function bxVec3Norm:Float( _result:Float[], _a:Float[] )="_bx_vec3_norm"
+
+'
+Function bxVec3Min:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_min"
+
+'
+Function bxVec3Max:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec3_max"
+
+'
+Function bxVec3Rcp:Void( _result:Float[], _a:Float[] )="_bx_vec3_rcp"
+
+' Calculate tangent frame from normal.
+Function bxVec3TangentFrame:Void( _n:Float[], _t:Float[], _b:Float[] )="_bx_vec3_tangent_frame"
+
+' Calculate tangent frame from normal and angle.
+Function bxVec3TangentFrame( _n:Float[], _t:Float[], _b:Float[], _angle:Float )="_bx_vec3_tangent_frame"
+
+'
+Function bxVec3FromLatLong:Void( _vec:Float[], _u:Float, _v:Float )="_bx_vec3_from_lat_long"
+
+' Convert direction to 2D latitude and longitude.
+'
+' @param[out] _outU U-coordinate.
+' @param[out] _outV V-coordinate.
+' @param[in] _dir Normalized direction vector.
+Function bxVec3ToLatLong:Void( _outU:Float[], _outV:Float[], _dir:Float[] )="_bx_vec3_to_lat_long"
+
+'
+Function bxQuatIdentity:Void( _result:Float[] )="_bx_quat_identity"
+
+'
+Function bxQuatMove:Void( _result:Float[], _a:Float[] )="_bx_quat_move"
+
+'
+Function bxQuatMulXYZ:Void( _result:Float[], _qa:Float[], _qb:Float[] )="_bx_quat_mul_xyz"
+
+'
+Function bxQuatMul:Void( _result:Float[], _qa:Float[], _qb:Float[] )="_bx_quat_mul"
+
+'
+Function bxQuatInvert:Void( _result:Float[], _quat:Float[] )="_bx_quat_invert"
+
+'
+Function bxQuatDot:Float( _a:Float[], _b:Float[] )="_bx_quat_dot"
+
+'
+Function bxQuatNorm:Void( _result:Float[], _quat:Float[] )="_bx_quat_norm"
+
+'
+Function bxQuatToEuler:Void( _result:Float[], _quat:Float[] )="_bx_quat_to_euler"
+
+'
+Function bxQuatRotateAxis:Void( _result:Float[], _axis:Float[], _angle:Float )="_bx_quat_rotate_axis"
+
+'
+Function bxQuatRotateX:Void( _result:Float[], _ax:Float )="_bx_quat_rotate_x"
+
+'
+Function bxQuatRotateY:Void( _result:Float[], _ay:Float )="_bx_quat_rotate_y"
+
+'
+Function bxQuatRotateZ:Void( _result:Float[], _az:Float )="_bx_quat_rotate_z"
+
+'
+Function bxVec3MulQuat:Void( _result:Float[], _vec:Float[], _quat:Float[] )="_bx_vec3_mul_quat"
+
+'
+Function bxMtxIdentity:Void( _result:Float[] )="_bx_mtx_identity"
+
+'
+Function bxMtxTranslate:Void( _result:Float[], _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_translate"
+
+'
+Function bxMtxScale:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float )="_bx_mtx_scale"
+
+'
+Function bxMtxScale:Void( _result:Float[], _scale:Float )="_bx_mtx_scale"
+
+'
+Function bxMtxFromNormal:Void( _result:Float[], _normal:Float[], _scale:Float, _pos:Float[] )="_bx_mtx_from_normal"
+
+'
+Function bxMtxFromNormal:Void( _result:Float[], _normal:Float[], _scale:Float, _pos:Float[], _angle:Float )="_bx_mtx_from_normal"
+
+'
+Function bxMtxQuat:Void( _result:Float[], _quat:Float[] )="_bx_mtx_quat"
+
+'
+Function bxMtxQuatTranslation:Void( _result:Float[], _quat:Float[], _translation:Float[] )="_bx_mtx_quat_translation"
+
+'
+Function bxMtxQuatTranslationHMD:Void( _result:Float[], _quat:Float[], _translation:Float[] )="_bx_mtx_quat_translation_hmd"
+
+'
+' Function bxMtxLookAtLh:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] = Null )="_bx_"
+Function bxMtxLookAtLh:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] )="_bx_mtx_look_at_lh"
+Function bxMtxLookAtLh:Void( _result:Float[], _eye:Float[], _at:Float[] )="_bx_mtx_look_at_lh"
+
+'
+' Function bxMtxLookAtRh:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] = Null )="_bx_"
+Function bxMtxLookAtRh:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] )="_bx_mtx_look_at_rh"
+Function bxMtxLookAtRh:Void( _result:Float[], _eye:Float[], _at:Float[] )="_bx_mtx_look_at_rh"
+
+'
+' Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _a:Float[], _up:Float[] = Null )="_bx_"
+Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[], _up:Float[] )="_bx_mtx_look_at"
+Function bxMtxLookAt:Void( _result:Float[], _eye:Float[], _at:Float[] )="_bx_mtx_look_at"
+
+'
+Function bxMtxProj:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj"
+
+'
+Function bxMtxProj:Void( _result:Float[], _fov:Float[], _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj"
+
+'
+Function bxMtxProj:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj"
+
+'
+Function bxMtxProjLh:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj_lh"
+
+'
+Function bxMtxProjLh:Void( _result:Float[], _fov:Float[], _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj_lh"
+
+'
+Function bxMtxProjLh:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj_lh"
+
+'
+Function bxMtxProjRh:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj_rh"
+
+'
+Function bxMtxProjRh:Void( _result:Float[], _fov:Float[], _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj_rh"
+
+'
+Function bxMtxProjRh:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _far:Float, _oglNdc:Bool )="_bx_mtx_proj_rh"
+
+'
+Function bxMtxProjInf:Void( _result:Float[], _fov:Float[], _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf"
+
+'
+Function bxMtxProjInf:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf"
+
+'
+Function bxMtxProjInf:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf"
+
+'
+Function bxMtxProjInfLh:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf_lh"
+
+'
+Function bxMtxProjInfLh:Void( _result:Float[], _fov:Float[], _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf_lh"
+
+'
+Function bxMtxProjInfLh:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf_lh"
+
+'
+Function bxMtxProjInfRh:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf_rh"
+
+'
+Function bxMtxProjInfRh:Void( _result:Float[], _fov:Float[], _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf_rh"
+
+'
+Function bxMtxProjInfRh:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_inf_rh"
+
+'
+Function bxMtxProjRevInfLh:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_rev_inf_lh"
+
+'
+Function bxMtxProjRevInfLh:Void( _result:Float[], _fov:Float[], _near:Float, _oglNdc:Bool )="_bx_mtx_proj_rev_inf_lh"
+
+'
+Function bxMtxProjRevInfLh:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_rev_inf_lh"
+
+'
+Function bxMtxProjRevInfRh:Void( _result:Float[], _ut:Float, _dt:Float, _lt:Float, _rt:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_rev_inf_rh"
+
+'
+Function bxMtxProjRevInfRh:Void( _result:Float[], _fov:Float[], _near:Float, _oglNdc:Bool )="_bx_mtx_proj_rev_inf_rh"
+
+'
+Function bxMtxProjRevInfRh:Void( _result:Float[], _fovy:Float, _aspect:Float, _near:Float, _oglNdc:Bool )="_bx_mtx_proj_rev_inf_rh"
+
+'
+Function bxMtxOrtho:Void( _result:Float[], _left:Float, _right:Float, _bottom:Float, _top:Float, _near:Float, _far:Float, _offset:Float, _oglNdc:Bool )="_bx_mtx_ortho"
+
+'
+Function bxMtxOrthoLh:Void( _result:Float[], _left:Float, _right:Float, _bottom:Float, _top:Float, _near:Float, _far:Float, _offset:Float, _oglNdc:Bool )="_bx_mtx_ortho_lh"
+
+'
+Function bxMtxOrthoRh:Void( _result:Float[], _left:Float, _right:Float, _bottom:Float, _top:Float, _near:Float, _far:Float, _offset:Float, _oglNdc:Bool )="_bx_mtx_ortho_rh"
+
+'
+Function bxMtxRotateX:Void( _result:Float[], _ax:Float )="_bx_mtx_rotate_x"
+
+'
+Function bxMtxRotateY:Void( _result:Float[], _ay:Float )="_bx_mtx_rotate_y"
+
+'
+Function bxMtxRotateZ:Void( _result:Float[], _az:Float )="_bx_mtx_rotate_z"
+
+'
+Function bxMtxRotateXY:Void( _result:Float[], _ax:Float, _ay:Float )="_bx_mtx_rotate_xy"
+
+'
+Function bxMtxRotateXYZ:Void( _result:Float[], _ax:Float, _ay:Float, _az:Float )="_bx_mtx_rotate_xyz"
+
+'
+Function bxMtxRotateZYX:Void( _result:Float[], _ax:Float, _ay:Float, _az:Float )="_bx_mtx_rotate_zyx"
+
+'
+Function bxMtxSRT:Void( _result:Float[], _sx:Float, _sy:Float, _sz:Float, _ax:Float, _ay:Float, _az:Float, _tx:Float, _ty:Float, _tz:Float )="_bx_mtx_srt"
+
+'
+Function bxVec3MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx"
+
+'
+Function bxVec3MulMtxXyz0:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx_xyz0"
+
+'
+Function bxVec3MulMtxH:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec3_mul_mtx_h"
+
+'
+Function bxVec4Mul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_vec4_mul"
+
+'
+Function bxVec4Mul:Void( _result:Float[], _a:Float[], _b:Float )="_bx_vec4_mul"
+
+'
+Function bxVec4MulMtx:Void( _result:Float[], _vec:Float[], _mat:Float[] )="_bx_vec4_mul_mtx"
+
+'
+Function bxMtxMul:Void( _result:Float[], _a:Float[], _b:Float[] )="_bx_mtx_mul"
+
+'
+Function bxMtxTranspose:Void( _result:Float[], _a:Float[] )="_bx_mtx_transpose"
+
+'
+Function bxMtx3Inverse:Void( _result:Float[], _a:Float[] )="_bx_mtx3_inverse"
+
+'
+Function bxMtxInverse:Void( _result:Float[], _a:Float[] )="_bx_mtx_inverse"
+
+' Convert LH to RH projection matrix and vice versa.
+'
+Function bxMtxProjFlipHandedness:Void( _dst:Float[], _src:Float[] )="_bx_mtx_proj_flip_handedness"
+
+' Convert LH to RH view matrix and vice versa.
+'
+Function bxMtxViewFlipHandedness:Void( _dst:Float[], _src:Float[] )="_bx_mtx_view_flip_handedness"
+
+'
+Function bxCalcNormal:Void( _result:Float[], _va:Float[], _vb:Float[], _vc:Float[] )="_bx_calc_normal"
+
+'
+Function bxCalcPlane:Void( _result:Float[], _va:Float[], _vb:Float[], _vc:Float[] )="_bx_calc_plane"
+
+'
+' Function bxCalcLinearFit2D:Void( _result:Float[], void* _points, uint32_t _stride, uint32_t _numPoints )="_bx_"
+Function bxCalcLinearFit2D:Void( _result:Float[], _points:DataBuffer, _stride:Int, _numPoints:Int )="_bx_calc_linear_fit_2d"
+
+'
+' Function bxCalcLinearFit3D:Void( _result:Float[], void* _points, uint32_t _stride, uint32_t _numPoints )="_bx_"
+Function bxCalcLinearFit3D:Void( _result:Float[], _points:DataBuffer, _stride:Int, _numPoints:Int )="_bx_calc_linear_fit_3d"
+
+'
+Function bxRgbToHsv:Void( _hsv:Float[], _rgb:Float[] )="_bx_rgb_to_hsv"
+
+'
+Function bxHsvToRgb:Void( _rgb:Float[], _hsv:Float[] )="_bx_hsv_to_rgb"
+
+'
+Function bxToLinear:Float( _a:Float )="bx::toLinear"
+
+'
+Function bxToGamma:Float( _a:Float )="bx::toGamma"
+
+Function bxCntTZ:Int( _value:Int )="_bx_cnt_t_z"
+
+
+
+' Template for avoiding MSVC: C4127: conditional expression is constant
+Function bxIsEnabled:Bool()="bx::isEnabled"
+
+'
+Function bxIsTriviallyCopyable:Bool()="bx::isTriviallyCopyable"
+
+' Exchange two values. (not possible)
+'  Function bxXchg:Void( a:Int, b:Int )="bx::xchg"
+'  Function bxXchg:Void( a:Float, b:Float )="bx::xchg"
+
+' Exchange memory.
+Function bxXchg:Void( _a:Int[], _b:Int[], _numBytes:Int )="_bx_xchg"
+Function bxXchg:Void( _a:Float[], _b:Float[], _numBytes:Int )="_bx_xchg"
+Function bxXchg:Void( _a:DataBuffer, _b:DataBuffer, _numBytes:Int )="_bx_xchg"
+
+' Returns minimum of two values.
+Function bxMin:Int( _a:Int, _b:Int )="bx::min"
+Function bxMin:Float( _a:Float, _b:Float )="bx::min"
+
+' Returns maximum of two values.
+Function bxMax:Int( _a:Int, _b:Int )="bx::max"
+Function bxMax:Float( _a:Float, _b:Float )="bx::max"
+
+' Returns minimum of three values.
+Function bxMin:Int( _a:Int, _b:Int, _c:Int )="bx::min"
+Function bxMin:Float( _a:Float, _b:Float, _c:Float )="bx::min"
+
+' Returns maximum of three values.
+Function bxMax:Int( _a:Int, _b:Int, _c:Int )="bx::max"
+Function bxMax:Float( _a:Float, _b:Float, _c:Float )="bx::max"
+
+' Returns middle of three values.
+Function bxMid:Int( _a:Int, _b:Int, _c:Int )="bx::mid"
+Function bxMid:Float( _a:Float, _b:Float, _c:Float )="bx::mid"
+
+' Returns clamped value between min/max.
+Function bxClamp:Int( _a:Int, _min:Int, _max:Int )="bx::clamp"
+Function bxClamp:Float( _a:Float, _min:Float, _max:Float )="bx::clamp"
+
+' Returns true if value is power of 2.
+Function bxIsPowerOf2:Bool( _a:Int )="bx::isPowerOf2"
+Function bxIsPowerOf2:Bool( _a:Float )="bx::isPowerOf2"
+
+' http://cnicholson.net/2011/01/stupid-c-tricks-a-better-sizeof_array/
+' template<typename T, size_t N>
+' char (&COUNTOF_REQUIRES_ARRAY_ARGUMENT(const T(&)[N]) )[N];
+
+'
+Function bxMemCopy:Void( _dst:Int[], _src:Int[], _numBytes:Int )="_bx_mem_copy"
+Function bxMemCopy:Void( _dst:Float[], _src:Float[], _numBytes:Int )="_bx_mem_copy"
+Function bxMemCopy:Void( _dst:DataBuffer, _src:DataBuffer, _numBytes:Int )="_bx_mem_copy"
+
+'
+Function bxMemCopy:Void( _dst:Int[], _src:Int[], _size:Int, _num:Int, _srcPitch:Int, _dstPitch:Int )="_bx_mem_copy"
+Function bxMemCopy:Void( _dst:Float[], _src:Float[], _size:Int, _num:Int, _srcPitch:Int, _dstPitch:Int )="_bx_mem_copy"
+Function bxMemCopy:Void( _dst:DataBuffer, _src:DataBuffer, _size:Int, _num:Int, _srcPitch:Int, _dstPitch:Int )="_bx_mem_copy"
+
+'
+Function bxGather:Void( _dst:Int[], _src:Int[], _size:Int, _num:Int, _srcPitch:Int )="_bx_gather"
+Function bxGather:Void( _dst:Float[], _src:Float[], _size:Int, _num:Int, _srcPitch:Int )="_bx_gather"
+Function bxGather:Void( _dst:DataBuffer, _src:DataBuffer, _size:Int, _num:Int, _srcPitch:Int )="_bx_gather"
+
+'
+Function bxScatter:Void( _dst:Int[], _src:Int[], _size:Int, _num:Int, _dstPitch:Int )="_bx_scatter"
+Function bxScatter:Void( _dst:Float[], _src:Float[], _size:Int, _num:Int, _dstPitch:Int )="_bx_scatter"
+Function bxScatter:Void( _dst:DataBuffer, _src:DataBuffer, _size:Int, _num:Int, _dstPitch:Int )="_bx_scatter"
+
+'
+Function bxMemMove:Void( _dst:Int[], _src:Int[], _numBytes:Int )="_bx_mem_move"
+Function bxMemMove:Void( _dst:Float[], _src:Float[], _numBytes:Int )="_bx_mem_move"
+Function bxMemMove:Void( _dst:DataBuffer, _src:DataBuffer, _numBytes:Int )="_bx_mem_move"
+
+'
+Function bxMemSet:Void( _dst:Int[], _ch:Int, _numBytes:Int )="_bx_mem_set"
+Function bxMemSet:Void( _dst:Float[], _ch:Int, _numBytes:Int )="_bx_mem_set"
+Function bxMemSet:Void( _dst:DataBuffer, _ch:Int, _numBytes:Int )="_bx_mem_set"
+
+'
+Function bxMemCmp:Int( _lhs:Int[], _rhs:Int[], _numBytes:Int )="_bx_mem_cmp"
+Function bxMemCmp:Int( _lhs:Float[], _rhs:Float[], _numBytes:Int )="_bx_mem_cmp"
+Function bxMemCmp:Int( _lhs:DataBuffer, _rhs:DataBuffer, _numBytes:Int )="_bx_mem_cmp"
+
+
+' from bgfx/embedded_shader.h:
+' ShaderHandle bgfx::createEmbeddedShader(const bgfx::EmbeddedShader* _es, RendererType::Enum _type, const char* _name);
+'  Function bgfxCreateEmbeddedShader:Int( _es:BgfxEmbeddedShader, _type:Int, _name:String )="_bgfx_create_embedded_shader"
 
 Function bgfxReadPixels:Void( pixels:Int[], x:Int, y:Int, width:Int, height:Int, arrayOffset:Int=0, arrayPitch:Int=0 )="_bgfx_read_pixels"
 
@@ -641,6 +1255,7 @@ Function bgfxWeldVertices:Int( _output:DataBuffer, _decl:BgfxVertexDecl, _data:D
 
 '  int bgfx_topology_convert(int _conversion, void* _dst, int _dstSize, const void* _indices, int _numIndices, bool _index32);
 Function bgfxTopologyConvert:Int( _conversion:Int, _dst:DataBuffer, _dstSize:Int, _indices:DataBuffer, _numIndices:Int, _index32:Bool )="_bgfx_topology_convert"
+Function bgfxTopologyConvert:Int( _conversion:Int, _dst:DataBuffer, _dstStart:Int, _dstSize:Int, _indices:DataBuffer, _indicesStart:Int, _numIndices:Int, _index32:Bool )="_bgfx_topology_convert"
 
 '  void bgfx_topology_sort_tri_list(int _sort, void* _dst, int _dstSize, const float _dir[3], const float _pos[3], const void* _vertices, int _stride, const void* _indices, int _numIndices, bool _index32);
 Function bgfxTopologySortTriList:Void( _sort:Int, _dst:DataBuffer, _dstSize:Int, _dir:Float[], _pos:Float[], _vertices:DataBuffer, _stride:Int, _indices:DataBuffer, _numIndices:Int, _index32:Bool )="_intri_list"
@@ -695,6 +1310,12 @@ Function bgfxCopy:Void( _mem:BgfxMemory, _data:DataBuffer, _index:Int, _size:Int
 Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:DataBuffer )="_bgfx_make_ref"
 Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:DataBuffer, _size:Int )="_bgfx_make_ref"
 Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:DataBuffer, _index:Int, _size:Int )="_bgfx_make_ref"
+Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:Int[] )="_bgfx_make_ref"
+Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:Int[], _size:Int )="_bgfx_make_ref"
+Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:Int[], _index:Int, _size:Int )="_bgfx_make_ref"
+Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:Float[] )="_bgfx_make_ref"
+Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:Float[], _size:Int )="_bgfx_make_ref"
+Function bgfxMakeRef:Void( _mem:BgfxMemory, _data:Float[], _index:Int, _size:Int )="_bgfx_make_ref"
 
 '  const bgfx_memory_object* bgfx_make_ref_release(const void* _data, int _size, bgfx_release_fn_t _releaseFn, void* _userData);
 ' this function requires a function pointer
@@ -718,7 +1339,7 @@ Function bgfxDbgTextPrintf:Void( _x:Int, _y:Int, _attr:Int, _format:String )="_b
 Function bgfxDbgTextImage:Void( _x:Int, _y:Int, _width:Int, _height:Int, _data:DataBuffer, _pitch:Int, _startIndex:Int=0 )="_bgfx_dbg_text_image"
 
 '  bgfx_index_buffer_handle_object bgfx_create_index_buffer(const bgfx_memory_object* _mem, int _flags);
-Function bgfxCreateIndexBuffer:Int( _mem:BgfxMemory, _flags=BGFX_BUFFER_NONE )="_bgfx_create_index_buffer"
+Function bgfxCreateIndexBuffer:Int( _mem:BgfxMemory, _flags:Int=BGFX_BUFFER_NONE )="_bgfx_create_index_buffer"
 
 '  void bgfx_destroy_index_buffer(bgfx_index_buffer_handle_object _handle);
 Function bgfxDestroyIndexBuffer:Void( _handle:Int )="_bgfx_destroy_index_buffer"
@@ -1128,8 +1749,8 @@ Function bgfxEncoderSetDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stream:I
 Function bgfxEncoderSetDynamicVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _handle:Int, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_dynamic_vertex_buffer"
 
 '  void bgfx_encoder_set_transient_vertex_buffer(struct bgfx_encoder_s* _encoder, int _stream, const bgfx_transient_vertex_buffer_object* _tvb, int _startVertex, int _numVertices);
-Function bgfxEncoderSetTransientVertexBuffer:Void( _encoder:BgfxEncoder, _encoder:Int, _tvb:BgfxTransientVertexBuffer )="_bgfx_encoder_set_transient_vertex_buffer"
-Function bgfxEncoderSetTransientVertexBuffer:Void( _encoder:BgfxEncoder, _encoder:Int, _tvb:BgfxTransientVertexBuffer, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_transient_vertex_buffer"
+Function bgfxEncoderSetTransientVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _tvb:BgfxTransientVertexBuffer )="_bgfx_encoder_set_transient_vertex_buffer"
+Function bgfxEncoderSetTransientVertexBuffer:Void( _encoder:BgfxEncoder, _stream:Int, _tvb:BgfxTransientVertexBuffer, _startVertex:Int, _numVertices:Int )="_bgfx_encoder_set_transient_vertex_buffer"
 
 '  void bgfx_encoder_set_vertex_count(struct bgfx_encoder_s* _encoder, int _numVertices);
 Function bgfxEncoderSetVertexCount:Void( _encoder:BgfxEncoder, _numVertices:Int )="_bgfx_encoder_set_vertex_count"
@@ -1223,12 +1844,89 @@ Function bgfxUtilsSet64Bit:Void( numbers:Int[], value:Int )
 End
 
 Function bgfxUtilsIs64BitEquals:Bool( numbers:Int[], bitMasks:Int[] )
-	Return ( numbers[ 0 ] & bitMasks[ 0 ] ) = bitMasks[ 0 ] And
-			( numbers[ 1 ] & bitMasks[ 1 ] ) = bitMasks[ 1 ]
+	Return ( numbers[ 0 ] & bitMasks[ 0 ] ) = bitMasks[ 0 ] And ( numbers[ 1 ] & bitMasks[ 1 ] ) = bitMasks[ 1 ]
 End
 
 Function bgfxUtilsIs64BitEquals:Bool( numbers:Int[], bitMasks:Int )
 	Return ( numbers[ 1 ] & bitMasks ) = bitMasks
+End
+
+'-------------------------------------------------------------------------------
+' 64-bit version 2
+'-------------------------------------------------------------------------------
+
+Function Clear64:Void( result:Int[] )
+	result[ 0 ] = 0
+	result[ 1 ] = 0
+End
+
+Function Set64:Void( result:Int[], value:Int[] )
+	result[ 0 ] = value[ 0 ]
+	result[ 1 ] = value[ 1 ]
+End
+
+Function Set64:Void( result:Int[], value:Int )
+	result[ 1 ] = value
+End
+
+Function And64:Void( result:Int[], value:Int[] )
+	result[ 0 ] &= value[ 0 ]
+	result[ 1 ] &= value[ 1 ]
+End
+
+Function And64:Void( result:Int[], value:Int )
+	result[ 1 ] &= value
+End
+
+Function Or64:Void( result:Int[], value:Int[] )
+	result[ 0 ] |= value[ 0 ]
+	result[ 1 ] |= value[ 1 ]
+End
+
+Function Or64:Void( result:Int[], value:Int )
+	result[ 1 ] |= value
+End
+
+Function Xor64:Void( result:Int[] )
+	result[ 0 ] = ~result[0]
+	result[ 1 ] = ~result[1]
+End
+
+Function IsZero64:Bool( result:Int[] )
+	Return result[ 0 ] = 0 And result[ 1 ] = 0
+End
+
+'  use If Not IsZero64( a, b ) Then
+'  Function IsNotZero64:Bool( result:Int[] )
+'  	Return result[ 0 ] <> 0 Or result[ 1 ] <> 0
+'  End
+
+Function Equals64:Bool( value1:Int[], value2:Int[] )
+	Return value1[ 0 ] = value2[ 0 ] And value1[ 1 ] = value2[ 1 ]
+End
+
+'  use If Not Equals64( a, b ) Then
+'  Function NotEquals64:Bool( value1:Int[], value2:Int[] )
+'  	Return value1[ 0 ] = value2[ 0 ] And value1[ 1 ] = value2[ 1 ]
+'  End
+
+
+
+'  Function bgfxUtilsIs64BitMasked:Bool( numbers:Int[], bitMasks:Int[] )
+'  	Return ( numbers[ 0 ] & bitMasks[ 0 ] ) Or ( numbers[ 1 ] & bitMasks[ 1 ] )
+'  End
+
+
+Function bgfxUtilsMakeRef:BgfxMemory( _data:Float[] )
+	Local _mem := New BgfxMemory()
+	bgfxMakeRef( _mem, _data )
+	Return _mem
+End
+
+Function bgfxUtilsMakeRef:BgfxMemory( _data:Int[] )
+	Local _mem := New BgfxMemory()
+	bgfxMakeRef( _mem, _data )
+	Return _mem
 End
 
 Function bgfxUtilsMakeRef:BgfxMemory( _data:DataBuffer )
@@ -1298,7 +1996,7 @@ Function bgfxUtilsLoadShader:Int( _name:String )
 	Return handle
 End
 
-Function bgfxUtilsLoadProgram:Int( _vsName:String, _fsName:String="" )
+Function bgfxUtilsLoadProgram:Int( _vsName:String, _fsName:String="", destroyShaders:Bool=True )
 
 	Local vsh:Int = bgfxUtilsLoadShader( _vsName )
 	Local fsh:Int = BGFX_INVALID_HANDLE
@@ -1307,8 +2005,20 @@ Function bgfxUtilsLoadProgram:Int( _vsName:String, _fsName:String="" )
 		fsh = bgfxUtilsLoadShader( _fsName )
 	Endif
 
-	Local destroyShaders:Bool = True ' destroy shaders when program is destroyed 
+	' Local destroyShaders:Bool = True ' destroy shaders when program is destroyed 
+	Return bgfxCreateProgram( vsh, fsh, destroyShaders )
+End
 
+Function bgfxUtilsCreateProgram:Int( _vsData:Int[], _fsData:Int[]=[], destroyShaders:Bool=True )
+
+	Local vsh:Int = bgfxCreateShader( bgfxUtilsMakeRef( BytesToDataBuffer( _vsData ) ) )
+	Local fsh:Int = BGFX_INVALID_HANDLE
+
+	If _fsData.Length() > 0  Then
+		fsh = bgfxCreateShader( bgfxUtilsMakeRef( BytesToDataBuffer( _fsData ) ) )
+	Endif
+
+	' Local destroyShaders:Bool = True ' destroy shaders when program is destroyed 
 	Return bgfxCreateProgram( vsh, fsh, destroyShaders )
 End
 
@@ -1345,6 +2055,14 @@ End
 '-------------------------------------------------------------------------------
 ' bgfx utils mesh
 '-------------------------------------------------------------------------------
+
+Function ByteToInt:Int( xx:Int, yy:Int, zz:Int, ww:Int )
+	Return (xx & $ff) | ((yy & $ff) Shl 8) | ((zz & $ff) Shl 16) | ((ww & $ff) Shl 24)
+End
+
+Function ShortToInt:Int( xx:Int, yy:Int )
+	Return (xx & $ffff) | ((yy & $ffff) Shl 16)
+End
 
 '-------------------------------------------------------------------------------
 ' @Cleanup: move these to bgfx utils
@@ -1850,5 +2568,97 @@ Function bgfxUtilsEncodeNormalRgba8:Int(_x:Float, _y:Float=0.0, _z:Float=0.0, _w
 	Local srcw:Float = _w * 0.5 + 0.5
 
 	Return (Int(srcw * 255) Shl 24) | (Int(srcz * 255) Shl 16) | (Int(srcy * 255) Shl 8) | Int(srcx * 255)
+End
+
+'-------------------------------------------------------------------------------
+' no operation shader for embedded shader table
+'-------------------------------------------------------------------------------
+
+' 10 bytes - V, S, H, 5, 0, 0, 0, 0, 0, 0
+Global _shaderNoop:Int[] = [ $56, $53, $48, $5, $0, $0, $0, $0, $0, $0 ]
+
+'-------------------------------------------------------------------------------
+' array to data buffer
+'-------------------------------------------------------------------------------
+
+Function BytesToDataBuffer:DataBuffer( bytes:Int[] )
+	Return BytesToDataBuffer( Null, bytes )
+End
+
+Function BytesToDataBuffer:DataBuffer( bytesDb:DataBuffer, bytes:Int[] )
+
+	If Not bytesDb Then
+		bytesDb = New DataBuffer( bytes.Length() )
+	Endif
+
+	For Local ii:Int = 0 Until bytes.Length()
+		bytesDb.PokeByte( ii, bytes[ ii ] )
+	Next
+
+	Return bytesDb
+End
+
+Function ShortsToDataBuffer:DataBuffer( shorts:Int[] )
+	Return ShortsToDataBuffer( Null, shorts )
+End
+
+Function ShortsToDataBuffer:DataBuffer( shortsDb:DataBuffer, shorts:Int[] )
+
+	If Not shortsDb Then
+		shortsDb = New DataBuffer( shorts.Length() )
+	Endif
+
+	For Local ii:Int = 0 Until shorts.Length()
+		shortsDb.PokeShort( ii, shorts[ ii ] )
+	Next
+
+	Return shortsDb
+End
+
+Function IntsToDataBuffer:DataBuffer( ints:Int[] )
+	Return IntsToDataBuffer( Null, ints )
+End
+
+Function IntsToDataBuffer:DataBuffer( intsDb:DataBuffer, ints:Int[] )
+
+	If Not intsDb Then
+		intsDb = New DataBuffer( ints.Length() )
+	Endif
+
+	For Local ii:Int = 0 Until ints.Length()
+		intsDb.PokeInt( ii, ints[ ii ] )
+	Next
+
+	Return intsDb
+End
+
+Function FloatsToDataBuffer:DataBuffer( floats:Int[] )
+	Return FloatsToDataBuffer( Null, floats )
+End
+
+Function FloatsToDataBuffer:DataBuffer( floatsDb:DataBuffer, floats:Int[] )
+
+	If Not floatsDb Then
+		floatsDb = New DataBuffer( floats.Length() )
+	Endif
+
+	For Local ii:Int = 0 Until floats.Length()
+		floatsDb.PokeFloat( ii, floats[ ii ] )
+	Next
+
+	Return floatsDb
+End
+
+
+' Returns true if both internal transient index and vertex buffer have
+' enough space.
+'
+' @param[in] _numVertices Number of vertices.
+' @param[in] _decl Vertex declaration.
+' @param[in] _numIndices Number of indices.
+'
+Function bgfxUtilsCheckAvailTransientBuffers:Bool( _numVertices:Int, _decl:BgfxVertexDecl, _numIndices:Int )
+	Return _numVertices = bgfxGetAvailTransientVertexBuffer( _numVertices, _decl ) And
+		( 0 = _numIndices Or _numIndices = bgfxGetAvailTransientIndexBuffer( _numIndices ) )
 End
 
