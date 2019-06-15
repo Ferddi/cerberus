@@ -494,8 +494,8 @@ End
 
 Function Circle:Void( _out:Float[], _angle:Float )
 
-	Local sa:Float = Sinr( _angle )
-	Local ca:Float = Cosr( _angle )
+	Local sa:Float = Sin( _angle )
+	Local ca:Float = Cos( _angle )
 
 	_out[ 0 ] = sa
 	_out[ 1 ] = ca
@@ -503,8 +503,8 @@ End
 
 Function Squircle:Void( _out:Float[], _angle:Float )
 
-	Local sa:Float = Sinr( _angle )
-	Local ca:Float = Cosr( _angle )
+	Local sa:Float = Sin( _angle )
+	Local ca:Float = Cos( _angle )
 
 	_out[ 0 ] = Sqrt( Abs( sa ) ) * Sgn( sa )
 	_out[ 1 ] = Sqrt( Abs( ca ) ) * Sgn( ca )
@@ -878,34 +878,34 @@ Class Geometry ' MaxHandlesT is unlimited since we are using class Stack
 			Local mem := New BgfxMemory()
 			bgfxAlloc( mem, numIndices * indexSize )
 
-			Local indexData := New DataBuffer( numIndices * indexSize )
+			Local indexData := New DataBuffer( geometry.m_topologyNumIndices[ 1 ] * indexSize )
 
 			' bx::memCopy(indexData, _indices, _numIndices*indexSize );
-			Local address:Int = 0
-			If _index32 Then
-				For Local ii:Int = 0 Until _numIndices
-					indexData.PokeInt( address, _indices[ ii ] ) ; address += INT_SIZE
-				Next
-			Else
-				For Local ii:Int = 0 Until _numIndices
-					indexData.PokeShort( address, _indices[ ii ] ) ; address += SHORT_SIZE
-				Next
-			Endif
 
 			bgfxTopologyConvert(
 				BGFX_TOPOLOGY_CONVERT_TRI_LIST_TO_LINE_LIST,
 				indexData,
-				geometry.m_topologyNumIndices[ 0 ] * indexSize,
 				geometry.m_topologyNumIndices[ 1 ] * indexSize,
 				indicesDb,
-				0,
 				_numIndices,
 				_index32 )
 
-			address = 0
-			For Local ii:Int = 0 Until numIndices
-				mem.PokeShort( address, indexData.PeekShort( address ) ) ; address += 2
-			Next
+			Local address:Int = 0
+			If _index32 Then
+				For Local ii:Int = 0 Until geometry.m_topologyNumIndices[ 0 ]
+					mem.PokeInt( address, indicesDb.PeekInt( ii * INT_SIZE ) ) ; address += INT_SIZE
+				Next
+				For Local ii:Int = 0 Until geometry.m_topologyNumIndices[ 1 ]
+					mem.PokeInt( address, indexData.PeekInt( ii * INT_SIZE ) ) ; address += INT_SIZE
+				Next
+			Else
+				For Local ii:Int = 0 Until geometry.m_topologyNumIndices[ 0 ]
+					mem.PokeShort( address, indicesDb.PeekShort( ii * SHORT_SIZE ) ) ; address += SHORT_SIZE
+				Next
+				For Local ii:Int = 0 Until geometry.m_topologyNumIndices[ 1 ]
+					mem.PokeShort( address, indexData.PeekShort( ii * SHORT_SIZE ) ) ; address += SHORT_SIZE
+				Next
+			Endif
 
 			Local _flags:Int = BGFX_BUFFER_NONE ; If _index32 Then _flags = BGFX_BUFFER_INDEX32
 			geometry.m_ibh = bgfxCreateIndexBuffer( mem, _flags )
@@ -1169,7 +1169,7 @@ Class DebugDrawShared
 			Local id                 :Int = Mesh.Cone0 + mesh 
 
 			Local num                :Int = GetCircleLod( mesh )
-			Local angleStep          :Float = TWOPI / num
+			Local angleStep          :Float = 360.0 / num
 
 			Local numVertices        :Int = num + 1
 			Local numIndices         :Int = num * 6
@@ -1188,9 +1188,9 @@ Class DebugDrawShared
 			Local address :Int = num * DebugShapeVertex.TOTAL_SIZE
 
 			vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, 0.0 )
-			vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, 0.0 ) ; address += 4
-			vertex.PokeFloat( address + DebugShapeVertex.X_ADDRESS, 0.0 ) ; address += 4
-			vertex.PokeByte( address + DebugShapeVertex.X_ADDRESS, 1 )
+			vertex.PokeFloat( address + DebugShapeVertex.Y_ADDRESS, 0.0 )
+			vertex.PokeFloat( address + DebugShapeVertex.Z_ADDRESS, 0.0 )
+			vertex.PokeByte( address + DebugShapeVertex.INDICES0_ADDRESS, 1 )
 
 			For Local ii:Int = 0 Until num
 
@@ -1237,7 +1237,7 @@ Class DebugDrawShared
 			Local id                 :Int = Mesh.Cylinder0 + mesh
 
 			Local num                :Int = GetCircleLod( mesh )
-			Local angleStep          :Float = TWOPI / num
+			Local angleStep          :Float = 360.0 / num
 
 			Local numVertices        :Int = num * 2
 			Local numIndices         :Int = num * 12
@@ -1313,7 +1313,7 @@ Class DebugDrawShared
 			Local id                 :Int = Mesh.Capsule0 + mesh
 
 			Local num                :Int = GetCircleLod( mesh )
-			Local angleStep          :Float = TWOPI / num
+			Local angleStep          :Float = 360.0 / num
 
 			Local numVertices        :Int = num * 2
 			Local numIndices         :Int = num * 6
@@ -1477,7 +1477,7 @@ Class DebugDrawShared
 		cubeIndicesDb.CopyBytes(
 			0,
 			ib,
-			m_mesh[ Mesh.Cube ].m_startIndex[ 0 ] * stride,
+			m_mesh[ Mesh.Cube ].m_startIndex[ 0 ] * SHORT_SIZE,
 			cubeIndicesDb.Length() )
 		cubeIndicesDb.Discard()
 
@@ -1541,15 +1541,22 @@ Global s_dds := New DebugDrawShared()
 
 Class MatrixStack
 
-	Method Reset:Void()
-		mtx     = 0
-		num     = 1
-		hasData = False
+	Method New()
+		Reset()
 	End
 
-	Field mtx     :Int
-	Field num     :Int
+	Method Reset:Void()
 
+		num = 1
+		hasData = False
+
+		data[  0 ] = 1.0 ; data[  1 ] = 0.0 ; data[  2 ] = 0.0 ; data[  3 ] = 0.0
+		data[  4 ] = 0.0 ; data[  5 ] = 1.0 ; data[  6 ] = 0.0 ; data[  7 ] = 0.0
+		data[  8 ] = 0.0 ; data[  9 ] = 0.0 ; data[ 10 ] = 1.0 ; data[ 11 ] = 0.0
+		data[ 12 ] = 0.0 ; data[ 13 ] = 0.0 ; data[ 14 ] = 0.0 ; data[ 15 ] = 1.0
+	End
+
+	Field num     :Int
 	Field hasData :Bool
 	Field data    :Float[ 8 * 16 ]
 End
@@ -1744,8 +1751,6 @@ Class DebugDrawEncoderImpl
 		Endif
 	End
 
-	Field m_transform := New BgfxTransform()
-
 	Method SetTransform:Void( _mtx:Float[]=[], _num:Int = 1, _flush:Bool = True )
 
 		' BX_CHECK(State::Count != m_state);
@@ -1772,22 +1777,27 @@ Class DebugDrawEncoderImpl
 		' mtxStack.data = transform.data;
 		' bx::memCopy(transform.data, _mtx, _num*64);
 
-		mtxStack.mtx  = bgfxEncoderAllocTransform( m_encoder, m_transform, _num )
+		' mtxStack.mtx  = bgfxEncoderAllocTransform( m_encoder, transform, _num )
 		mtxStack.num  = _num
-
 		mtxStack.hasData = True
-
-		' Local address:Int = 0
-		' For Local ii:Int = 0 Until 16
-		'	mtxStack.data[ ii ] = m_transform.PeekFloat( address ) ; address += 4
-		' Next
+		' mtxStack.data = transform
 
 		' bxMemCopy( m_transform.Data(), _mtx, _num * 64 )
 		Local address:Int = 0
 		For Local ii:Int = 0 Until _num * 16
-			m_transform.PokeFloat( address, _mtx[ ii ] ) ; address += 4
+			' transform.PokeFloat( address, _mtx[ ii ] ) ; address += 4
 			mtxStack.data[ ii ] = _mtx[ ii ]
 		Next
+
+'		Print "SetTransform mtxStack.mtx=" + mtxStack.mtx
+'		Print "SetTransform mtxStack.mtx=" + mtxStack.mtx
+'		If mtxStack.data Then
+'			Local s := "SetTransform mtxStack.data=[ " + mtxStack.data.PeekFloat( 0 )
+'			For Local ii:Int = 1 Until 16
+'				s += ", " + mtxStack.data.PeekFloat( ii * 4 )
+'			Next
+'			Print s
+'		Endif
 	End
 
 	Method SetTranslate:Void( _x:Float, _y:Float, _z:Float )
@@ -1837,7 +1847,8 @@ Class DebugDrawEncoderImpl
 			SetTransform( _mtx, _num, _flush )
 		Else
 
-			Local mtx:Float[ _num * 16 ]
+			' Local mtx:Float[ _num * 16 ]
+			Local mtx:Float[ 8 * 16 ]
 
 			Local matrixResult :Float[ 16 ]
 			Local mtxTransform :Float[ 16 ]
@@ -1858,6 +1869,7 @@ Class DebugDrawEncoderImpl
 			m_mtxStackCurrent += 1
 			SetTransform( mtx, _num, _flush )
 		Endif
+
 	End
 
 	Method PopTransform:Void( _flush:Bool = True )
@@ -2190,7 +2202,7 @@ Class DebugDrawEncoderImpl
 			flip = -1.0
 		Endif
 
-		Local alpha :Int = _attrib.m_abgr Shr 24
+		Local alpha :Int = ( _attrib.m_abgr Shr 24 ) & $ff
 
 		' Local params:Float[][] = [ [
 		Local params:Float[] = [
@@ -2214,10 +2226,10 @@ Class DebugDrawEncoderImpl
 			0.0, ' ], [ ' unused
 
 			' matColor
-			(( _attrib.m_abgr        ) & $ff) / 255.0,
-			(( _attrib.m_abgr Shr  8 ) & $ff) / 255.0,
-			(( _attrib.m_abgr Shr 16 ) & $ff) / 255.0,
-			(alpha) / 255.0 ] ' ]
+			Float(( _attrib.m_abgr        ) & $ff) / 255.0,
+			Float(( _attrib.m_abgr Shr  8 ) & $ff) / 255.0,
+			Float(( _attrib.m_abgr Shr 16 ) & $ff) / 255.0,
+			Float(alpha) / 255.0 ] ' ]
 
 		' bxVec3Norm( params[0], params[0] )
 		bxVec3Norm( params, params )
@@ -2272,8 +2284,8 @@ Class DebugDrawEncoderImpl
 			bgfxEncoderSetIndexBuffer( m_encoder, geometry.m_ibh, 0, geometry.m_topologyNumIndices[0] )
 		Endif
 
-		bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
-		' bgfxEncoderSetTransform( m_encoder, m_mtxStack[ m_mtxStackCurrent ].data )
+		' bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+		bgfxEncoderSetTransform( m_encoder, m_mtxStack[ m_mtxStackCurrent ].data )
 
 		' bgfx::ProgramHandle program = s_dds.m_program[wireframe ? Program::FillMesh : Program::FillLitMesh];
 		Local program:Int
@@ -2351,7 +2363,8 @@ Class DebugDrawEncoderImpl
 				bgfxEncoderSetTransientIndexBuffer( m_encoder, tib )
 			Endif
 
-			bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+			' bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+			bgfxEncoderSetTransform( m_encoder, m_mtxStack[ m_mtxStackCurrent ].data )
 
 			Local program:Int
 
@@ -3002,7 +3015,8 @@ Class DebugDrawEncoderImpl
 
 		' MatrixStack& stack = m_mtxStack[m_mtxStackCurrent];
 		Local mtxStack := m_mtxStack[ m_mtxStackCurrent ]
-		bgfxEncoderSetTransformCached( m_encoder, mtxStack.mtx, mtxStack.num )
+		' bgfxEncoderSetTransformCached( m_encoder, mtxStack.mtx, mtxStack.num )
+		bgfxEncoderSetTransform( m_encoder, mtxStack.data, mtxStack.num )
 
 		bgfxEncoderSetVertexBuffer( m_encoder, 0, s_dds.m_vbh, mesh.m_startVertex, mesh.m_numVertices )
 
@@ -3022,14 +3036,14 @@ Class DebugDrawEncoderImpl
 		Endif
 	End
 
-	Field tvb := New BgfxTransientVertexBuffer()
-	Field tib := New BgfxTransientIndexBuffer()
-
 	Method Flush:Void()
 
 		If 0 <> m_pos Then
 
 			If bgfxUtilsCheckAvailTransientBuffers( m_pos, DebugVertex.ms_decl, m_indexPos ) Then
+
+				Local tvb := New BgfxTransientVertexBuffer()
+				Local tib := New BgfxTransientIndexBuffer()
 
 				' bgfx::TransientVertexBuffer tvb;
 				' Local tvb := BgfxTransientVertexBufferPool.Allocate()
@@ -3070,7 +3084,21 @@ Class DebugDrawEncoderImpl
 				Or64( state, BGFX_STATE_BLEND_ALPHA )
 				bgfxEncoderSetState( m_encoder, state )
 
-				bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+				' bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+				bgfxEncoderSetTransform( m_encoder, m_mtxStack[ m_mtxStackCurrent ].data )
+'				Local mtx:Float[16]
+'				bxMtxRotateX( mtx, 1.0 )
+'				bgfxEncoderSetTransform( m_encoder, mtx )
+'
+'				Local mtxStack := m_mtxStack[ m_mtxStackCurrent ]
+'				Print "Flush mtxStack.mtx=" + mtxStack.mtx
+'				If mtxStack.data Then
+'					Local s := "Flush mtxStack.data=[ " + mtxStack.data.PeekFloat( 0 )
+'					For Local ii:Int = 1 Until 16
+'						s += ", " + mtxStack.data.PeekFloat( ii * 4 )
+'					Next
+'					Print s
+'				Endif
 
 				' bgfx::ProgramHandle program = s_dds.m_program[attrib.m_stipple ? 1 : 0];
 				Local program:Int
@@ -3097,6 +3125,9 @@ Class DebugDrawEncoderImpl
 			Local numIndices:Int = m_posQuad / 4 * 6
 
 			If bgfxUtilsCheckAvailTransientBuffers( m_posQuad, DebugUvVertex.ms_decl, numIndices ) Then
+
+				Local tvb := New BgfxTransientVertexBuffer()
+				Local tib := New BgfxTransientIndexBuffer()
 
 				' bgfx::TransientVertexBuffer tvb;
 				' Local tvb := BgfxTransientVertexBufferPool.Allocate()
@@ -3145,7 +3176,8 @@ Class DebugDrawEncoderImpl
 
 				bgfxEncoderSetState( m_encoder, state )
 
-				bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+				' bgfxEncoderSetTransformCached( m_encoder, m_mtxStack[ m_mtxStackCurrent ].mtx )
+				bgfxEncoderSetTransform( m_encoder, m_mtxStack[ m_mtxStackCurrent ].data )
 				bgfxEncoderSetTexture( m_encoder, 0, s_dds.s_texColor, s_dds.m_texture )
 				bgfxEncoderSubmit( m_encoder, m_viewId, s_dds.m_program[ Program.FillTexture ] )
 			Endif

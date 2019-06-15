@@ -2582,14 +2582,10 @@ Global _shaderNoop:Int[] = [ $56, $53, $48, $5, $0, $0, $0, $0, $0, $0 ]
 '-------------------------------------------------------------------------------
 
 Function BytesToDataBuffer:DataBuffer( bytes:Int[] )
-	Return BytesToDataBuffer( Null, bytes )
+	Return BytesToDataBuffer( New DataBuffer( bytes.Length() ), bytes )
 End
 
 Function BytesToDataBuffer:DataBuffer( bytesDb:DataBuffer, bytes:Int[] )
-
-	If Not bytesDb Then
-		bytesDb = New DataBuffer( bytes.Length() )
-	Endif
 
 	For Local ii:Int = 0 Until bytes.Length()
 		bytesDb.PokeByte( ii, bytes[ ii ] )
@@ -2599,51 +2595,45 @@ Function BytesToDataBuffer:DataBuffer( bytesDb:DataBuffer, bytes:Int[] )
 End
 
 Function ShortsToDataBuffer:DataBuffer( shorts:Int[] )
-	Return ShortsToDataBuffer( Null, shorts )
+	Return ShortsToDataBuffer( New DataBuffer( shorts.Length() * SHORT_SIZE ), shorts )
 End
 
 Function ShortsToDataBuffer:DataBuffer( shortsDb:DataBuffer, shorts:Int[] )
 
-	If Not shortsDb Then
-		shortsDb = New DataBuffer( shorts.Length() )
-	Endif
+	Local address:Int = 0
 
 	For Local ii:Int = 0 Until shorts.Length()
-		shortsDb.PokeShort( ii, shorts[ ii ] )
+		shortsDb.PokeShort( address, shorts[ ii ] ) ; address += SHORT_SIZE
 	Next
 
 	Return shortsDb
 End
 
 Function IntsToDataBuffer:DataBuffer( ints:Int[] )
-	Return IntsToDataBuffer( Null, ints )
+	Return IntsToDataBuffer( New DataBuffer( ints.Length() * INT_SIZE ), ints )
 End
 
 Function IntsToDataBuffer:DataBuffer( intsDb:DataBuffer, ints:Int[] )
 
-	If Not intsDb Then
-		intsDb = New DataBuffer( ints.Length() )
-	Endif
+	Local address:Int = 0
 
 	For Local ii:Int = 0 Until ints.Length()
-		intsDb.PokeInt( ii, ints[ ii ] )
+		intsDb.PokeInt( address, ints[ ii ] ) ; address += INT_SIZE
 	Next
 
 	Return intsDb
 End
 
 Function FloatsToDataBuffer:DataBuffer( floats:Int[] )
-	Return FloatsToDataBuffer( Null, floats )
+	Return FloatsToDataBuffer( New DataBuffer( floats.Length() * FLOAT_SIZE ), floats )
 End
 
 Function FloatsToDataBuffer:DataBuffer( floatsDb:DataBuffer, floats:Int[] )
 
-	If Not floatsDb Then
-		floatsDb = New DataBuffer( floats.Length() )
-	Endif
+	Local address:Int = 0
 
 	For Local ii:Int = 0 Until floats.Length()
-		floatsDb.PokeFloat( ii, floats[ ii ] )
+		floatsDb.PokeFloat( address, floats[ ii ] ) ; address += FLOAT_SIZE
 	Next
 
 	Return floatsDb
@@ -2661,4 +2651,3 @@ Function bgfxUtilsCheckAvailTransientBuffers:Bool( _numVertices:Int, _decl:BgfxV
 	Return _numVertices = bgfxGetAvailTransientVertexBuffer( _numVertices, _decl ) And
 		( 0 = _numIndices Or _numIndices = bgfxGetAvailTransientIndexBuffer( _numIndices ) )
 End
-

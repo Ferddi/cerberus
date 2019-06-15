@@ -721,7 +721,7 @@ Class DebugDrawExample Extends App
 
 			dde.SetTransform( bunny )
 			Local wireframe:Bool = ( time Mod 2.0 ) > 1.0
-			If wireframe Then dde.SetWireframe( True ) Else dde.SetWireframe( False )
+			dde.SetWireframe( wireframe )
 			If wireframe Then dde.SetColor( $ffff00ff ) Else dde.SetColor( $ff00ff00 )
 			dde.Draw( m_bunny )
 		' }
@@ -758,7 +758,7 @@ Class DebugDrawExample Extends App
 			dde.SetLod( 2 )
 			dde.Draw( sphere )
 
-			sphere.m_center[ 0 ] = 4.0
+			sphere.m_center[ 0 ] = -4.0
 			If BoundsIntersect( ray, sphere, hit ) Then
 				DrawIntersect( hit )
 				dde.SetColor( selected )
@@ -788,7 +788,7 @@ Class DebugDrawExample Extends App
 			dde.Push()
 				dde.SetStipple( True, 1.0, time * 0.1 )
 				dde.SetColor( $ff0000ff )
-				dde.DrawCircle( normal, center, 1.0, 0.5 + Sin( time * 10.0 ) )
+				dde.DrawCircle( normal, center, 1.0, 0.5 + Sinr( time * 10.0 ) )
 			dde.Pop()
 
 			dde.SetSpin( time )
@@ -811,31 +811,31 @@ Class DebugDrawExample Extends App
 			dde.Push()
 				dde.SetSpin( time * 0.3 )
 				' {
-					cone.Init( -11.0, 4.0, 0.0, -13.0, 6.0, 1.0, 1.0 )
-					cylinder.Init( -9.0, 2.0, -1.0, -11.0, 4.0, 0.0, 0.5 )
+				cone.Init( -11.0, 4.0, 0.0, -13.0, 6.0, 1.0, 1.0 )
+				cylinder.Init( -9.0, 2.0, -1.0, -11.0, 4.0, 0.0, 0.5 )
 
-					If False Or BoundsIntersect( ray, cone, hit ) Or BoundsIntersect( ray, cylinder, hit ) Then
-						DrawIntersect( hit )
-						dde.SetColor( selected )
-					Else
-						dde.SetColor( $ffffffff )
-					Endif
-
-					dde.Draw( cone )
-					dde.Draw( cylinder )
-				' }
-			dde.Pop()
-
-			' {
-				dde.SetLod( 0 )
-				capsule.Init( 0.0, 7.0, 0.0, -6.0, 7.0, 0.0, 0.5 )
-				If BoundsIntersect( ray, capsule, hit ) Then
+				If False Or BoundsIntersect( ray, cone, hit ) Or BoundsIntersect( ray, cylinder, hit ) Then
 					DrawIntersect( hit )
 					dde.SetColor( selected )
 				Else
 					dde.SetColor( $ffffffff )
 				Endif
-				dde.Draw( capsule )
+
+				dde.Draw( cone )
+				dde.Draw( cylinder )
+				' }
+			dde.Pop()
+
+			' {
+			dde.SetLod( 0 )
+			capsule.Init( 0.0, 7.0, 0.0, -6.0, 7.0, 0.0, 0.5 )
+			If BoundsIntersect( ray, capsule, hit ) Then
+				DrawIntersect( hit )
+				dde.SetColor( selected )
+			Else
+				dde.SetColor( $ffffffff )
+			Endif
+			dde.Draw( capsule )
 			' }
 		dde.Pop()
 
