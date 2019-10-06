@@ -158,6 +158,93 @@ void bgfx_callback_capture_frame(bgfx_callback_interface_t* _this, const void* _
 }
 
 //-----------------------------------------------------------------------------
+// move to bimg???
+//-----------------------------------------------------------------------------
+
+class bimg_image_container_object : public Object
+{
+public:
+	bimg::ImageContainer * _image;
+
+	bimg_image_container_object()
+	{
+	}
+	~bimg_image_container_object()
+	{
+	}
+
+	int Width()
+	{
+		return _image->m_width;
+	}
+
+	int Height()
+	{
+		return _image->m_height;
+	}
+
+	void PokeByte( int addr, int value )
+	{
+		*(char *)(_image->m_data + addr) = value;
+	}
+
+	void PokeShort( int addr, int value )
+	{
+		*(short *)(_image->m_data + addr) = value;
+	}
+
+	void PokeInt( int addr, int value )
+	{
+		*(int *)(_image->m_data + addr) = value;
+	}
+
+	void PokeFloat( int addr, float value )
+	{
+		*(float *)(_image->m_data + addr) = value;
+	}
+
+	int PeekByte( int addr )
+	{
+		return *(char * )(_image->m_data + addr);
+	}
+
+	int PeekShort( int addr )
+	{
+		return *(short *)(_image->m_data + addr);
+	}
+
+	int PeekInt( int addr )
+	{
+		return *(int *)(_image->m_data + addr);
+	}
+
+	float PeekFloat( int addr )
+	{
+		return *(float *)(_image->m_data + addr);
+	}
+};
+
+// Function bimgImageLoad( _image:BimgImageContainer, _filePath:String, _dstFormat:Int )=""
+// Function bimgImageFree( _image:BimgImageContainer )="_bimg_image_free"
+
+bx::AllocatorI* getDefaultAllocator();
+
+void _bimg_image_load( bimg_image_container_object * _image, BBDataBuffer * _dataBuffer, int _dstFormat )
+{
+	_image->_image = bimg::imageParse( getDefaultAllocator(), _dataBuffer->ReadPointer(0), _dataBuffer->Length(),  bimg::TextureFormat::Enum( _dstFormat ) ); // , BGFX_TEXTURE_FORMAT_COUNT, NULL );
+}
+
+void _bimg_image_free( bimg_image_container_object * _image )
+{
+	bimg::imageFree( _image->_image );
+}
+
+//-----------------------------------------------------------------------------
+// move to bimg???
+//-----------------------------------------------------------------------------
+
+
+//-----------------------------------------------------------------------------
 // classes
 //-----------------------------------------------------------------------------
 

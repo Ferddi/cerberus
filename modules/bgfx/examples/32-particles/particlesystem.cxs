@@ -1,0 +1,1736 @@
+'
+' Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+' License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+'
+
+Import bgfx
+
+'  #include <bgfx/bgfx.h>
+'  ' #include <bgfx/embedded_shader.h>
+'  
+'  #include "particle_system.h"
+'  #include "../bgfx_utils.h"
+'  #include "../packrect.h"
+'  
+'  #include <bx/easing.h>
+'  #include <bx/handlealloc.h>
+
+Import debugdraw
+
+Import vs_particle_bin
+Import fs_particle_bin
+
+' move to easing.cxs later
+
+Const BX_EASING_LINEAR         :Int = 0
+Const BX_EASING_STEP           :Int = 1
+Const BX_EASING_SMOOTH_STEP    :Int = 2
+
+Const BX_EASING_IN_QUAD        :Int = 3
+Const BX_EASING_OUT_QUAD       :Int = 4
+Const BX_EASING_IN_OUT_QUAD    :Int = 5
+Const BX_EASING_OUT_IN_QUAD    :Int = 6
+
+Const BX_EASING_IN_CUBIC       :Int = 7
+Const BX_EASING_OUT_CUBIC      :Int = 8
+Const BX_EASING_IN_OUT_CUBIC   :Int = 9
+Const BX_EASING_OUT_IN_CUBIC   :Int = 10
+
+Const BX_EASING_IN_QUART       :Int = 11
+Const BX_EASING_OUT_QUART      :Int = 12
+Const BX_EASING_IN_OUT_QUART   :Int = 13
+Const BX_EASING_OUT_IN_QUART   :Int = 14
+
+Const BX_EASING_IN_QUINT       :Int = 15
+Const BX_EASING_OUT_QUINT      :Int = 16
+Const BX_EASING_IN_OUT_QUINT   :Int = 17
+Const BX_EASING_OUT_IN_QUINT   :Int = 18
+
+Const BX_EASING_IN_SINE        :Int = 19
+Const BX_EASING_OUT_SINE       :Int = 20
+Const BX_EASING_IN_OUT_SINE    :Int = 21
+Const BX_EASING_OUT_IN_SINE    :Int = 22
+
+Const BX_EASING_IN_EXPO        :Int = 23
+Const BX_EASING_OUT_EXPO       :Int = 24
+Const BX_EASING_IN_OUT_EXPO    :Int = 25
+Const BX_EASING_OUT_IN_EXPO    :Int = 26
+
+Const BX_EASING_IN_CIRC        :Int = 27
+Const BX_EASING_OUT_CIRC       :Int = 28
+Const BX_EASING_IN_OUT_CIRC    :Int = 29
+Const BX_EASING_OUT_IN_CIRC    :Int = 30
+
+Const BX_EASING_IN_ELASTIC     :Int = 31
+Const BX_EASING_OUT_ELASTIC    :Int = 32
+Const BX_EASING_IN_OUT_ELASTIC :Int = 33
+Const BX_EASING_OUT_IN_ELASTIC :Int = 34
+
+Const BX_EASING_IN_BACK        :Int = 35
+Const BX_EASING_OUT_BACK       :Int = 36
+Const BX_EASING_IN_OUT_BACK    :Int = 37
+Const BX_EASING_OUT_IN_BACK    :Int = 38
+
+Const BX_EASING_IN_BOUNCE      :Int = 39
+Const BX_EASING_OUT_BOUNCE     :Int = 40
+Const BX_EASING_IN_OUT_BOUNCE  :Int = 41
+Const BX_EASING_OUT_IN_BOUNCE  :Int = 42
+
+Const BX_EASING_COUNT          :Int = 43
+
+'  Function bxEaseOut:Float( _t:Float, ease:EaseFn )
+'  	Return 1.0 - ease.Tick( 1.0 - t )
+'  End
+'  
+'  Function bxEaseMix:Float( _t:Float, easeFrom0toH:EaseFn, easeFromHto1:EaseFn )
+'  	If _t < 0.5 Then Return easeFrom0toH.Tick( 2.0 * _t ) * 0.5
+'  	Return easeFromHto1.Tick( 2.0 * _t - 1.0 ) * 0.5 + 0.5
+'  End
+'  
+'  Function bxEaseLinear:Float( _t:Float )
+'  	Return _t
+'  End
+'  
+'  Function bxEaseStep:Float( _t:Float )
+'  	If _t < 0.5 Then Return 0.0
+'  	Return 1.0
+'  End
+'  
+'  Function bxEaseSmoothStep:Float( _t:Float )
+'  	Return bxSquare( _t ) * ( 3.0 - 2.0 * _t )
+'  End
+'  
+'  Function bxEaseInQuad:Float( _t:Float )
+'  	Return bxSquare( _t )
+'  End
+'  
+'  Function bxEaseOutQuad:Float( _t:Float )
+'  	Return 1.0 - bxEaseInQuad( 1.0 - t )
+'  End
+
+Global BxEaseLinear       := New BxEaseFnLinear()
+Global BxEaseStep         := New BxEaseFnStep()
+Global BxEaseSmoothStep   := New BxEaseFnSmoothStep()
+
+Global BxEaseInQuad       := New BxEaseFnInQuad()
+Global BxEaseOutQuad      := New BxEaseFnOutQuad()
+Global BxEaseInOutQuad    := New BxEaseFnInOutQuad()
+Global BxEaseOutInQuad    := New BxEaseFnOutInQuad()
+
+Global BxEaseInCubic      := New BxEaseFnInCubic()
+Global BxEaseOutCubic     := New BxEaseFnOutCubic()
+Global BxEaseInOutCubic   := New BxEaseFnInOutCubic()
+Global BxEaseOutInCubic   := New BxEaseFnOutInCubic()
+
+Global BxEaseInQuart      := New BxEaseFnInQuart()
+Global BxEaseOutQuart     := New BxEaseFnOutQuart()
+Global BxEaseInOutQuart   := New BxEaseFnInOutQuart()
+Global BxEaseOutInQuart   := New BxEaseFnOutInQuart()
+
+Global BxEaseInQuint      := New BxEaseFnInQuint()
+Global BxEaseOutQuint     := New BxEaseFnOutQuint()
+Global BxEaseInOutQuint   := New BxEaseFnInOutQuint()
+Global BxEaseOutInQuint   := New BxEaseFnOutInQuint()
+
+Global BxEaseInSine       := New BxEaseFnInSine()
+Global BxEaseOutSine      := New BxEaseFnOutSine()
+Global BxEaseInOutSine    := New BxEaseFnInOutSine()
+Global BxEaseOutInSine    := New BxEaseFnOutInSine()
+
+Global BxEaseInExpo       := New BxEaseFnInExpo()
+Global BxEaseOutExpo      := New BxEaseFnOutExpo()
+Global BxEaseInOutExpo    := New BxEaseFnInOutExpo()
+Global BxEaseOutInExpo    := New BxEaseFnOutInExpo()
+
+Global BxEaseInCirc       := New BxEaseFnInCirc()
+Global BxEaseOutCirc      := New BxEaseFnOutCirc()
+Global BxEaseInOutCirc    := New BxEaseFnInOutCirc()
+Global BxEaseOutInCirc    := New BxEaseFnOutInCirc()
+
+Global BxEaseInElastic    := New BxEaseFnInElastic()
+Global BxEaseOutElastic   := New BxEaseFnOutElastic()
+Global BxEaseInOutElastic := New BxEaseFnInOutElastic()
+Global BxEaseOutInElastic := New BxEaseFnOutInElastic()
+
+Global BxEaseInBack       := New BxEaseFnInBack()
+Global BxEaseOutBack      := New BxEaseFnOutBack()
+Global BxEaseInOutBack    := New BxEaseFnInOutBack()
+Global BxEaseOutInBack    := New BxEaseFnOutInBack()
+
+Global BxEaseInBounce     := New BxEaseFnInBounce()
+Global BxEaseOutBounce    := New BxEaseFnOutBounce()
+Global BxEaseInOutBounce  := New BxEaseFnInOutBounce()
+Global BxEaseOutInBounce  := New BxEaseFnOutInBounce()
+
+Global s_easeFunc:BxEaseFn[] = [
+
+	BxEaseFn( BxEaseLinear ),
+	BxEaseFn( BxEaseStep ),
+	BxEaseSmoothStep,
+
+	BxEaseInQuad,
+	BxEaseOutQuad,
+	BxEaseInOutQuad,
+	BxEaseOutInQuad,
+
+	BxEaseInCubic,
+	BxEaseOutCubic,
+	BxEaseInOutCubic,
+	BxEaseOutInCubic,
+
+	BxEaseInQuart,
+	BxEaseOutQuart,
+	BxEaseInOutQuart,
+	BxEaseOutInQuart,
+
+	BxEaseInQuint,
+	BxEaseOutQuint,
+	BxEaseInOutQuint,
+	BxEaseOutInQuint,
+
+	BxEaseInSine,
+	BxEaseOutSine,
+	BxEaseInOutSine,
+	BxEaseOutInSine,
+
+	BxEaseInExpo,
+	BxEaseOutExpo,
+	BxEaseInOutExpo,
+	BxEaseOutInExpo,
+
+	BxEaseInCirc,
+	BxEaseOutCirc,
+	BxEaseInOutCirc,
+	BxEaseOutInCirc,
+
+	BxEaseInElastic,
+	BxEaseOutElastic,
+	BxEaseInOutElastic,
+	BxEaseOutInElastic,
+
+	BxEaseInBack,
+	BxEaseOutBack,
+	BxEaseInOutBack,
+	BxEaseOutInBack,
+
+	BxEaseInBounce,
+	BxEaseOutBounce,
+	BxEaseInOutBounce,
+	BxEaseOutInBounce ]
+
+'  	BX_STATIC_ASSERT(BX_COUNTOF(s_easeFunc) == Easing::Count);
+
+Function bxGetEaseFunc:BxEaseFn( _enum:Int )
+	Return s_easeFunc[ _enum ]
+End
+
+Class BxEaseFn
+
+	Method EaseOut:Float( ease:BxEaseFn, _t:Float )
+		Return 1.0 - ease.Tick( 1.0 - _t )
+	End
+
+	Method EaseMix:Float( easeFrom0toH:BxEaseFn, easeFromHto1:BxEaseFn, _t:Float )
+		If _t < 0.5 Then Return easeFrom0toH.Tick( 2.0 * _t ) * 0.5
+		Return easeFromHto1.Tick( 2.0 * _t - 1.0 ) * 0.5 + 0.5
+	End
+
+	Method Tick:Float( _t:Float )
+	End
+End
+
+Class BxEaseFnLinear Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return _t
+	End
+End
+
+Class BxEaseFnStep Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		If _t < 0.5 Then Return 0.0
+		Return 1.0
+	End
+End
+
+Class BxEaseFnSmoothStep Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return _t * _t * ( 3.0 - 2.0 * _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' quad
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInQuad Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return _t * _t
+	End
+End
+
+Class BxEaseFnOutQuad Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInQuad, _t )
+	End
+End
+
+Class BxEaseFnInOutQuad Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInQuad, BxEaseOutQuad, _t )
+	End
+End
+
+Class BxEaseFnOutInQuad Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutQuad, BxEaseInQuad, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' cubic
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInCubic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return _t * _t * _t
+	End
+End
+
+Class BxEaseFnOutCubic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInCubic, _t )
+	End
+End
+
+Class BxEaseFnInOutCubic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInCubic, BxEaseOutCubic, _t )
+	End
+End
+
+Class BxEaseFnOutInCubic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutCubic, BxEaseInCubic, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' quart
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInQuart Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return _t * _t * _t * _t
+	End
+End
+
+Class BxEaseFnOutQuart Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInQuart, _t )
+	End
+End
+
+Class BxEaseFnInOutQuart Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInQuart, BxEaseOutQuart, _t )
+	End
+End
+
+Class BxEaseFnOutInQuart Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutQuart, BxEaseInQuart, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' quint
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInQuint Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return _t * _t * _t * _t * _t
+	End
+End
+
+Class BxEaseFnOutQuint Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInQuint, _t )
+	End
+End
+
+Class BxEaseFnInOutQuint Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInQuint, BxEaseOutQuint, _t )
+	End
+End
+
+Class BxEaseFnOutInQuint Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutQuint, BxEaseInQuint, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' sine
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInSine Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return 1.0 - Cos( _t * 90 )
+	End
+End
+
+Class BxEaseFnOutSine Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInSine, _t )
+	End
+End
+
+Class BxEaseFnInOutSine Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInSine, BxEaseOutSine, _t )
+	End
+End
+
+Class BxEaseFnOutInSine Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutSine, BxEaseInSine, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' expo
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInExpo Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return Pow( 2.0, 10.0 * ( _t - 1.0 ) ) - 0.001
+	End
+End
+
+Class BxEaseFnOutExpo Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInExpo, _t )
+	End
+End
+
+Class BxEaseFnInOutExpo Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInExpo, BxEaseOutExpo, _t )
+	End
+End
+
+Class BxEaseFnOutInExpo Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutExpo, BxEaseInExpo, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' circ
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInCirc Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return -( Sqrt( 1.0 - _t * _t ) - 1.0 )
+	End
+End
+
+Class BxEaseFnOutCirc Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInCirc, _t )
+	End
+End
+
+Class BxEaseFnInOutCirc Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInCirc, BxEaseOutCirc, _t )
+	End
+End
+
+Class BxEaseFnOutInCirc Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutCirc, BxEaseInCirc, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' elastic
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInElastic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return Pow( 2.0, -10.0 * _t ) * Sin( ( _t - 0.3 / 4.0 ) * 360.0 / 0.3 ) + 1.0
+	End
+End
+
+Class BxEaseFnOutElastic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInElastic, _t )
+	End
+End
+
+Class BxEaseFnInOutElastic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInElastic, BxEaseOutElastic, _t )
+	End
+End
+
+Class BxEaseFnOutInElastic Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutElastic, BxEaseInElastic, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' back
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInBack Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return BxEaseInCubic.Tick( _t ) - _t * Sin( _t * 180 )
+	End
+End
+
+Class BxEaseFnOutBack Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInBack, _t )
+	End
+End
+
+Class BxEaseFnInOutBack Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInBack, BxEaseOutBack, _t )
+	End
+End
+
+Class BxEaseFnOutInBack Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutBack, BxEaseInBack, _t )
+	End
+End
+
+'-------------------------------------------------------------------------------
+' bounce
+'-------------------------------------------------------------------------------
+
+Class BxEaseFnInBounce Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		If 4.0 / 11.0 > _t Then Return  121.0 /  16.0 * _t * _t
+		If 8.0 / 11.0 > _t Then Return  363.0 /  40.0 * _t * _t -    99.0 /   10.0 * _t +    17.0 /    5.0
+		If 9.0 / 10.0 > _t Then Return 4356.0 / 361.0 * _t * _t - 35442.0 / 1805.0 * _t + 16061.0 / 1805.0
+		                        Return   54.0 /   5.0 * _t * _t -   513.0 /   25.0 * _t +   268.0 /   25.0
+	End
+End
+
+Class BxEaseFnOutBounce Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseOut( BxEaseInBounce, _t )
+	End
+End
+
+Class BxEaseFnInOutBounce Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseInBounce, BxEaseOutBounce, _t )
+	End
+End
+
+Class BxEaseFnOutInBounce Extends BxEaseFn
+	Method Tick:Float( _t:Float )
+		Return EaseMix( BxEaseOutBounce, BxEaseInBounce, _t )
+	End
+End
+
+
+
+
+' move rng to rng.cxs
+
+Class Rng
+	Method Gen:Int()
+		Return 0
+	End
+End
+
+Class RngMwc Extends Rng
+
+	' George Marsaglia's MWC
+
+	Field m_z :Int
+	Field m_w :Int
+
+	Method New( _z:Int=12345, _w:Int=65435 )
+		Self.m_z = _z
+		Self.m_w = _w
+	End
+
+	Method Reset:Void( _z:Int=12345, _w:Int=65435 )
+		Self.m_z = _z
+		Self.m_w = _w
+	End
+
+	Method Gen:Int()
+
+		m_z = ( 36969 * ( m_z & UINT16_MAX ) ) + ( ( m_z Shr 16 ) & UINT16_MAX )
+		m_w = ( 18000 * ( m_w & UINT16_MAX ) ) + ( ( m_w Shr 16 ) & UINT16_MAX )
+
+		Return ( m_z Shr 16 ) + m_w
+	End
+End
+
+Class RngShr3 Extends Rng
+
+	' George Marsaglia's SHR3
+
+	Field m_jsr:Int
+
+	Method New( _jsr:Int=34221 )
+		Self.m_jsr = _jsr
+	End
+
+	Method Reset:Void( _jsr:Int=34221 )
+		Self.m_jsr = _jsr
+	End
+
+	Method Gen:Int()
+
+		m_jsr ~= m_jsr Shl 17
+		m_jsr ~= m_jsr Shr 13
+		m_jsr ~= m_jsr Shl 5
+
+		Return m_jsr
+	End
+End
+
+'
+' should be in bgfx.cxs
+'
+Const UINT16_MAX     :Int = 65535
+Const INV_UINT16_MAX :Float = 1.0 / Float( UINT16_MAX )
+
+Function bxFRnd:Float( _rng:Rng )
+	' float random - Returns random number between 0.0f and 1.0f.
+	Local rnd:Int = _rng.Gen() & UINT16_MAX
+	Return Float( rnd ) * INV_UINT16_MAX
+End
+
+Function bxFRndH:Float( _rng:Rng )
+	' float random half? - Returns random number between -1.0f and 1.0f.
+	Return bxFRnd( _rng ) * 2.0 - 1.0
+End
+
+Function bxRandUnitCircle:Void( _result:Float[], _rng:Rng )
+
+	Local angle:Float = bxFRnd( _rng ) * 360
+
+	_result[ 0 ] = Cos( angle )
+	_result[ 1 ] = 0.0
+	_result[ 2 ] = Sin( angle )
+End
+
+Function bxRandUnitSphere:Void( _result:Float[], _rng:Rng )
+
+	Local rand0  :Float = bxFRnd( _rng ) * 2.0 - 1.0
+	Local rand1  :Float = bxFRnd( _rng ) * 360
+	Local sqrtf1 :Float = Sqrt( 1.0 - rand0 * rand0 )
+
+	_result[ 0 ] = sqrtf1 * Cos( rand1 )
+	_result[ 1 ] = sqrtf1 * Sin( rand1 )
+	_result[ 2 ] = rand0
+End
+
+Function bxRandUnitHemisphere:Void( _result:Float[], _rng:Rng, _normal:Float[] )
+
+	Local dir:Float[ 3 ]
+	bxRandUnitSphere( dir, _rng )
+
+	Local DdotN:Float = dir[ 0 ] * _normal[ 0 ] + dir[ 1 ] * _normal[ 1 ] + dir[2] * _normal[ 2 ]
+
+	If 0.0 > DdotN Then
+		dir[ 0 ] = -dir[ 0 ]
+		dir[ 1 ] = -dir[ 1 ]
+		dir[ 2 ] = -dir[ 2 ]
+	Endif
+
+	_result[ 0 ] = dir[ 0 ]
+	_result[ 1 ] = dir[ 1 ]
+	_result[ 2 ] = dir[ 2 ]
+End
+
+'  Function bxGenerateSphereHammersley
+'  	inline void generateSphereHammersley(void* _data, uint32_t _stride, uint32_t _num, float _scale)
+'  	{
+'  		uint8_t* data = (uint8_t*)_data;
+'  
+'  		for (uint32_t ii = 0; ii < _num; ii++)
+'  		{
+'  			float tt = 0.0f;
+'  			float pp = 0.5;
+'  			for (uint32_t jj = ii; jj; jj >>= 1)
+'  			{
+'  				tt += (jj & 1) ? pp : 0.0f;
+'  				pp *= 0.5f;
+'  			}
+'  
+'  			tt = 2.0f * tt - 1.0f;
+'  
+'  			const float phi    = (ii + 0.5f) / _num;
+'  			const float phirad =  phi * kPi2;
+'  			const float st     = sqrt(1.0f-tt*tt) * _scale;
+'  
+'  			float* xyz = (float*)data;
+'  			data += _stride;
+'  
+'  			xyz[0] = st * cos(phirad);
+'  			xyz[1] = st * sin(phirad);
+'  			xyz[2] = tt * _scale;
+'  		}
+'  	}
+
+'  Function bxShuffle:Void( _rng:Rng, _array:Int[] )
+'  	Local _num:Int = _array.Length()
+'  	
+'  End
+'  
+'  	template<typename Rng, typename Ty>
+'  	inline void shuffle(Rng* _rng, Ty* _array, uint32_t _num)
+'  	{
+'  		BX_CHECK(_num != 0, "Number of elements can't be 0!");
+'  
+'  		for (uint32_t ii = 0, num = _num-1; ii < num; ++ii)
+'  		{
+'  			uint32_t jj = ii + 1 + _rng->gen() % (num - ii);
+'  			bx::xchg(_array[ii], _array[jj]);
+'  		}
+'  	}
+
+
+
+
+
+
+
+
+
+
+
+Const EMITTER_SHAPE_SPHERE      :Int = 0
+Const EMITTER_SHAPE_HEMISPHERE  :Int = 1
+Const EMITTER_SHAPE_CIRCLE      :Int = 2
+Const EMITTER_SHAPE_DISC        :Int = 3
+Const EMITTER_SHAPE_RECT        :Int = 4
+Const EMITTER_SHAPE_COUNT       :Int = 5
+
+Const EMITTER_DIRECTION_UP      :Int = 0
+Const EMITTER_DIRECTION_OUTWARD :Int = 1
+Const EMITTER_DIRECTION_COUNT   :Int = 2
+
+'-------------------------------------------------------------------------------
+' particle shaders
+'-------------------------------------------------------------------------------
+
+Global vs_particle:Int[][] = [
+	_shaderNoop,      ' BGFX_RENDERER_TYPE_NOOP
+	vs_particle_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	vs_particle_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	vs_particle_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' vs_particle_pssl, ' BGFX_RENDERER_TYPE_GNM
+	vs_particle_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	vs_particle_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	vs_particle_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	vs_particle_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Global fs_particle:Int[][] = [
+	_shaderNoop,      ' BGFX_RENDERER_TYPE_NOOP
+	fs_particle_dx9,  ' BGFX_RENDERER_TYPE_DIRECT3D9
+	fs_particle_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D11
+	fs_particle_dx11, ' BGFX_RENDERER_TYPE_DIRECT3D12
+	_shaderNoop, ' fs_particle_pssl, ' BGFX_RENDERER_TYPE_GNM
+	fs_particle_mtl,  ' BGFX_RENDERER_TYPE_METAL
+	fs_particle_glsl, ' BGFX_RENDERER_TYPE_OPENGLES
+	fs_particle_glsl, ' BGFX_RENDERER_TYPE_OPENGL
+	fs_particle_spv ] ' BGFX_RENDERER_TYPE_VULKAN
+	' BGFX_RENDERER_TYPE_COUNT
+
+Class PosColorTexCoord0Vertex
+
+	Field m_x     :Float
+	Field m_y     :Float
+	Field m_z     :Float
+
+	Field m_abgr  :Int
+
+	Field m_u     :Float
+	Field m_v     :Float
+
+	Field m_blend :Float
+	Field m_angle :Float
+
+	Const TOTAL_SIZE :Int = 8 * 4
+
+	Global ms_decl := New BgfxVertexDecl()
+
+	Function Init:Void()
+		bgfxVertexDeclBegin( ms_decl )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_POSITION,  3, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_COLOR0,    4, BGFX_ATTRIB_TYPE_UINT8, True )
+		bgfxVertexDeclAdd( ms_decl, BGFX_ATTRIB_TEXCOORD0, 4, BGFX_ATTRIB_TYPE_FLOAT )
+		bgfxVertexDeclEnd( ms_decl )
+	End
+End
+
+Class EmitterUniforms
+
+	Field m_position           :Float[ 3 ]
+	Field m_angle              :Float[ 3 ]
+
+	Field m_blendStart         :Float[ 2 ]
+	Field m_blendEnd           :Float[ 2 ]
+	Field m_offsetStart        :Float[ 2 ]
+	Field m_offsetEnd          :Float[ 2 ]
+	Field m_scaleStart         :Float[ 2 ]
+	Field m_scaleEnd           :Float[ 2 ]
+	Field m_lifeSpan           :Float[ 2 ]
+	Field m_gravityScale       :Float
+
+	Field m_rgba               :Int[ 5 ]
+	Field m_particlesPerSecond :Int
+
+	Field m_easePos            :Int ' bx::Easing::Enum m_easePos;
+	Field m_easeRgba           :Int ' bx::Easing::Enum m_easeRgba;
+	Field m_easeBlend          :Int ' bx::Easing::Enum m_easeBlend;
+	Field m_easeScale          :Int ' bx::Easing::Enum m_easeScale;
+
+	Field m_handle             :Int ' EmitterSpriteHandle m_handle;
+
+	Method Reset:Void()
+
+		m_position[ 0 ] = 0.0
+		m_position[ 1 ] = 0.0
+		m_position[ 2 ] = 0.0
+
+		m_angle[ 0 ] = 0.0
+		m_angle[ 1 ] = 0.0
+		m_angle[ 2 ] = 0.0
+
+		m_particlesPerSecond = 0
+
+		m_offsetStart[ 0 ] = 0.0
+		m_offsetStart[ 1 ] = 1.0
+		m_offsetEnd[ 0 ]   = 2.0
+		m_offsetEnd[ 1 ]   = 3.0
+
+		m_rgba[ 0 ] = $00ffffff
+		m_rgba[ 1 ] = UINT32_MAX
+		m_rgba[ 2 ] = UINT32_MAX
+		m_rgba[ 3 ] = UINT32_MAX
+		m_rgba[ 4 ] = $00ffffff
+
+		m_blendStart[ 0 ] = 0.8
+		m_blendStart[ 1 ] = 1.0
+		m_blendEnd[ 0 ]   = 0.0
+		m_blendEnd[ 1 ]   = 0.2
+
+		m_scaleStart[ 0 ] = 0.1
+		m_scaleStart[ 1 ] = 0.2
+		m_scaleEnd[ 0 ]   = 0.3
+		m_scaleEnd[ 1 ]   = 0.4
+
+		m_lifeSpan[ 0 ]   = 1.0
+		m_lifeSpan[ 1 ]   = 2.0
+
+		m_gravityScale  = 0.0
+
+		m_easePos   = BX_EASING_LINEAR
+		m_easeRgba  = BX_EASING_LINEAR
+		m_easeBlend = BX_EASING_LINEAR
+		m_easeScale = BX_EASING_LINEAR
+	End
+
+	' Method CopyTo:Void( destination:EmitterUniforms )
+	Method CopyTo:Void( result:EmitterUniforms )
+
+		For Local ii:Int = 0 Until m_position.Length()
+			result.m_position[ ii ] = Self.m_position[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_angle.Length()
+			result.m_angle[ ii ] = Self.m_angle[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_blendStart.Length()
+			result.m_blendStart[ ii ] = Self.m_blendStart[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_blendEnd.Length()
+			result.m_blendEnd[ ii ] = Self.m_blendEnd[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_offsetStart.Length()
+			result.m_offsetStart[ ii ] = Self.m_offsetStart[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_offsetEnd.Length()
+			result.m_offsetEnd[ ii ] = Self.m_offsetEnd[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_scaleStart.Length()
+			result.m_scaleStart[ ii ] = Self.m_scaleStart[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_scaleEnd.Length()
+			result.m_scaleEnd[ ii ] = Self.m_scaleEnd[ ii ]
+		Next
+
+		For Local ii:Int = 0 Until m_lifeSpan.Length()
+			result.m_lifeSpan[ ii ] = Self.m_lifeSpan[ ii ]
+		Next
+
+		result.m_gravityScale = Self.m_gravityScale
+
+		For Local ii:Int = 0 Until m_rgba.Length()
+			result.m_rgba[ ii ] = Self.m_rgba[ ii ]
+		Next
+
+		result.m_particlesPerSecond = Self.m_particlesPerSecond
+
+		result.m_easePos = Self.m_easePos
+		result.m_easeRgba = Self.m_easeRgba
+		result.m_easeBlend = Self.m_easeBlend
+		result.m_easeScale = Self.m_easeScale
+
+		result.m_handle = Self.m_handle
+	End
+End
+
+Class PsParticle
+
+	Field start      :Float[ 3 ]
+	Field finish     :Float[ 2 ][ ] ' float end[2][3];
+	Field blendStart :Float
+	Field blendEnd   :Float
+	Field scaleStart :Float
+	Field scaleEnd   :Float
+
+	Field rgba       :Int[ 6 ]
+
+	Field life       :Float
+	Field lifeSpan   :Float
+
+	Method New()
+		For Local ii:Int = 0 Until finish.Length()
+			finish[ ii ] = New Float[ 3 ]
+		Next
+	End
+
+	Method CopyTo:Void( result:PsParticle )
+
+		result.start[ 0 ]  = Self.start[ 0 ]
+		result.start[ 1 ]  = Self.start[ 1 ]
+		result.start[ 2 ]  = Self.start[ 2 ]
+
+		result.finish[ 0 ][ 0 ] = Self.finish[ 0 ][ 0 ]
+		result.finish[ 0 ][ 1 ] = Self.finish[ 0 ][ 1 ]
+		result.finish[ 0 ][ 2 ] = Self.finish[ 0 ][ 2 ]
+		result.finish[ 1 ][ 0 ] = Self.finish[ 1 ][ 0 ]
+		result.finish[ 1 ][ 1 ] = Self.finish[ 1 ][ 1 ]
+		result.finish[ 1 ][ 2 ] = Self.finish[ 1 ][ 2 ]
+
+		result.blendStart  = Self.blendStart
+		result.blendEnd    = Self.blendEnd
+
+		result.scaleStart  = Self.scaleStart
+		result.scaleEnd    = Self.scaleEnd
+
+		result.rgba[ 0 ]   = Self.rgba[ 0 ]
+		result.rgba[ 1 ]   = Self.rgba[ 1 ]
+		result.rgba[ 2 ]   = Self.rgba[ 2 ]
+		result.rgba[ 3 ]   = Self.rgba[ 3 ]
+		result.rgba[ 4 ]   = Self.rgba[ 4 ]
+
+		result.life        = Self.life
+		result.lifeSpan    = Self.lifeSpan
+	End
+End
+
+Class PsParticleSort
+
+	Field dist :Float
+	Field idx  :Int
+End
+
+Function psToAbgr:Int( _rgba:Float[] )
+
+	Return 0 |
+		( ( Int( _rgba[ 0 ] * 255.0 ) & $ff ) Shl  0 ) |
+		( ( Int( _rgba[ 1 ] * 255.0 ) & $ff ) Shl  8 ) |
+		( ( Int( _rgba[ 2 ] * 255.0 ) & $ff ) Shl 16 ) |
+		( ( Int( _rgba[ 3 ] * 255.0 ) & $ff ) Shl 24 )
+End
+
+Function psToAbgr:Int( _rr:Float, _gg:Float, _bb:Float, _aa:Float )
+
+	Return 0 |
+		( ( Int( _rr * 255.0 ) & $ff ) Shl  0 ) |
+		( ( Int( _gg * 255.0 ) & $ff ) Shl  8 ) |
+		( ( Int( _bb * 255.0 ) & $ff ) Shl 16 ) |
+		( ( Int( _aa * 255.0 ) & $ff ) Shl 24 )
+End
+
+Const SPRITE_TEXTURE_SIZE:Int = 1024
+
+Class PsSpriteT
+
+	Field m_maxHandlesT  :Int = 256
+	Field m_textureSizeT :Int = 1024
+
+	Field m_freeHandles := New IntStack()
+
+	Field m_pack :Pack2D[]
+	Field m_ra   :RectPack2DT256
+
+	Method New( _maxHandlesT:Int=256, _textureSizeT:Int=1024 )
+
+		m_maxHandlesT  = _maxHandlesT
+		m_textureSizeT = _textureSizeT
+
+		m_pack = New Pack2D[ m_maxHandlesT ]
+		m_ra = New RectPack2DT256( m_textureSizeT, m_textureSizeT )
+
+		For Local ii:Int = m_maxHandlesT -1 To 0 Step -1
+			m_pack[ ii ] = New Pack2D()
+			m_freeHandles.Push( ii )
+		Next
+	End
+
+	' EmitterSpriteHandle create(uint16_t _width, uint16_t _height)
+	Method Create:Int( _width:Int, _height:Int )
+
+		' EmitterSpriteHandle handle = { bx::kInvalidHandle };
+		Local handle:Int = BX_INVALID_HANDLE
+
+		' if (m_handleAlloc.getNumHandles() < m_handleAlloc.getMaxHandles() )
+		If Not m_freeHandles.IsEmpty() Then
+
+			Local pack := m_pack[ m_freeHandles.Top() ]
+
+			If m_ra.Find( _width, _height, pack ) Then
+
+				handle = m_freeHandles.Pop()
+				' m_pack[ handle ] = pack
+			Endif
+		Endif
+
+		Return handle
+	End
+
+	Method Destroy:Void( _sprite:Int ) ' (EmitterSpriteHandle _sprite)
+
+		Local pack := m_pack[ _sprite ]
+
+		m_ra.Clear( pack )
+		m_freeHandles.Push( _sprite )
+	End
+
+	Method Get:Pack2D( _sprite:Int ) ' (EmitterSpriteHandle _sprite)
+		Return m_pack[ _sprite ]
+	End
+End
+
+' namespace ps
+' {
+
+Class PsEmitter
+
+	Field m_shape     :Int ' EmitterShape::Enum     m_shape;
+	Field m_direction :Int ' EmitterDirection::Enum m_direction;
+
+	Field m_dt        :Float
+	' bx::RngMwc      m_rng;
+	Field m_rng       := New RngMwc()
+	Field m_uniforms  := New EmitterUniforms()
+
+	Field m_aabb      := New BoundsAabb()
+
+	Field m_particles :PsParticle[]
+
+	Field m_num       :Int
+	Field m_max       :Int
+
+	' void create(EmitterShape::Enum _shape, EmitterDirection::Enum _direction, uint32_t _maxParticles);
+	Method Create:Void( _shape:Int, _direction:Int, _maxParticles:Int )
+
+		Reset()
+
+		m_shape     = _shape
+		m_direction = _direction
+		m_max       = _maxParticles
+
+		' m_particles = (Particle*)BX_ALLOC(s_ctx.m_allocator, m_max*sizeof(Particle) );
+		m_particles = New PsParticle[ m_max ]
+
+		For Local ii:Int = 0 Until m_max
+			m_particles[ ii ] = New PsParticle()
+		Next
+	End
+
+	Method Destroy:Void()
+		' BX_FREE(s_ctx.m_allocator, m_particles);
+		m_particles = Null
+	End
+
+	Method Reset:Void()
+
+		m_dt = 0.0
+		m_uniforms.Reset()
+		m_num = 0
+		m_aabb.Reset()
+
+		' m_rng.Reset()
+	End
+
+	Method Update:Void( _dt:Float )
+
+		Local num:Int = m_num
+
+		For Local ii:Int = 0 Until num
+
+			Local particle := m_particles[ ii ]
+
+			particle.life += _dt * 1.0 / particle.lifeSpan
+
+			If particle.life > 1.0 Then
+
+				If ii <> num -1 Then
+					m_particles[ num -1 ].CopyTo( particle )
+					ii -= 1
+				Endif
+
+				num -= 1
+			Endif
+		Next
+
+		m_num = num
+
+		If 0 < m_uniforms.m_particlesPerSecond Then
+			Spawn( _dt )
+		Endif
+	End
+
+	Method Spawn:Void( _dt:Float )
+
+		Local mtx:Float[ 16 ]
+
+		bxMtxSRT(
+			mtx,
+			1.0, 1.0, 1.0,
+			m_uniforms.m_angle[ 0 ],    m_uniforms.m_angle[ 1 ],    m_uniforms.m_angle[ 2 ],
+			m_uniforms.m_position[ 0 ], m_uniforms.m_position[ 1 ], m_uniforms.m_position[ 2 ] )
+
+		Local timePerParticle:Float = 1.0 / m_uniforms.m_particlesPerSecond
+		m_dt += _dt
+		Local numParticles:Int = m_dt / timePerParticle
+		m_dt -= numParticles * timePerParticle
+
+		Local time:Float = 0.0
+
+		For Local ii:Int = 0 Until numParticles
+
+			If m_num >= m_max Then Exit
+			Local particle := m_particles[ m_num ]
+			m_num += 1
+
+			Local up:Float[] = [ 0.0, 1.0, 0.0 ]
+
+			Local pos:Float[ 3 ]
+
+			Select m_shape
+
+			Case EMITTER_SHAPE_SPHERE
+				bxRandUnitSphere( pos, m_rng )
+
+			Case EMITTER_SHAPE_HEMISPHERE
+				bxRandUnitHemisphere( pos, m_rng, up )
+
+			Case EMITTER_SHAPE_CIRCLE
+				bxRandUnitCircle( pos, m_rng )
+
+			Case EMITTER_SHAPE_DISC
+				Local tmp:Float[ 3 ]
+				bxRandUnitCircle( tmp, m_rng);
+				bxVec3Mul( pos, tmp, bxFRnd( m_rng ) );
+
+			Case EMITTER_SHAPE_RECT
+				pos[ 0 ] = bxFRndH( m_rng )
+				pos[ 1 ] = 0.0
+				pos[ 2 ] = bxFRndH( m_rng )
+
+			Default
+				bxRandUnitSphere( pos, m_rng )
+			End
+
+			Local dir:Float[ 3 ]
+
+			Select m_direction
+
+			Case EMITTER_DIRECTION_UP
+				bxVec3Move( dir, up )
+
+			Case EMITTER_DIRECTION_OUTWARD
+				bxVec3Norm( dir, pos )
+
+			Default
+				bxVec3Move( dir, up )
+			End
+
+			Local start  :Float[ 3 ]
+			Local finish :Float[ 3 ]
+
+			Local startOffset:Float = bxLerp( m_uniforms.m_offsetStart[ 0 ], m_uniforms.m_offsetStart[ 1 ], bxFRnd( m_rng ) )
+			bxVec3Mul( start, pos, startOffset )
+
+			Local endOffset:Float = bxLerp( m_uniforms.m_offsetEnd[ 0 ], m_uniforms.m_offsetEnd[ 1 ], bxFRnd( m_rng ) )
+			Local tmp1:Float[ 3 ]
+			bxVec3Mul( tmp1, dir, endOffset )
+			bxVec3Add( finish, tmp1, start )
+
+			particle.life = time
+			particle.lifeSpan = bxLerp( m_uniforms.m_lifeSpan[ 0 ], m_uniforms.m_lifeSpan[ 1 ], bxFRnd( m_rng ) )
+
+			Local gravity:Float[] = [ 0.0, -9.81 * m_uniforms.m_gravityScale * bxSquare( particle.lifeSpan ), 0.0 ]
+
+			bxVec3MulMtx( particle.start,  start,  mtx )
+			bxVec3MulMtx( particle.finish[ 0 ], finish, mtx )
+			bxVec3Add( particle.finish[ 1 ], particle.finish[ 0 ], gravity);
+'  			particle.finish[ 3 ] = tmp1[ 0 ]
+'  			particle.finish[ 4 ] = tmp1[ 1 ]
+'  			particle.finish[ 5 ] = tmp1[ 2 ]
+
+			' bx::memCopy(particle.rgba, m_uniforms.m_rgba, BX_COUNTOF(m_uniforms.m_rgba)*sizeof(uint32_t) );
+			For Local ii:Int = 0 Until m_uniforms.m_rgba.Length()
+				particle.rgba[ ii ] = m_uniforms.m_rgba[ ii ]
+			Next
+
+			particle.blendStart = bxLerp( m_uniforms.m_blendStart[ 0 ], m_uniforms.m_blendStart[ 1 ], bxFRnd( m_rng ) )
+			particle.blendEnd   = bxLerp( m_uniforms.m_blendEnd[ 0 ],   m_uniforms.m_blendEnd[ 1 ],   bxFRnd( m_rng ) )
+
+			particle.scaleStart = bxLerp( m_uniforms.m_scaleStart[ 0 ], m_uniforms.m_scaleStart[ 1 ], bxFRnd( m_rng ) )
+			particle.scaleEnd   = bxLerp( m_uniforms.m_scaleEnd[ 0 ],   m_uniforms.m_scaleEnd[ 1 ],   bxFRnd( m_rng ) )
+
+			time += timePerParticle
+		Next
+	End
+
+	Const FLOAT_MIN :Float =  1.175494e-38
+	Const FLOAT_MAX :Float =  3.402823e+38
+
+	' uint32_t render(const float _uv[4], const float* _mtxView, const float* _eye, uint32_t _first, uint32_t _max, ParticleSort* _outSort, PosColorTexCoord0Vertex* _outVertices)
+	Method Render:Int( _uv:Float[], _mtxView:Float[], _eye:Float[], _first:Int, _max:Int, _outSort:PsParticleSortStack, _tvb:BgfxTransientVertexBuffer ) ' _outVertices:PosColorTexCoord0Vertex[] )
+
+		Local easeRgba  := bxGetEaseFunc( m_uniforms.m_easeRgba )
+		Local easePos   := bxGetEaseFunc( m_uniforms.m_easePos )
+		Local easeBlend := bxGetEaseFunc( m_uniforms.m_easeBlend )
+		Local easeScale := bxGetEaseFunc( m_uniforms.m_easeScale )
+
+		Local aabb := BoundsAabbPool.Allocate()
+		' aabb.Init( BX_KINFINITY, BX_KINFINITY, BX_KINFINITY, -BX_KINFINITY, -BX_KINFINITY, -BX_KINFINITY )
+		aabb.Init( FLOAT_MAX, FLOAT_MAX, FLOAT_MAX, -FLOAT_MAX, -FLOAT_MAX, -FLOAT_MAX )
+
+		Local num     :Int = m_num
+		Local current :Int = _first
+
+		' for (uint32_t jj = 0, num = m_num, current = _first ; jj < num && current < _max ; ++jj, ++current)
+		For Local jj:Int = 0 Until num
+
+			If current >= _max Then Exit
+			current += 1
+
+			Local particle := m_particles[ jj ]
+
+			Local ttPos   :Float = easePos.Tick( particle.life )
+			Local ttScale :Float = easeScale.Tick( particle.life )
+			Local ttBlend :Float = bxClamp( easeBlend.Tick( particle.life ), 0.0, 1.0 )
+			Local ttRgba  :Float = bxClamp( easeRgba.Tick( particle.life ),  0.0, 1.0 )
+
+			Local p0:Float[ 3 ]
+			bxVec3Lerp( p0, particle.start, particle.finish[ 0 ], ttPos )
+
+			Local p1:Float[ 3 ]
+			bxVec3Lerp( p1, particle.finish[ 0 ], particle.finish[ 1 ], ttPos )
+
+			Local pos:Float[ 3 ]
+			bxVec3Lerp( pos, p0, p1, ttPos )
+
+			Local sort := _outSort.Get( current )
+			Local tmp:Float[ 3 ]
+			bxVec3Sub( tmp, _eye, pos )
+			sort.dist = bxSqrt( bxVec3Dot( tmp, tmp ) )
+			sort.idx  = current
+
+			Local idx       :Int = Int( ttRgba * 4 )
+			Local ttmod     :Float = bxMod( ttRgba, 0.25 ) / 0.25
+			Local rgbaStart :Int = particle.rgba[ idx     ]
+			Local rgbaEnd   :Int = particle.rgba[ idx + 1 ]
+
+			Local rrStart   :Int = ( rgbaStart Shr  0 ) & $ff
+			Local ggStart   :Int = ( rgbaStart Shr  8 ) & $ff
+			Local bbStart   :Int = ( rgbaStart Shr 16 ) & $ff
+			Local aaStart   :Int = ( rgbaStart Shr 24 ) & $ff
+
+			Local rrEnd     :Int = ( rgbaEnd Shr  0 ) & $ff
+			Local ggEnd     :Int = ( rgbaEnd Shr  8 ) & $ff
+			Local bbEnd     :Int = ( rgbaEnd Shr 16 ) & $ff
+			Local aaEnd     :Int = ( rgbaEnd Shr 24 ) & $ff
+
+			Local rr        :Float = bxLerp( rrStart, rrEnd, ttmod ) / 255.0
+			Local gg        :Float = bxLerp( ggStart, ggEnd, ttmod ) / 255.0
+			Local bb        :Float = bxLerp( bbStart, bbEnd, ttmod ) / 255.0
+			Local aa        :Float = bxLerp( aaStart, aaEnd, ttmod ) / 255.0
+
+			Local blend     :Float = bxLerp( particle.blendStart, particle.blendEnd, ttBlend )
+			Local scale     :Float = bxLerp( particle.scaleStart, particle.scaleEnd, ttScale )
+
+			Local abgr      :Int = psToAbgr( rr, gg, bb, aa )
+
+			Local udir      :Float[ 3 ]
+			Local vdir      :Float[ 3 ]
+
+			udir[ 0 ] = _mtxView[ 0 ] * scale
+			udir[ 1 ] = _mtxView[ 4 ] * scale
+			udir[ 2 ] = _mtxView[ 8 ] * scale
+
+			vdir[ 0 ] = _mtxView[ 1 ] * scale
+			vdir[ 1 ] = _mtxView[ 5 ] * scale
+			vdir[ 2 ] = _mtxView[ 9 ] * scale
+
+			' PosColorTexCoord0Vertex* vertex = &_outVertices[current*4];
+			Local vertex :Int
+			Local index  :Int = current * 4
+			Local xyz    :Float[ 3 ]
+
+			' vertex = _outVertices[ index ] ; index += 1
+			vertex = index * PosColorTexCoord0Vertex.TOTAL_SIZE ; index += 1
+			bxVec3Sub( tmp, pos, udir )
+			bxVec3Sub( xyz, tmp, vdir )
+			BoundsAabbExpand( aabb, xyz )
+			_tvb.PokeFloat( vertex, xyz[ 0 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 1 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 2 ] ) ; vertex += 4
+			_tvb.PokeInt  ( vertex, abgr     ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 0 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 1 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, blend    ) ; vertex += 4
+
+			' vertex = _outVertices[ index ] ; index += 1
+			vertex = index * PosColorTexCoord0Vertex.TOTAL_SIZE ; index += 1
+			bxVec3Add( tmp, pos, udir )
+			bxVec3Sub( xyz, tmp, vdir )
+			BoundsAabbExpand( aabb, xyz )
+			_tvb.PokeFloat( vertex, xyz[ 0 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 1 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 2 ] ) ; vertex += 4
+			_tvb.PokeInt  ( vertex, abgr     ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 2 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 1 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, blend    ) ; vertex += 4
+
+			' vertex = _outVertices[ index ] ; index += 1
+			vertex = index * PosColorTexCoord0Vertex.TOTAL_SIZE ; index += 1
+			bxVec3Add( tmp, pos, udir )
+			bxVec3Add( xyz, tmp, vdir )
+			BoundsAabbExpand( aabb, xyz )
+			_tvb.PokeFloat( vertex, xyz[ 0 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 1 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 2 ] ) ; vertex += 4
+			_tvb.PokeInt  ( vertex, abgr     ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 2 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 3 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, blend    ) ; vertex += 4
+
+			' vertex = _outVertices[ index ] ; index += 1
+			vertex = index * PosColorTexCoord0Vertex.TOTAL_SIZE ; index += 1
+			bxVec3Sub( tmp, pos, udir )
+			bxVec3Add( xyz, tmp, vdir )
+			BoundsAabbExpand( aabb, xyz )
+			_tvb.PokeFloat( vertex, xyz[ 0 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 1 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, xyz[ 2 ] ) ; vertex += 4
+			_tvb.PokeInt  ( vertex, abgr     ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 0 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, _uv[ 3 ] ) ; vertex += 4
+			_tvb.PokeFloat( vertex, blend    ) ; vertex += 4
+		Next
+
+		m_aabb = aabb
+
+		Return m_num
+	End
+End
+
+'  static int32_t particleSortFn(const void* _lhs, const void* _rhs)
+'  {
+'  	const ParticleSort& lhs = *(const ParticleSort*)_lhs;
+'  	const ParticleSort& rhs = *(const ParticleSort*)_rhs;
+'  	return lhs.dist > rhs.dist ? -1 : 1;
+'  }
+
+Class PsParticleSortStack Extends Stack< PsParticleSort >
+
+	Method New( data:PsParticleSort[] )
+		Super.New( data )
+	End
+	
+	Method Equals:Bool( lhs:PsParticleSort, rhs:PsParticleSort )
+		Return lhs.dist = rhs.dist
+	End
+	
+	Method Compare:Int( lhs:PsParticleSort, rhs:PsParticleSort )
+		If lhs.dist < rhs.dist Return -1
+		Return lhs.dist > rhs.dist
+	End
+End
+
+Class ParticleSystem
+
+	' bx::AllocatorI* m_allocator;
+
+	' bx::HandleAlloc* m_emitterAlloc;
+	' Emitter* m_emitter;
+	Field m_emitters        :PsEmitter[]
+	Field m_emitterAlloc    :IntStack
+	Field m_emitterFree     :IntStack
+
+	' typedef SpriteT<256, SPRITE_TEXTURE_SIZE> Sprite;
+	' Sprite m_sprite;
+	Field m_sprite          := New PsSpriteT( 256, SPRITE_TEXTURE_SIZE )
+
+	Field s_texColor        :Int ' bgfx::UniformHandle s_texColor;
+	Field m_texture         :Int ' bgfx::TextureHandle m_texture;
+	Field m_particleProgram :Int ' bgfx::ProgramHandle m_particleProgram;
+
+	Field m_num             :Int
+
+	Field m_memory := New BgfxMemory()
+
+	'
+	' @Cleanup: _maxEmitters can be removed
+	'
+
+	' void init(uint16_t _maxEmitters, bx::AllocatorI* _allocator)
+	Method Init:Void( _maxEmitters:Int )
+
+		' m_allocator = _allocator;
+
+		' if (NULL == _allocator)
+		' {
+		'	static bx::DefaultAllocator allocator;
+		'	m_allocator = &allocator;
+		' }
+
+		' m_emitterAlloc = bx::createHandleAlloc(m_allocator, _maxEmitters);
+		' m_emitter = (Emitter*)BX_ALLOC(m_allocator, sizeof(Emitter)*_maxEmitters);
+		' m_emitter = New PsEmitter[ _maxEmitters ]
+		m_emitters     = New PsEmitter[ _maxEmitters ]
+		m_emitterAlloc = New IntStack()
+		m_emitterFree  = New IntStack()
+
+		For Local ii:Int = _maxEmitters -1 To 0 Step -1
+			m_emitters[ ii ] = New PsEmitter()
+			m_emitterFree.Push( ii )
+		Next
+
+		PosColorTexCoord0Vertex.Init()
+
+		m_num = 0
+
+		s_texColor = bgfxCreateUniform( "s_texColor", BGFX_UNIFORM_TYPE_INT1 )
+		m_texture  = bgfxCreateTexture2D( 
+			SPRITE_TEXTURE_SIZE,
+			SPRITE_TEXTURE_SIZE,
+			False,
+			1,
+			BGFX_TEXTURE_FORMAT_BGRA8 )
+
+		' bgfx::RendererType::Enum type = bgfx::getRendererType();
+		Local type:Int = bgfxGetRendererType()
+		m_particleProgram = bgfxUtilsCreateProgram( vs_particle[ type ], fs_particle[ type ], True )
+	End
+
+	Method Shutdown:Void()
+
+		bgfxDestroy( m_particleProgram )
+		bgfxDestroy( m_texture )
+		bgfxDestroy( s_texColor )
+
+		' bx::destroyHandleAlloc(m_allocator, m_emitterAlloc);
+		' BX_FREE(m_allocator, m_emitter);
+
+		' m_allocator = NULL;
+	End
+
+	' EmitterSpriteHandle createSprite(uint16_t _width, uint16_t _height, const void* _data)
+	Method CreateSprite:Int( _width:Int, _height:Int, _data:DataBuffer )
+
+		' EmitterSpriteHandle handle = m_sprite.create(_width, _height);
+		Local handle:Int = m_sprite.Create( _width, _height )
+
+		If SpriteHandleIsValid( handle ) Then
+
+			Local pack := m_sprite.Get( handle )
+
+			bgfxCopy( m_memory, _data, pack.m_width * pack.m_height * 4 )
+
+			bgfxUpdateTexture2D( 
+				m_texture, 
+				0, 
+				0, 
+				pack.m_x, 
+				pack.m_y, 
+				pack.m_width, 
+				pack.m_height,
+				m_memory )
+				' bgfxUtilsCopy( _data, pack.m_width * pack.m_height * 4 ) )
+		Endif
+
+		Return handle
+	End
+
+	' void destroy(EmitterSpriteHandle _handle)
+	Method DestroySprite:Void( _handle:Int )
+		m_sprite.Destroy( _handle )
+	End
+
+	Method Update:Void( _dt:Float )
+
+		Local numParticles :Int = 0
+		Local num          :Int = m_emitterAlloc.Length()
+
+		For Local ii:Int = 0 Until num
+			Local idx     :Int = m_emitterAlloc.Get( ii )
+			Local emitter := m_emitters[ idx ]
+			emitter.Update( _dt )
+			numParticles += emitter.m_num
+		Next
+
+		m_num = numParticles
+	End
+
+	Field m_particleSort := New PsParticleSortStack()
+
+	Field m_tvb := New BgfxTransientVertexBuffer()
+	Field m_tib := New BgfxTransientIndexBuffer()
+
+	Field state :Int[2]
+
+	Method Render:Void( _view:Int, _mtxView:Float[], _eye:Float[] )
+
+		If 0 <> m_num Then
+
+			Local numVertices :Int = bgfxGetAvailTransientVertexBuffer( m_num * 4, PosColorTexCoord0Vertex.ms_decl )
+			Local numIndices  :Int = bgfxGetAvailTransientIndexBuffer( m_num * 6 )
+			Local max         :Int = bxMin( numVertices / 4, numIndices / 6 )
+
+			If m_num = max Then
+				Local ss:String
+				ss = "Truncating transient buffer for particles to maximum available (requested "
+				ss += m_num
+				ss += ", available "
+				ss += max
+				ss += ")."
+				Print ss
+			Endif
+
+			If 0 < max Then
+
+				bgfxAllocTransientBuffers( m_tvb, PosColorTexCoord0Vertex.ms_decl, max * 4, m_tib, max * 6 )
+
+				' PosColorTexCoord0Vertex* vertices = (PosColorTexCoord0Vertex*)tvb.data;
+				' ParticleSort* particleSort = (ParticleSort*)BX_ALLOC(m_allocator, max*sizeof(ParticleSort) );
+				While m_particleSort.Length() <= max
+					m_particleSort.Push( New PsParticleSort() )
+				Wend
+
+				Local pos         :Int = 0
+				Local numEmitters :Int = m_emitterAlloc.Length()
+
+				For Local ii:Int = 0 Until numEmitters
+
+					Local handle  :Int = m_emitterAlloc.Get( ii )
+					Local emitter := m_emitters[ handle ]
+
+					' Local pack    :Pack2D = m_sprite.Get(emitter.m_uniforms.m_handle)
+					Local pack    := m_sprite.Get(emitter.m_uniforms.m_handle)
+					Local invTextureSize:Float = 1.0 / SPRITE_TEXTURE_SIZE
+
+					Local uv:Float[] = [
+						  pack.m_x                   * invTextureSize,
+						  pack.m_y                   * invTextureSize,
+						( pack.m_x + pack.m_width  ) * invTextureSize,
+						( pack.m_y + pack.m_height ) * invTextureSize ]
+
+					pos += emitter.Render( uv, _mtxView, _eye, pos, max, m_particleSort, m_tvb ) ' vertices );
+				Next
+
+				' qsort( particleSort, max, sizeof( ParticleSort ), particleSortFn );
+				m_particleSort.Sort()
+
+'  				uint16_t* indices = (uint16_t*)tib.data;
+				For Local ii:Int = 0 Until max
+
+					Local sort := m_particleSort.Get( ii )
+					Local idx  :Int = sort.idx
+
+'  					uint16_t* index = &indices[ii*6];
+'  					index[0] = idx*4+0;
+'  					index[1] = idx*4+1;
+'  					index[2] = idx*4+2;
+'  					index[3] = idx*4+2;
+'  					index[4] = idx*4+3;
+'  					index[5] = idx*4+0;
+
+					m_tib.PokeShort( ( ii * 6 + 0 ) * SHORT_SIZE, idx * 4 + 0 )
+					m_tib.PokeShort( ( ii * 6 + 1 ) * SHORT_SIZE, idx * 4 + 1 )
+					m_tib.PokeShort( ( ii * 6 + 2 ) * SHORT_SIZE, idx * 4 + 2 )
+					m_tib.PokeShort( ( ii * 6 + 3 ) * SHORT_SIZE, idx * 4 + 2 )
+					m_tib.PokeShort( ( ii * 6 + 4 ) * SHORT_SIZE, idx * 4 + 3 )
+					m_tib.PokeShort( ( ii * 6 + 5 ) * SHORT_SIZE, idx * 4 + 0 )
+				Next
+
+'  				While m_particleSort.Length() > 0
+'  					m_particleSort.Pop().Free()
+'  				Wend
+
+				' BX_FREE(m_allocator, particleSort);
+
+'  				bgfxUtilsClear64Bit( state )
+'  				bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_RGB )
+'  				bgfxUtilsSet64Bit( state, BGFX_STATE_WRITE_A )
+'  				bgfxUtilsSet64Bit( state, BGFX_STATE_DEPTH_TEST_LESS )
+'  				bgfxUtilsSet64Bit( state, BGFX_STATE_CULL_CW )
+'  				bgfxUtilsSet64Bit( state, BGFX_STATE_BLEND_NORMAL )
+
+				' state = 0x00000010 0626201f
+
+				state[ 0 ] = $00000010
+				state[ 1 ] = $0626201f
+
+				bgfxSetState( state )
+
+				bgfxSetTransientVertexBuffer( 0, m_tvb )
+				bgfxSetTransientIndexBuffer( m_tib )
+
+				bgfxSetTexture( 0, s_texColor, m_texture )
+				bgfxSubmit( _view, m_particleProgram )
+			Endif
+
+		Endif
+	End
+
+	Method CreateEmitter:Int( _shape:Int, _direction:Int, _maxParticles:Int )
+
+		Local handle:Int = -1
+
+		If m_emitterFree.Length() > 0 Then
+
+			handle = m_emitterFree.Pop()
+			m_emitterAlloc.Push( handle )
+
+			Local emitter := m_emitters[ handle ]
+			emitter.Create( _shape, _direction, _maxParticles )
+		Endif
+
+		Return handle
+	End
+
+	Method UpdateEmitter:Void( _handle:Int, _uniforms:EmitterUniforms )
+
+		If Not ( _handle >= 0 And _handle < m_emitters.Length() ) Then
+			Print "destroyEmitter handle " + _handle + " is not valid."
+			Return
+		Endif
+
+		Local emitter := m_emitters[ _handle ]
+
+		If Not _uniforms Then
+			emitter.Reset()
+		Else
+			' bx::memCopy(&emitter.m_uniforms, _uniforms, sizeof(EmitterUniforms) );
+			' emitter.m_uniforms.CopyTo( _uniforms )
+			_uniforms.CopyTo( emitter.m_uniforms )
+		Endif
+	End
+
+	Method GetAabb:Void( _handle:Int, _outAabb:BoundsAabb )
+
+		If Not ( _handle >= 0 And _handle < m_emitters.Length() ) Then
+			Print "getAabb handle " + _handle + " is not valid."
+			Return
+		Endif
+
+		m_emitters[ _handle ].m_aabb.CopyTo( _outAabb )
+	End
+
+	Method DestroyEmitter:Void( _handle:Int )
+
+		If Not ( _handle >= 0 And _handle < m_emitters.Length() ) Then
+			Print "destroyEmitter handle " + _handle + " is not valid."
+			Return
+		Endif
+
+		m_emitters[ _handle ].Destroy()
+
+		' m_emitterAlloc->free(_handle.idx);
+		m_emitterAlloc.RemoveFirst( _handle )
+		m_emitterFree.Push( _handle )
+	End
+
+End
+
+' static ParticleSystem s_ctx;
+
+Global s_ctx := New ParticleSystem()
+
+' } // namespace ps
+
+' using namespace ps;
+
+Function psInit:Void( _maxEmitters:Int=64 ) ' , bx::AllocatorI* _allocator=Null)
+	s_ctx.Init( _maxEmitters ) ' , _allocator);
+End
+
+Function psShutdown:Void()
+	s_ctx.Shutdown()
+End
+
+Function psCreateSprite:Int( _width:Int, _height:Int, _data:DataBuffer )
+	Return s_ctx.CreateSprite( _width, _height, _data )
+End
+
+Function psDestroy:Void( _handle:Int )
+	s_ctx.Destroy( _handle )
+End
+
+Function psCreateEmitter:Int( _shape:Int, _direction:Int, _maxParticles:Int )
+	Return s_ctx.CreateEmitter( _shape, _direction, _maxParticles )
+End
+
+Function psUpdateEmitter:Void( _handle:Int, _uniforms:EmitterUniforms )
+	s_ctx.UpdateEmitter( _handle, _uniforms )
+End
+
+Function psGetAabb:Void( _handle:Int, _outAabb:BoundsAabb )
+	s_ctx.GetAabb( _handle, _outAabb )
+End
+
+Function psDestroyEmitter:Void( _handle:Int )
+	s_ctx.DestroyEmitter( _handle )
+End
+
+Function psUpdate:Void( _dt:Float )
+	s_ctx.Update( _dt )
+End
+
+Function psRender:Void( _view:Int, _mtxView:Float[], _eye:Float[] )
+	s_ctx.Render( _view, _mtxView, _eye )
+End

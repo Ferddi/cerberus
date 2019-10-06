@@ -386,6 +386,50 @@ Enumerate
 Extern
 
 '-------------------------------------------------------------------------------
+' move to bimg
+'-------------------------------------------------------------------------------
+
+Class BimgImageContainer="bimg_image_container_object"
+
+	Method Width     :Int()
+	Method Height    :Int()
+
+	Method PokeByte  :Void( addr:Int, value:Int )
+	Method PokeShort :Void( addr:Int, value:Int )
+	Method PokeInt   :Void( addr:Int, value:Int )
+	Method PokeFloat :Void( addr:Int, value:Float )
+
+	Method PeekByte  :Int( addr:Int )
+	Method PeekShort :Int( addr:Int )
+	Method PeekInt   :Int( addr:Int )
+	Method PeekFloat :Float( addr:Int )
+End
+
+Function bimgImageLoad:Void( _image:BimgImageContainer, data:DataBuffer, _dstFormat:Int )="_bimg_image_load"
+Function bimgImageFree:Void( _image:BimgImageContainer )="_bimg_image_free"
+
+Public
+
+Function bimgImageLoad:Void( _image:BimgImageContainer, _filePath:String, _dstFormat:Int )
+
+	Local filePath :String = "cerberus://data/" + _filePath
+	Local dataBuf  := DataBuffer.Load( filePath )
+
+	If dataBuf Then
+		Print "DataBuffer.Length()=" + dataBuf.Length()
+		bimgImageLoad( _image, dataBuf, _dstFormat )
+	Else
+		DebugLog( "Error - Unable to load texture: " + filePath )
+	Endif
+End
+
+Extern
+
+'-------------------------------------------------------------------------------
+' move to bimg
+'-------------------------------------------------------------------------------
+
+'-------------------------------------------------------------------------------
 ' classes
 '-------------------------------------------------------------------------------
 

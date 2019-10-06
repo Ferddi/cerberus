@@ -1,0 +1,467 @@
+
+#MOJO_AUTO_SUSPEND_ENABLED = False
+
+#GLFW_WINDOW_WIDTH          = 1280
+#GLFW_WINDOW_HEIGHT         = 720
+
+' using DrawText to draw some bgfx debug text
+Import mojo1bgfx
+
+' remove DrawText codes and use these minimal imports
+'Import mojo.app
+'Import bgfx
+'
+'Import mojo.input
+
+Import camera
+Import particlesystem
+
+Global s_shapeNames:String[] = [	"Sphere", "Hemisphere", "Circle", "Disc", "Rect" ]
+
+Global s_directionName:String[] = [	"Up", "Outward" ]
+
+Global s_easeFuncName:String[] = [
+	"Linear",
+	"Step",
+	"SmoothStep",
+	"InQuad",
+	"OutQuad",
+	"InOutQuad",
+	"OutInQuad",
+	"InCubic",
+	"OutCubic",
+	"InOutCubic",
+	"OutInCubic",
+	"InQuart",
+	"OutQuart",
+	"InOutQuart",
+	"OutInQuart",
+	"InQuint",
+	"OutQuint",
+	"InOutQuint",
+	"OutInQuint",
+	"InSine",
+	"OutSine",
+	"InOutSine",
+	"OutInSine",
+	"InExpo",
+	"OutExpo",
+	"InOutExpo",
+	"OutInExpo",
+	"InCirc",
+	"OutCirc",
+	"InOutCirc",
+	"OutInCirc",
+	"InElastic",
+	"OutElastic",
+	"InOutElastic",
+	"OutInElastic",
+	"InBack",
+	"OutBack",
+	"InOutBack",
+	"OutInBack",
+	"InBounce",
+	"OutBounce",
+	"InOutBounce",
+	"OutInBounce" ]
+
+Class Emitter
+
+	Field m_uniforms  := New EmitterUniforms() ' EmitterUniforms m_uniforms;
+	Field m_handle    :Int ' EmitterHandle          m_handle;
+
+	Field m_shape     :Int ' EmitterShape::Enum     m_shape;
+	Field m_direction :Int ' EmitterDirection::Enum m_direction;
+
+	Method Create:Void()
+
+		m_shape      = EMITTER_SHAPE_SPHERE
+		m_direction  = EMITTER_DIRECTION_OUTWARD
+
+		m_handle     = psCreateEmitter( m_shape, m_direction, 1024 )
+		m_uniforms.Reset()
+	End
+
+	Method Destroy:Void()
+		psDestroyEmitter( m_handle )
+	End
+
+	Method Update:Void()
+		psUpdateEmitter( m_handle, m_uniforms )
+	End
+
+	Method Imgui:Void()
+'  //		if (ImGui::CollapsingHeader("General") )
+'  		{
+'  			if (ImGui::Combo("Shape", (int*)&m_shape, s_shapeNames, BX_COUNTOF(s_shapeNames) )
+'  			||  ImGui::Combo("Direction", (int*)&m_direction, s_directionName, BX_COUNTOF(s_directionName) ) )
+'  			{
+'  				psDestroyEmitter(m_handle);
+'  				m_handle = psCreateEmitter(m_shape, m_direction, 1024);
+'  			}
+'  
+'  			ImGui::SliderInt("particles / s", (int*)&m_uniforms.m_particlesPerSecond, 0, 1024);
+'  
+'  			ImGui::SliderFloat("Gravity scale"
+'  					, &m_uniforms.m_gravityScale
+'  					, -2.0f
+'  					,  2.0f
+'  					);
+'  
+'  			ImGui::RangeSliderFloat("Life span"
+'  					, &m_uniforms.m_lifeSpan[0]
+'  					, &m_uniforms.m_lifeSpan[1]
+'  					, 0.1f
+'  					, 5.0f
+'  					);
+'  
+'  			if (ImGui::Button("Reset") )
+'  			{
+'  				psUpdateEmitter(m_handle);
+'  			}
+'  		}
+'  
+'  		if (ImGui::CollapsingHeader("Position and scale") )
+'  		{
+'  			ImGui::Combo("Position Ease", (int*)&m_uniforms.m_easePos, s_easeFuncName, BX_COUNTOF(s_easeFuncName) );
+'  
+'  			ImGui::RangeSliderFloat("Start offset"
+'  					, &m_uniforms.m_offsetStart[0]
+'  					, &m_uniforms.m_offsetStart[1]
+'  					, 0.0f
+'  					, 10.0f
+'  					);
+'  			ImGui::RangeSliderFloat("End offset"
+'  					, &m_uniforms.m_offsetEnd[0]
+'  					, &m_uniforms.m_offsetEnd[1]
+'  					, 0.0f
+'  					, 10.0f
+'  					);
+'  
+'  			ImGui::Text("Scale:");
+'  
+'  			ImGui::Combo("Scale Ease", (int*)&m_uniforms.m_easeScale, s_easeFuncName, BX_COUNTOF(s_easeFuncName) );
+'  
+'  			ImGui::RangeSliderFloat("Scale Start"
+'  					, &m_uniforms.m_scaleStart[0]
+'  					, &m_uniforms.m_scaleStart[1]
+'  					, 0.0f
+'  					, 3.0f
+'  					);
+'  			ImGui::RangeSliderFloat("Scale End"
+'  					, &m_uniforms.m_scaleEnd[0]
+'  					, &m_uniforms.m_scaleEnd[1]
+'  					, 0.0f
+'  					, 3.0f
+'  					);
+'  		}
+'  
+'  		if (ImGui::CollapsingHeader("Blending and color") )
+'  		{
+'  			ImGui::Combo("Blend Ease", (int*)&m_uniforms.m_easeBlend, s_easeFuncName, BX_COUNTOF(s_easeFuncName) );
+'  			ImGui::RangeSliderFloat("Blend Start"
+'  					, &m_uniforms.m_blendStart[0]
+'  					, &m_uniforms.m_blendStart[1]
+'  					, 0.0f
+'  					, 1.0f
+'  					);
+'  			ImGui::RangeSliderFloat("Blend End"
+'  					, &m_uniforms.m_blendEnd[0]
+'  					, &m_uniforms.m_blendEnd[1]
+'  					, 0.0f
+'  					, 1.0f
+'  					);
+'  
+'  			ImGui::Text("Color:");
+'  
+'  			ImGui::Combo("RGBA Ease", (int*)&m_uniforms.m_easeRgba, s_easeFuncName, BX_COUNTOF(s_easeFuncName) );
+'  			ImGui::ColorWheel("RGBA0", &m_uniforms.m_rgba[0], 0.3f);
+'  			ImGui::ColorWheel("RGBA1", &m_uniforms.m_rgba[1], 0.3f);
+'  			ImGui::ColorWheel("RGBA2", &m_uniforms.m_rgba[2], 0.3f);
+'  			ImGui::ColorWheel("RGBA3", &m_uniforms.m_rgba[3], 0.3f);
+'  			ImGui::ColorWheel("RGBA4", &m_uniforms.m_rgba[4], 0.3f);
+'  		}
+	End
+
+	Method Gizmo:Void( _view:Float[], _proj:Float[] )
+
+'  		float mtx[16];
+'  		bx::mtxSRT(mtx
+'  				, 1.0f, 1.0f, 1.0f
+'  				, m_uniforms.m_angle[0],    m_uniforms.m_angle[1],    m_uniforms.m_angle[2]
+'  				, m_uniforms.m_position[0], m_uniforms.m_position[1], m_uniforms.m_position[2]
+'  				);
+'  
+'  		ImGuiIO& io = ImGui::GetIO();
+'  		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+'  
+'  		ImGuizmo::Manipulate(
+'  				_view
+'  				, _proj
+'  				, ImGuizmo::TRANSLATE
+'  				, ImGuizmo::LOCAL
+'  				, mtx
+'  				);
+'  
+'  		float scale[3];
+'  		ImGuizmo::DecomposeMatrixToComponents(mtx, m_uniforms.m_position, m_uniforms.m_angle, scale);
+	End
+End
+
+Const ASCII_ZERO                      :Int =  48 ' 0
+Const ASCII_UPPERCASE_A               :Int =  65 ' A
+
+Function IntToHex:String( number:Int )
+
+	Local str:String
+
+	' While number <> 0
+	While str.Length() < 8
+
+		Local digit    :Int = number & $F
+		Local charCode :Int
+
+		If digit >= 0 And digit <= 9 Then
+			charCode = digit + ASCII_ZERO
+		Else
+			charCode = digit + ASCII_UPPERCASE_A - 10
+		Endif
+
+		str = String.FromChar( charCode ) + str
+
+		number = ( number Shr 4 ) & $0fffffff
+
+'  		Print "number=" + number + " digit=" + digit + " charCode=" + charCode + " str=" + str
+	Wend
+
+	Return str
+End
+
+Class ParticleExample Extends App
+
+	Field bgfxCaps     := New BgfxCaps()
+
+	Field m_width      :Int ' use DeviceWidth directly
+	Field m_height     :Int ' use DeviceHeight directly
+'  	Field m_debug      :Int = BGFX_DEBUG_NONE
+	Field m_debug      :Int ' = BGFX_DEBUG_TEXT
+	Field m_reset      :Int ' = BGFX_RESET_VSYNC
+
+	Field m_timeOffset :Int
+
+	Field m_emitter    :Emitter[ 4 ]
+
+	Method OnCreate:Int()
+
+		SetUpdateRate( 60 )
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+		m_debug  = BGFX_DEBUG_NONE
+		m_reset  = BGFX_RESET_VSYNC ' <-- not used because init is in target
+
+'  		bgfx::Init init;
+'  		init.type     = args.m_type;
+'  		init.vendorId = args.m_pciId;
+'  		init.resolution.width  = m_width;
+'  		init.resolution.height = m_height;
+'  		init.resolution.reset  = m_reset;
+'  		bgfx::init(init);
+
+		' Enable m_debug text.
+		bgfxSetDebug( m_debug )
+
+		' Set view 0 clear state.
+		bgfxSetViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, $202020ff, 1.0, 0 )
+
+		ddInit()
+
+		psInit()
+
+		Local img := New BimgImageContainer()
+
+		bimgImageLoad( img, "textures/particle.ktx", BGFX_TEXTURE_FORMAT_BGRA8 )
+
+		Local imageWidth  :Int = img.Width()
+		Local imageHeight :Int = img.Height()
+		Local imageData   := New DataBuffer( imageWidth * imageHeight * 4 )
+
+		For Local address:Int = 0 Until imageData.Length() Step 4
+			imageData.PokeInt( address, img.PeekInt( address ) )
+		Next
+
+'		Local address :Int = 0
+'		Local ss      :String
+'
+'		For Local jj:Int = 0 Until imageHeight
+'			For Local ii:Int = 0 Until imageWidth
+'				Local pixel:Int = imageData.PeekInt( address ) ; address += 4
+'				ss += IntToHex( pixel ) + ", "
+'			Next
+'			ss += "~n"
+'		Next
+'
+'		Print ss
+
+		Local sprite:Int = psCreateSprite( ' EmitterSpriteHandle sprite
+			imageWidth,    ' uint16_t(image->m_width)
+			imageHeight,   ' uint16_t(image->m_height)
+			imageData )    ' image->m_data
+
+		bimgImageFree( img )
+
+		For Local ii:Int = 0 Until m_emitter.Length()
+			m_emitter[ ii ] = New Emitter()
+			m_emitter[ ii ].Create()
+			m_emitter[ ii ].m_uniforms.m_handle = sprite
+			m_emitter[ ii ].m_uniforms.m_particlesPerSecond = 128
+			m_emitter[ ii ].Update()
+		Next
+
+		' imguiCreate();
+
+'		DebugStop()
+
+		CameraCreate()
+
+		Local initialPos:Float[] = [ 0.0, 2.0, -12.0 ]
+		CameraSetPosition( initialPos )
+		CameraSetVerticalAngle( 0.0 )
+
+		m_timeOffset = Millisecs()
+
+		Return 0
+	End
+
+	Method OnUpdate:Int()
+		Return 0
+	End
+
+	'
+	' @Bug: Crash when trying to destroy bgfx
+	'
+'  	Method OnClose:Int()
+'  
+'  		For Local ii:Int = 0 Until m_emitter.Length()
+'  			m_emitter[ ii ].Destroy()
+'  		Next
+'  
+'  		psShutdown()
+'  
+'  		ddShutdown()
+'  
+'  		' imguiDestroy()
+'  
+'  		CameraDestroy()
+'  
+'  		' Shutdown bgfx.
+'  		bgfxShutdown()
+'  
+'  		Return 0
+'  	End
+
+	Field last           :Int
+	Field dde            := New DebugDrawEncoder()
+
+	Field showBounds     :Bool = True
+	Field currentEmitter :Int = 0
+
+	Field timeScale:Float = 1.0
+
+	Method OnRender:Int()
+
+		'DebugStop()
+
+		m_width  = DeviceWidth()
+		m_height = DeviceHeight()
+
+		' Set view 0 default viewport.
+		bgfxSetViewRect( 0, 0, 0, m_width, m_height )
+
+		bgfxTouch( 0 )
+
+		' Update frame timer
+		Local now       :Int = Millisecs() - m_timeOffset
+		Local frameTime :Int = now - last
+		last = now
+		Local deltaTime :Float = Float( frameTime ) * 0.001
+
+		' Update camera.
+		CameraUpdate( deltaTime )
+
+		Local view:Float[ 16 ]
+		CameraGetViewMtx( view )
+
+		Local proj:Float[ 16 ]
+
+		' Set view and projection matrix for view 0.
+		' {
+			bgfxGetCaps( bgfxCaps )
+			bxMtxProj( proj, 60.0, Float( m_width ) / Float( m_height ), 0.1, 100.0, bgfxCaps.GetHomogeneousDepth() )
+
+			bgfxSetViewTransform( 0, view, proj )
+			bgfxSetViewRect( 0, 0, 0, m_width, m_height )
+		' }
+
+		'-------------------------------------------------------------------------
+		'
+		' imgui is missing
+'		For Local ii:Int = 0 Until m_emitter.Length()
+'			m_emitter[ ii ].m_uniforms.m_particlesPerSecond = 128
+'		Next
+		'
+		'-------------------------------------------------------------------------
+
+		dde.Begin( 0 )
+
+		Local center:Float[] = [ 0.0, 0.0, 0.0 ]
+		dde.DrawGrid( AXIS_Y, center )
+
+		Local eye:Float[ 3 ]
+		CameraGetPosition( eye )
+
+		' @Cleanup: m_emitter[ currentEmitter ].Update and psUpdate needs to be in Update?
+		m_emitter[ currentEmitter ].Update()
+
+		psUpdate( deltaTime * timeScale )
+		psRender( 0, view, eye )
+
+		If showBounds Then
+
+			Local aabb := BoundsAabbPool.Allocate()
+
+			psGetAabb( m_emitter[ currentEmitter ].m_handle, aabb )
+
+			dde.Push()
+				dde.SetWireframe( True )
+				dde.SetColor( $ff0000ff )
+				dde.Draw( aabb )
+			dde.Pop()
+
+			aabb.Free()
+		Endif
+
+		dde.Finish()
+
+		' Advance to next frame. Rendering thread will be kicked to
+		' process submitted rendering primitives.
+		'
+		' bgfxFrame is done in the while loop of method void BBGlfwGame::Run() 
+		' in file targets\glfw3_bgfx\modules\native\glfwgame.cpp
+		' it is done after method RenderGame(), where glfwSwapBuffers used to be
+		'
+		' bgfxFrame()
+
+		Return 0
+	End
+
+End
+
+Function Main:Int()
+	Print "Title: 32-particles"
+	Print "Description: Particles."
+	New ParticleExample()
+	Return 0
+End
+
+
