@@ -1,10 +1,43 @@
-***** v2019-02-21 *****
+***** v2019-10-05 *****
+
+FIX: [ANDROID] change file permission of gradlew in template.    (Author: Dawlane)
+MOD: [ANDROID] added 64bit libs to the target, to support Googles changes in August 2019.
+FIX: [TRANS] Fixed CopyFile for Linux to preserve file permissions.    (Author: Dawlane)
+FIX: [TED] Fixed symlinks opening a second file when DebugStop is used.    (Author: Dawlane)
+MOD: [TED] Another attempt at fixing the colorization/capitalization of the API. 
+           "FOR LOCAL ..." is still buggy
+MOD: [TED] Moved Open Project from the BUILD menu to the FILE menu. 
+MOD: [TED] Replaced Options dialog with a similar one like from Dawlane's version of TED. 
+           This dialog is much smaller and so can be displayed on small screens two.
+FIX: [TED] CTRL+PgDown and CTRL+PgUP now works on Linux to switch between open code tabs.
+MOD: [TRANS/GLFW] On Windows you can add an app icon (.ico file) now via the new #GLFW_APP_ICON preprocessor setting.
+FIX: [OSX] Recompiled the launcher as a 64bit app, so it is compatible with OSX Catalina (10.15.x).
+FIX: [MOJO1] Fixed missing usage of frame parameter in DrawImage9P.    (Author: Rich)
+MOD: [WIN8/WINPHONE8] Depreciated these targets. 
+                      If you need them, move them out of the targets/depreciated folder.
+MOD: [TRANS/ANDROID] Reactivated logcat filtering.
+
+***** v2019-05-05 *****
 
 MOD: [ANDROID] Changed MIN_SDK back to 16 like it was before.
 MOD: [DOCS] Added A-Z shortcuts on top of indexes.
-NEW: [MOJO2] Added Image.LoadFrames:Image[]( path:String,cellWidth:Int,cellHeight:Int,padded:Bool=False,xhandle:Float=.5,yhandle:Float=.5,flags:Int=Image.Filter|Image.Mipmap,shader:Shader=Null ).
-FIX: [AGK] Fixed docs creation to be compatible with the latest MakeDocs.
 MOD: [Trans/ANDROID] Release builds are installed automatically now.
+FIX: [AGK] Fixed docs creation to be compatible with the latest MakeDocs.
+FIX: [MAKEDOCS] Fixed brl.markdown bug.
+FIX: [TED] Fixed fixed displaying an iframe element in the docs.    (Author: Dawlane)
+FIX: [TED] Fixed scaling issues when displaying images.
+NEW: [TED] Added overwrite mode. Just press the insert key to toggle it.
+NEW: [MOJO2] Added Image.LoadFrames:Image[]( path:String,cellWidth:Int,cellHeight:Int,padded:Bool=False,xhandle:Float=.5,yhandle:Float=.5,flags:Int=Image.Filter|Image.Mipmap,shader:Shader=Null ).
+NEW: [MOJO.APP] Added SetDeviceWindowIcon( _path:String ).
+NEW: [MOJO.APP] Added SetDeviceWindowTitle( _title:String ).
+NEW: [MOJO.APP] Added SetDeviceWindowSize( _width:Int, _height:Int ).
+NEW: [MOJO.APP] Added SetDeviceWindowPosition( _x:Int, _y:Int ).
+NEW: [MOJO.APP] Added SetDeviceWindowSizeLimits:Void( _minWidth:Int, _minHeight:Int, _maxWidth:Int, _maxHeight:Int )
+NEW: [MOJO.INPUT] Added SetMousePos:Void( _x:Int, _y:Int ).
+NEW: [MOJO.INPUT] Added SetClipboard:Void( _text:String ).
+NEW: [MOJO.INPUT] Added GetClipboard:String().
+NEW: [CERBERUS.INTERPOLATE] New module.
+NEW: [MOJO.COLOR] New module.
 
 ***** v2018-12-30 *****
 

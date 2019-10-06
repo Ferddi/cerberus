@@ -39,7 +39,7 @@ Change Log
 
 #include <QHostInfo>
 
-#define TED_VERSION "2018-12-29"
+#define TED_VERSION "2019-10-5"
 
 #define SETTINGS_VERSION 2
 
@@ -239,18 +239,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow( parent ),_ui( new Ui::Mai
     addDockWidget( Qt::RightDockWidgetArea,_browserDockWidget );
     connect( _browserDockWidget,SIGNAL(visibilityChanged(bool)),SLOT(onDockVisibilityChanged(bool)) );
 
-#ifdef Q_OS_WIN
-    //_ui->actionFileNext->setShortcut( QKeySequence( "Ctrl+Tab" ) );
-    QList<QKeySequence> shortcuts;
-    shortcuts.append(QKeySequence(Qt::CTRL + Qt::Key_Tab));
-    shortcuts.append(QKeySequence(Qt::CTRL + Qt::Key_PageDown));
-    _ui->actionFileNext->setShortcuts(shortcuts);
-    //_ui->actionFilePrevious->setShortcut( QKeySequence( "Ctrl+Shift+Tab" ) );
-    QList<QKeySequence> shortcuts2;
-    shortcuts2.append(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_Tab));
-    shortcuts2.append(QKeySequence(Qt::CTRL + Qt::Key_PageUp));
-    _ui->actionFilePrevious->setShortcuts(shortcuts2);
-#else
+#ifdef Q_OS_MAC
     //_ui->actionFileNext->setShortcut( QKeySequence( "Meta+Tab" ) );
     QList<QKeySequence> shortcuts;
     shortcuts.append(QKeySequence(Qt::META + Qt::Key_Tab));
@@ -262,6 +251,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow( parent ),_ui( new Ui::Mai
     shortcuts2.append(QKeySequence(Qt::META + Qt::SHIFT + Qt::Key_Tab));
     shortcuts2.append(QKeySequence(Qt::META + Qt::Key_PageUp));
     _ui->actionFilePrevious->setShortcuts(shortcuts2);
+#else
+    //_ui->actionFileNext->setShortcut( QKeySequence( "Ctrl+Tab" ) );
+    QList<QKeySequence> shortcuts;
+    shortcuts.append(QKeySequence(Qt::CTRL + Qt::Key_Tab));
+    shortcuts.append(QKeySequence(Qt::CTRL + Qt::Key_PageDown));
+    _ui->actionFileNext->setShortcuts(shortcuts);
+    //_ui->actionFilePrevious->setShortcut( QKeySequence( "Ctrl+Shift+Tab" ) );
+    QList<QKeySequence> shortcuts2;
+    shortcuts2.append(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_Tab));
+    shortcuts2.append(QKeySequence(Qt::CTRL + Qt::Key_PageUp));
+    _ui->actionFilePrevious->setShortcuts(shortcuts2);
+
+
 #endif
 
     _projectPopupMenu=new QMenu;
@@ -517,12 +519,13 @@ void MainWindow::showImage(const QString &path) {
         int w = img.width();
         int h = img.height();
         QString imgSize = QString::number(w)+"x"+ QString::number(h);
-        label->setScaledContents(true);
+        label->setScaledContents(false);
         label->setAlignment(Qt::AlignCenter);
-        label->setMinimumWidth(250);
-        label->setMinimumHeight(250);
+        label->setMinimumWidth(128);
+        label->setMinimumHeight(128);
         label->setPixmap(QPixmap::fromImage(img).scaled(w,h,Qt::KeepAspectRatio));
         label->setWindowTitle("CX Image Viewer-> "+ imgSize+" : "+path);
+        label->setAutoFillBackground(true);
         label->show();
     }else{
 #ifdef Q_OS_WIN
@@ -604,6 +607,14 @@ QWidget *MainWindow::newFileTemplate( const QString &cpath ){
 
     file.close();
 
+/* DAWLANE LINUX SYSLINK PATH FIX
+* If symbolic links are use, the IDE will try to open a new editor on an error.
+* This fix sets the path to the full path of the actual target file.
+*/
+#ifdef Q_OS_LINUX
+    path = QFileInfo(path).canonicalFilePath();
+#endif
+
     if( CodeEditor *editor=editorWithPath( path ) ) closeFile( editor );
 
     return openFile( path,true );
@@ -679,6 +690,14 @@ QWidget *MainWindow::openFile( const QString &cpath,bool addToRecent ){
         showDoc(path);
         return nullptr;
     }
+
+/* DAWLANE LINUX SYSLINK PATH FIX
+* If symbolic links are use, the IDE will try to open a new editor on an error.
+* This fix sets the path to the full path of the actual target file.
+*/
+#ifdef Q_OS_LINUX
+    path = QFileInfo(path).canonicalFilePath();
+#endif
 
     CodeEditor *editor=editorWithPath( path );
     if( editor ){
@@ -962,6 +981,7 @@ void MainWindow::readSettings(){
         prefs->setValue( "console1Color",QColor( 70,70,70 ) );
         prefs->setValue( "console2Color",QColor( 70,170,70 ) );
         prefs->setValue( "console3Color",QColor( 70,70,170 ) );
+        prefs->setValue( "console4Color",QColor( 70,170,170 ) );
         prefs->setValue( "defaultColor",QColor( 0,0,0 ) );
         prefs->setValue( "numbersColor",QColor( 0,0,255 ) );
         prefs->setValue( "stringsColor",QColor( 170,0,255 ) );
@@ -1602,7 +1622,8 @@ void MainWindow::print( const QString &str ){
 }
 
 void MainWindow::cdebug( const QString &str ){
-    _consoleTextWidget->setTextColor( QColor( 128,0,128 ) );
+    _consoleTextWidget->setTextColor( Prefs::prefs()->getColor( "console3Color" ) );
+    //_consoleTextWidget->setTextColor( QColor( 128,0,128 ) );
     print( str );
 }
 
@@ -1744,7 +1765,7 @@ void MainWindow::onProcFinished(){
         onProcLineAvailable( 0 );
     }
 
-    _consoleTextWidget->setTextColor( QColor( Prefs::prefs()->getColor( "console3Color" ) ) );
+    _consoleTextWidget->setTextColor( QColor( Prefs::prefs()->getColor( "console4Color" ) ) );
     print( "Done." );
 
     if( _rebuildingHelp ){
@@ -2178,7 +2199,7 @@ void MainWindow::onDebugStepOut(){
 void MainWindow::onDebugKill(){
     if( !_consoleProc ) return;
 
-    _consoleTextWidget->setTextColor( Prefs::prefs()->getColor( "console1Color" ) );
+    _consoleTextWidget->setTextColor( Prefs::prefs()->getColor( "console4Color" ) );
     print( "Killing process..." );
 
     _consoleProc->kill();
